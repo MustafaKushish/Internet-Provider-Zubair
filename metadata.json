@@ -1,0 +1,8 @@
+{
+  "name": "Remix منظومة ساس بلس | نظام إدارة مشتركي وأبراج الإنترنت",
+  "description": "نظام متكامل واحترافي لإدارة مشتركي شبكات الإنترنت، تتبع الاشتراكات، الأرباح، التنبيهات، ديون المشتركين والدعم الفني باللغة العربية.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
