@@ -72,7 +72,8 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
     setEditingUser(user);
     setName(user.name);
     setUsername(user.username);
-    setPassword(user.password);
+    // كلمات المرور محفوظة مشفرة على الخادم؛ الحقل الفارغ يعني عدم التغيير
+    setPassword('');
     setRole(user.role);
     setPhone(user.phone || '');
     setIsActive(user.isActive);
@@ -90,9 +91,10 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !username.trim() || !password.trim()) return;
-    if (password.trim().length < 6) {
-      alert('يجب أن تتكون كلمة المرور من 6 خانات على الأقل.');
+    if (!name.trim() || !username.trim()) return;
+    if (!editingUser && !password.trim()) return;
+    if (password.trim() && password.trim().length < 8) {
+      alert('يجب أن تتكون كلمة المرور من 8 خانات على الأقل.');
       return;
     }
 
@@ -100,7 +102,7 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
       id: editingUser ? editingUser.id : undefined,
       name: name.trim(),
       username: username.trim(),
-      password: password.trim(),
+      password: password.trim() || undefined,
       role,
       phone: phone.trim(),
       isActive,
@@ -425,7 +427,8 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
               <div>
                 <div className="flex justify-between items-center mb-1">
                   <label className="text-slate-300 font-semibold">
-                    كلمة المرور (Password) <span className="text-rose-400">*</span>
+                    {editingUser ? 'كلمة مرور جديدة (اتركها فارغة لعدم التغيير)' : 'كلمة المرور المؤقتة (Password)'}
+                    {!editingUser && <span className="text-rose-400"> *</span>}
                   </label>
                   <button
                     type="button"
@@ -439,7 +442,7 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                 <div className="relative">
                   <input
                     type={showPassword ? 'text' : 'password'}
-                    required
+                    required={!editingUser}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="w-full bg-slate-800 border border-slate-700 rounded-lg pr-3 pl-9 py-2 text-white font-mono text-left focus:outline-none focus:border-indigo-500"

@@ -61,18 +61,16 @@ export const INITIAL_TOWERS: TowerPoint[] = [
   { id: 'tow_7', name: 'سكتر حي الضباط', location: 'حي الضباط - الزبير', notes: 'سكتر ميمو فائق السرعة' },
 ];
 
-// Initial Staff User Accounts with Roles & Authorities
+// حساب عرض مبدئي فقط (قبل أول تسجيل دخول)؛ الحسابات الحقيقية وكلمات المرور على الخادم
 export const INITIAL_STAFF_USERS: StaffUser[] = [
   {
     id: 'user_admin_1',
     name: 'المدير العام (أولاد كشيش)',
     username: 'admin',
-    password: 'admin@2026',
     role: 'admin',
     phone: '+964 771 979 7455',
     isActive: true,
     createdAt: '2026-10-07',
-    // كلمة المرور الأولية معروفة، لذلك يُجبَر المدير على تغييرها عند أول دخول
-    mustChangePassword: true,
+    mustChangePassword: false,
   },
 ];

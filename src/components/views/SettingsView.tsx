@@ -49,7 +49,7 @@ interface SettingsViewProps {
     towers?: TowerPoint[];
   }) => void;
   onResetToDemoData: () => void;
-  onUpdateAdminPassword?: (newPassword: string) => void;
+  onUpdateAdminPassword?: (currentPassword: string, newPassword: string) => Promise<string | null>;
   onNavigateToProviders?: () => void;
   staffUsers?: StaffUser[];
   towers?: TowerPoint[];
@@ -84,16 +84,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setPasswordError(null);
     setPasswordSuccess(null);
-
-    // Verify current admin password if known
-    if (adminUser && currentAdminPassword !== adminUser.password) {
-      setPasswordError('كلمة المرور الحالية غير صحيحة.');
-      return;
-    }
 
     if (newAdminPassword.length < 8) {
       setPasswordError('يجب أن تتكون كلمة المرور الجديدة من 8 خانات على الأقل.');
@@ -106,7 +100,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     }
 
     if (onUpdateAdminPassword) {
-      onUpdateAdminPassword(newAdminPassword);
+      // كلمة المرور الحالية يتحقق منها الخادم
+      const err = await onUpdateAdminPassword(currentAdminPassword, newAdminPassword);
+      if (err) {
+        setPasswordError(err);
+        return;
+      }
       setPasswordSuccess('تم تغيير كلمة مرور المدير العام بنجاح!');
       setCurrentAdminPassword('');
       setNewAdminPassword('');

@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { authApi, loginAndStore, setToken } from '../sync/api';
 import { StaffUser } from '../types/isp';
 import {
   Lock,
@@ -16,15 +17,13 @@ import {
 } from 'lucide-react';
 
 interface LockScreenProps {
-  users: StaffUser[];
   currentUser: StaffUser;
-  lockReason: 'manual' | 'inactivity' | 'auth_required' | null;
+  lockReason: 'manual' | 'inactivity' | 'auth_required' | 'session_expired' | null;
   ispName: string;
   onUnlock: (user: StaffUser) => void;
 }
 
 export const LockScreen: React.FC<LockScreenProps> = ({
-  users,
   currentUser,
   lockReason,
   ispName,
@@ -35,30 +34,52 @@ export const LockScreen: React.FC<LockScreenProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [busy, setBusy] = useState(false);
+  // null = جارٍ الفحص؛ true = لا يوجد أي حساب بعد (أول تشغيل على الخادم)
+  const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
+  const [setupName, setSetupName] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+
+  useEffect(() => {
+    authApi.status()
+      .then(r => setNeedsSetup(r.needsSetup))
+      .catch(e => {
+        setNeedsSetup(false);
+        setError(e.message);
+      });
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    const username = selectedUsername.trim();
+    const pwd = password.trim();
 
-    const targetUser = users.find(
-      u => u.username.toLowerCase() === selectedUsername.trim().toLowerCase()
-    );
-
-    if (!targetUser) {
-      setError('اسم المستخدم غير مسجل في المنظومة. يرجى التحقق من اسم الحساب.');
-      return;
+    if (needsSetup) {
+      if (pwd.length < 8) {
+        setError('يجب أن تتكون كلمة المرور من 8 خانات على الأقل.');
+        return;
+      }
+      if (pwd !== confirmPassword.trim()) {
+        setError('كلمتا المرور غير متطابقتين.');
+        return;
+      }
     }
 
-    if (!targetUser.isActive) {
-      setError('هذا الحساب معطل حالياً من قبل إدارة المنظومة.');
-      return;
+    setBusy(true);
+    try {
+      if (needsSetup) {
+        const res = await authApi.setup(setupName.trim(), username, pwd);
+        setToken(res.token);
+        onUnlock(res.user);
+      } else {
+        onUnlock(await loginAndStore(username, pwd));
+      }
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
     }
-
-    if (targetUser.password !== password.trim()) {
-      setError('كلمة المرور غير صحيحة، يرجى المحاولة مرة أخرى.');
-      return;
-    }
-
-    onUnlock(targetUser);
   };
 
   return (
@@ -90,7 +111,22 @@ export const LockScreen: React.FC<LockScreenProps> = ({
         </div>
 
         {/* Security / Inactivity Notice */}
-        {lockReason === 'inactivity' ? (
+        {needsSetup ? (
+          <div className="bg-emerald-950/60 border border-emerald-800/80 rounded-2xl p-3.5 text-xs text-emerald-200 flex items-start gap-2.5">
+            <Sparkles className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <strong className="block text-emerald-300 font-bold mb-0.5">الإعداد الأول للمنظومة</strong>
+              <p className="text-emerald-200/90 leading-relaxed text-[11px]">
+                لا يوجد أي حساب على الخادم بعد. أنشئ الآن حساب المدير العام؛ ستُحفظ كلمة المرور مشفرة على الخادم.
+              </p>
+            </div>
+          </div>
+        ) : lockReason === 'session_expired' ? (
+          <div className="bg-amber-950/60 border border-amber-700/80 rounded-2xl p-3 text-xs text-amber-200 flex items-center gap-2.5">
+            <Clock className="w-4 h-4 text-amber-400 flex-shrink-0" />
+            <span>انتهت الجلسة على الخادم. سجّل الدخول من جديد؛ التغييرات غير المرفوعة محفوظة على هذا الجهاز.</span>
+          </div>
+        ) : lockReason === 'inactivity' ? (
           <div className="bg-amber-950/60 border border-amber-700/80 rounded-2xl p-3.5 text-xs text-amber-200 flex items-start gap-2.5">
             <Clock className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5 animate-pulse" />
             <div>
@@ -116,6 +152,22 @@ export const LockScreen: React.FC<LockScreenProps> = ({
 
         {/* Form: Username and Password */}
         <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+          {needsSetup && (
+            <div>
+              <label htmlFor="setup-name" className="block text-slate-300 font-semibold mb-1.5">
+                اسم المدير الظاهر في المنظومة
+              </label>
+              <input
+                id="setup-name"
+                type="text"
+                required
+                value={setupName}
+                onChange={(e) => setSetupName(e.target.value)}
+                placeholder="مثال: المدير العام (أولاد كشيش)"
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-cyan-500 text-sm"
+              />
+            </div>
+          )}
           <div>
             <label className="block text-slate-300 font-semibold mb-1.5">
               اسم المستخدم (Username)
@@ -162,6 +214,24 @@ export const LockScreen: React.FC<LockScreenProps> = ({
             </div>
           </div>
 
+          {needsSetup && (
+            <div>
+              <label htmlFor="setup-confirm" className="block text-slate-300 font-semibold mb-1.5">
+                تأكيد كلمة المرور (8 خانات على الأقل)
+              </label>
+              <input
+                id="setup-confirm"
+                type={showPassword ? 'text' : 'password'}
+                required
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-mono text-left focus:outline-none focus:border-cyan-500 text-sm"
+                dir="ltr"
+                autoComplete="new-password"
+              />
+            </div>
+          )}
+
           {error && (
             <div className="bg-rose-950/70 border border-rose-800 p-2.5 rounded-xl text-rose-300 flex items-center gap-2 text-xs">
               <ShieldAlert className="w-4 h-4 flex-shrink-0" />
@@ -171,10 +241,11 @@ export const LockScreen: React.FC<LockScreenProps> = ({
 
           <button
             type="submit"
-            className="w-full py-3 bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white rounded-xl font-bold shadow-lg shadow-cyan-600/30 transition cursor-pointer flex items-center justify-center gap-2 text-sm"
+            disabled={busy || needsSetup === null}
+            className="w-full disabled:opacity-60 disabled:cursor-wait py-3 bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white rounded-xl font-bold shadow-lg shadow-cyan-600/30 transition cursor-pointer flex items-center justify-center gap-2 text-sm"
           >
             <ShieldCheck className="w-4 h-4" />
-            <span>تسجيل الدخول وفتح المنظومة</span>
+            <span>{busy ? 'جارٍ التحقق…' : needsSetup ? 'إنشاء حساب المدير والدخول' : 'تسجيل الدخول وفتح المنظومة'}</span>
           </button>
         </form>
       </div>

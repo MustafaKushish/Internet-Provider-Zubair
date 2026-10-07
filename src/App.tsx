@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Subscriber,
   PaymentRecord,
@@ -25,8 +25,6 @@ import {
   saveProviders,
   loadSettings,
   saveSettings,
-  loadStaffUsers,
-  saveStaffUsers,
   loadActiveStaffUser,
   saveActiveStaffUser,
   exportSubscribersToExcel,
@@ -70,6 +68,9 @@ import { LockScreen } from './components/LockScreen';
 import { ProviderModal } from './components/ProviderModal';
 import { TowerModal } from './components/TowerModal';
 import { ForcePasswordChange } from './components/ForcePasswordChange';
+import { SyncStatusBadge } from './components/SyncStatusBadge';
+import { authApi, usersApi, getToken, setToken, ApiError } from './sync/api';
+import { useCloudSync } from './sync/useCloudSync';
 
 // Views
 import { SubscribersView } from './components/views/SubscribersView';
@@ -102,7 +103,8 @@ export default function App() {
   const [tickets, setTickets] = useState<SupportTicket[]>(loadTickets);
   const [providers, setProviders] = useState<UpstreamProvider[]>(loadProviders);
   const [settings, setSettings] = useState<SystemSettings>(loadSettings);
-  const [staffUsers, setStaffUsers] = useState<StaffUser[]>(loadStaffUsers);
+  // قائمة الموظفين تأتي من الخادم بعد تسجيل الدخول (بدون كلمات مرور)
+  const [staffUsers, setStaffUsers] = useState<StaffUser[]>([]);
   const [currentUser, setCurrentUser] = useState<StaffUser>(loadActiveStaffUser);
   const [towerPoints, setTowerPoints] = useState<TowerPoint[]>(loadTowers);
 
@@ -146,11 +148,11 @@ export default function App() {
 
   // Security Lock & Inactivity Auto-logout (5 minutes = 300,000 ms)
   // By default when opening the app, username and password are required
-  const [isLocked, setIsLocked] = useState<boolean>(() => {
-    return sessionStorage.getItem('sas_plus_authenticated_session') !== 'active';
-  });
-  const [lockReason, setLockReason] = useState<'manual' | 'inactivity' | 'auth_required' | null>(() => {
-    return sessionStorage.getItem('sas_plus_authenticated_session') !== 'active' ? 'auth_required' : null;
+  const hasActiveSession = () =>
+    sessionStorage.getItem('sas_plus_authenticated_session') === 'active' && !!getToken();
+  const [isLocked, setIsLocked] = useState<boolean>(() => !hasActiveSession());
+  const [lockReason, setLockReason] = useState<'manual' | 'inactivity' | 'auth_required' | 'session_expired' | null>(() => {
+    return hasActiveSession() ? null : 'auth_required';
   });
 
   const [forceOpenAddUserModal, setForceOpenAddUserModal] = useState(false);
@@ -163,9 +165,7 @@ export default function App() {
     const resetInactivityTimer = () => {
       clearTimeout(timeoutId);
       timeoutId = setTimeout(() => {
-        sessionStorage.removeItem('sas_plus_authenticated_session');
-        setIsLocked(true);
-        setLockReason('inactivity');
+        lockApp('inactivity');
       }, 5 * 60 * 1000); // 5 minutes of no activity
     };
 
@@ -181,22 +181,76 @@ export default function App() {
     };
   }, [isLocked]);
 
-  const handleLogout = () => {
+  // القفل = إنهاء الجلسة على الخادم أيضاً؛ البيانات غير المرفوعة تبقى على الجهاز وتُرفع بعد الدخول
+  function lockApp(reason: 'manual' | 'inactivity' | 'session_expired') {
+    if (getToken()) authApi.logout().catch(() => undefined);
+    setToken(null);
     sessionStorage.removeItem('sas_plus_authenticated_session');
     setIsLocked(true);
-    setLockReason('manual');
+    setLockReason(reason);
+  }
+
+  const handleLogout = () => lockApp('manual');
+
+  const refreshStaffUsers = () => {
+    usersApi.list().then(r => setStaffUsers(r.users)).catch(() => undefined);
   };
 
+  // يُستدعى بعد نجاح تسجيل الدخول على الخادم (رمز الجلسة محفوظ مسبقاً)
   const handleUnlock = (user: StaffUser) => {
-    const withLogin = { ...user, lastLogin: new Date().toISOString() };
-    setCurrentUser(withLogin);
-    saveActiveStaffUser(withLogin);
-    setStaffUsers(prev => prev.map(u => u.id === user.id ? { ...u, lastLogin: withLogin.lastLogin } : u));
+    setCurrentUser(user);
+    saveActiveStaffUser(user);
     setActiveTabRaw('subscribers');
     sessionStorage.setItem('sas_plus_authenticated_session', 'active');
     setIsLocked(false);
     setLockReason(null);
+    if (!user.mustChangePassword) refreshStaffUsers();
   };
+
+  // عند إعادة تحميل الصفحة: التأكد من أن الجلسة ما زالت صالحة (بدون إنترنت نكمل بالبيانات المحفوظة)
+  useEffect(() => {
+    if (isLocked) return;
+    authApi.me()
+      .then(r => {
+        setCurrentUser(r.user);
+        saveActiveStaffUser(r.user);
+        if (!r.user.mustChangePassword) refreshStaffUsers();
+      })
+      .catch((e: ApiError) => {
+        if (e.status === 401) lockApp('session_expired');
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ---------- المزامنة مع الخادم ----------
+  const settingsAsList = useMemo(() => [{ ...settings, id: 'main' }], [settings]);
+  const [syncNotice, setSyncNotice] = useState<string | null>(null);
+  const { status: syncStatus, syncNow } = useCloudSync({
+    enabled: !isLocked && !currentUser.mustChangePassword,
+    sources: {
+      subscribers: {
+        value: subscribers,
+        set: setSubscribers,
+        fromServer: (d: any) => refreshSubscriberStatus(d as Subscriber, settings.warningDaysBeforeExpiry),
+      },
+      payments: { value: payments, set: setPayments },
+      tickets: { value: tickets, set: setTickets },
+      providers: { value: providers, set: setProviders },
+      towers: { value: towerPoints, set: setTowerPoints },
+      settings: {
+        value: settingsAsList,
+        set: (updater: any) => setSettings(prev => {
+          const list = typeof updater === 'function' ? updater([{ ...prev, id: 'main' }]) : updater;
+          const main = list.find((x: any) => x.id === 'main');
+          if (!main) return prev;
+          const { id: _id, ...rest } = main;
+          return { ...INITIAL_SETTINGS, ...rest };
+        }),
+      },
+    },
+    onAuthError: () => lockApp('session_expired'),
+    onRejected: msgs => setSyncNotice(`تم إلغاء تغيير لم يقبله الخادم: ${msgs.join(' ')}`),
+  });
 
   // Sync to localStorage
   useEffect(() => {
@@ -218,10 +272,6 @@ export default function App() {
   useEffect(() => {
     saveSettings(settings);
   }, [settings]);
-
-  useEffect(() => {
-    saveStaffUsers(staffUsers);
-  }, [staffUsers]);
 
   useEffect(() => {
     saveActiveStaffUser(currentUser);
@@ -598,104 +648,81 @@ export default function App() {
     }
   };
 
-  // Handlers: Staff Users (للمدير فقط)
-  const handleSaveStaffUser = (userData: Partial<StaffUser>) => {
+  // Handlers: Staff Users (للمدير فقط) — تُنفَّذ على الخادم الذي يتحقق من الصلاحيات أيضاً
+  const handleSaveStaffUser = async (userData: Partial<StaffUser>) => {
     if (currentUser.role !== 'admin') {
-      alert('عذراً: إدارة المستخدمين مخصصة للمدير العام فقط!');
+      setSyncNotice('عذراً: إدارة المستخدمين مخصصة للمدير العام فقط!');
       return;
     }
-    if (userData.username) {
-      const uname = userData.username.trim().toLowerCase();
-      const duplicate = staffUsers.some(u => u.username.trim().toLowerCase() === uname && u.id !== userData.id);
-      if (duplicate) {
-        alert('اسم المستخدم مستخدم مسبقاً لحساب آخر، اختر اسماً مختلفاً.');
-        return;
-      }
-    }
-    if (userData.id) {
-      const target = staffUsers.find(u => u.id === userData.id);
-      // منع إزالة آخر مدير نشط
-      const otherActiveAdmins = staffUsers.filter(u => u.role === 'admin' && u.isActive && u.id !== userData.id).length;
-      const demotes = userData.role !== undefined && userData.role !== 'admin';
-      if (target?.role === 'admin' && otherActiveAdmins === 0 && (demotes || userData.isActive === false)) {
-        alert('لا يمكن تعطيل أو تغيير دور آخر حساب مدير نشط في المنظومة.');
-        return;
-      }
-      const passwordChanged = userData.password !== undefined && userData.password !== target?.password;
-      const patch: Partial<StaffUser> = { ...userData };
-      if (!patch.createdAt) delete patch.createdAt;
-      if (passwordChanged) patch.mustChangePassword = false;
-      setStaffUsers(prev => prev.map(u => u.id === userData.id ? { ...u, ...patch } as StaffUser : u));
-      if (currentUser.id === userData.id) {
-        setCurrentUser(prev => ({ ...prev, ...patch } as StaffUser));
-      }
-    } else {
-      if (!userData.password || userData.password.trim().length < 6) {
-        alert('يجب تحديد كلمة مرور من 6 خانات على الأقل للحساب الجديد.');
-        return;
-      }
-      const newUser: StaffUser = {
-        id: uid('user_staff'),
-        name: userData.name || 'موظف جديد',
-        username: userData.username || `user_${Date.now().toString().slice(-4)}`,
-        password: userData.password.trim(),
-        role: userData.role || 'accountant',
-        phone: userData.phone || '',
-        isActive: userData.isActive ?? true,
-        createdAt: todayStr(),
+    try {
+      const payload: Partial<StaffUser> = {
+        name: userData.name,
+        username: userData.username,
+        role: userData.role,
+        phone: userData.phone,
+        isActive: userData.isActive,
       };
-      setStaffUsers(prev => [...prev, newUser]);
+      if (userData.password && userData.password.trim()) payload.password = userData.password.trim();
+      const res = userData.id
+        ? await usersApi.update(userData.id, payload)
+        : await usersApi.create(payload);
+      setStaffUsers(res.users);
+      const me = res.users.find(u => u.id === currentUser.id);
+      if (me) {
+        setCurrentUser(me);
+        saveActiveStaffUser(me);
+      }
+    } catch (e) {
+      setSyncNotice((e as Error).message);
     }
   };
 
-  const handleDeleteStaffUser = (userId: string) => {
+  const handleDeleteStaffUser = async (userId: string) => {
     if (currentUser.role !== 'admin') {
-      alert('عذراً: حذف المستخدمين مخصص للمدير العام فقط!');
+      setSyncNotice('عذراً: حذف المستخدمين مخصص للمدير العام فقط!');
       return;
     }
     if (userId === currentUser.id) {
-      alert('لا يمكنك حذف الحساب الذي تستخدمه حالياً.');
+      setSyncNotice('لا يمكنك حذف الحساب الذي تستخدمه حالياً.');
       return;
     }
     const target = staffUsers.find(u => u.id === userId);
-    if (target?.role === 'admin' && staffUsers.filter(u => u.role === 'admin').length <= 1) {
-      alert('لا يمكن حذف آخر حساب مدير في المنظومة!');
-      return;
-    }
     if (confirm(`هل أنت متأكد من حذف حساب (${target?.name || ''})؟`)) {
-      setStaffUsers(prev => prev.filter(u => u.id !== userId));
+      try {
+        const res = await usersApi.remove(userId);
+        setStaffUsers(res.users);
+      } catch (e) {
+        setSyncNotice((e as Error).message);
+      }
     }
   };
 
-  // تبديل المستخدم يتم فقط بعد التحقق من كلمة المرور (عبر نافذة تسجيل الدخول)
+  // تبديل المستخدم يتم فقط بعد تسجيل الدخول على الخادم (عبر نافذة تسجيل الدخول)
   const handleSwitchStaffUser = (user: StaffUser) => {
-    setCurrentUser(user);
-    saveActiveStaffUser(user);
-    setActiveTabRaw('subscribers');
+    handleUnlock(user);
   };
 
   const requestSwitchUser = () => {
     setIsLoginModalOpen(true);
   };
 
-  // تغيير كلمة مرور المستخدم الحالي (من الإعدادات أو الشاشة الإجبارية)
-  const changeCurrentUserPassword = (newPassword: string) => {
-    const updated = { ...currentUser, password: newPassword, mustChangePassword: false };
-    const updatedList = staffUsers.map(u => u.id === currentUser.id ? { ...u, password: newPassword, mustChangePassword: false } : u);
-    setStaffUsers(updatedList);
-    saveStaffUsers(updatedList);
-    setCurrentUser(updated);
-    saveActiveStaffUser(updated);
+  // تغيير كلمة مرور المستخدم الحالي؛ يعيد رسالة خطأ أو null عند النجاح
+  const changeCurrentUserPassword = async (currentPassword: string, newPassword: string): Promise<string | null> => {
+    try {
+      const res = await authApi.changePassword(currentPassword, newPassword);
+      setCurrentUser(res.user);
+      saveActiveStaffUser(res.user);
+      refreshStaffUsers();
+      return null;
+    } catch (e) {
+      return (e as Error).message;
+    }
   };
 
-  const handleUpdateAdminPassword = (newPassword: string) => {
-    if (currentUser.role !== 'admin') return;
-    changeCurrentUserPassword(newPassword);
-  };
+  const handleUpdateAdminPassword = (currentPassword: string, newPassword: string) =>
+    changeCurrentUserPassword(currentPassword, newPassword);
 
-  const handleForcedPasswordChange = (newPassword: string) => {
-    changeCurrentUserPassword(newPassword);
-  };
+  const handleForcedPasswordChange = (newPassword: string) => changeCurrentUserPassword('', newPassword);
 
   // Handlers: Provider Management & Renaming across Zubair
   const handleSaveProvider = (updatedProvider: UpstreamProvider, oldName?: string) => {
@@ -840,13 +867,7 @@ export default function App() {
     setProviders(data.providers || INITIAL_PROVIDERS);
     setSettings(restoredSettings);
     if (Array.isArray(data.towers)) setTowerPoints(data.towers);
-    if (Array.isArray(data.staffUsers) && data.staffUsers.some(u => u.role === 'admin' && u.isActive)) {
-      setStaffUsers(data.staffUsers);
-      // إذا لم يعد المستخدم الحالي موجوداً في النسخة المستعادة يجب تسجيل الدخول من جديد
-      if (!data.staffUsers.some(u => u.id === currentUser.id)) {
-        handleLogout();
-      }
-    }
+    // حسابات الموظفين تُدار على الخادم ولا تُستعاد من ملف النسخة الاحتياطية
   };
 
   const handleClearAllData = () => {
@@ -860,7 +881,6 @@ export default function App() {
   if (isLocked) {
     return (
       <LockScreen
-        users={staffUsers}
         currentUser={currentUser}
         lockReason={lockReason}
         ispName={settings.ispName}
@@ -1084,6 +1104,13 @@ export default function App() {
           <span className="font-mono text-cyan-400 font-semibold" dir="ltr">+964 771 979 7455</span>
         </p>
       </footer>
+
+      <SyncStatusBadge
+        status={syncStatus}
+        notice={syncNotice}
+        onDismissNotice={() => setSyncNotice(null)}
+        onSyncNow={() => { void syncNow(); }}
+      />
 
       {/* Modals */}
       <SubscriberModal

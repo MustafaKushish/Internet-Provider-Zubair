@@ -5,7 +5,7 @@ import { KeyRound, AlertTriangle, LogOut } from 'lucide-react';
 interface ForcePasswordChangeProps {
   user: StaffUser;
   ispName: string;
-  onChangePassword: (newPassword: string) => void;
+  onChangePassword: (newPassword: string) => Promise<string | null>;
   onLogout: () => void;
 }
 
@@ -20,7 +20,9 @@ export const ForcePasswordChange: React.FC<ForcePasswordChangeProps> = ({
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [busy, setBusy] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     const pwd = newPassword.trim();
@@ -28,15 +30,14 @@ export const ForcePasswordChange: React.FC<ForcePasswordChangeProps> = ({
       setError('يجب أن تتكون كلمة المرور الجديدة من 8 خانات على الأقل.');
       return;
     }
-    if (pwd === user.password) {
-      setError('كلمة المرور الجديدة يجب أن تختلف عن كلمة المرور الحالية.');
-      return;
-    }
     if (pwd !== confirmPassword.trim()) {
       setError('كلمتا المرور غير متطابقتين.');
       return;
     }
-    onChangePassword(pwd);
+    setBusy(true);
+    const err = await onChangePassword(pwd);
+    setBusy(false);
+    if (err) setError(err);
   };
 
   return (

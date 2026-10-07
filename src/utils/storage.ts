@@ -30,7 +30,6 @@ const TICKETS_KEY = 'sas_plus_tickets_kashish_v1';
 const PROVIDERS_KEY = 'sas_plus_providers_kashish_v1';
 const TOWERS_KEY = 'sas_plus_towers_kashish_v1';
 const SETTINGS_KEY = 'sas_plus_settings_kashish_v1';
-const STAFF_USERS_KEY = 'sas_plus_staff_users_kashish_v1';
 const ACTIVE_USER_KEY = 'sas_plus_active_user_kashish_v1';
 
 // Purge any legacy demo mock data from earlier tests
@@ -50,6 +49,8 @@ const LEGACY_KEYS = [
   'isp_subscribers',
   'isp_payments',
   'isp_tickets',
+  // قائمة الموظفين القديمة كانت تحفظ كلمات المرور كنص واضح في المتصفح؛ أصبحت على الخادم
+  'sas_plus_staff_users_kashish_v1',
 ];
 try {
   if (typeof window !== 'undefined' && window.localStorage) {
@@ -223,52 +224,16 @@ export function saveSettings(settings: SystemSettings): void {
   }
 }
 
-// Storage loaders for Staff Users
-export function loadStaffUsers(): StaffUser[] {
-  try {
-    const raw = localStorage.getItem(STAFF_USERS_KEY);
-    if (!raw) return INITIAL_STAFF_USERS;
-    const parsed: StaffUser[] = JSON.parse(raw);
-    if (!Array.isArray(parsed) || parsed.length === 0) return INITIAL_STAFF_USERS;
-
-    // Purge deprecated demo users (user_acc_1 and user_tech_1) as requested by user
-    const cleaned = parsed.filter(u => u.id !== 'user_acc_1' && u.id !== 'user_tech_1');
-
-    // أي حساب ما زال يستخدم كلمة المرور الافتراضية المعروفة يُجبَر على تغييرها
-    cleaned.forEach(u => {
-      if (u.password === INITIAL_STAFF_USERS[0].password) u.mustChangePassword = true;
-    });
-
-    // Ensure at least the admin user exists
-    const hasAdmin = cleaned.some(u => u.role === 'admin' || u.username === 'admin');
-    if (!hasAdmin) {
-      cleaned.unshift({ ...INITIAL_STAFF_USERS[0], mustChangePassword: true });
-    }
-
-    if (cleaned.length !== parsed.length) {
-      saveStaffUsers(cleaned);
-    }
-    return cleaned;
-  } catch (e) {
-    return INITIAL_STAFF_USERS;
-  }
-}
-
-export function saveStaffUsers(users: StaffUser[]): void {
-  try {
-    localStorage.setItem(STAFF_USERS_KEY, JSON.stringify(users));
-  } catch (e) {
-    console.error('Error saving staff users:', e);
-  }
-}
-
 // Storage loader for Active Logged-in Staff User
 export function loadActiveStaffUser(): StaffUser {
   try {
     const raw = localStorage.getItem(ACTIVE_USER_KEY);
     if (!raw) return INITIAL_STAFF_USERS[0];
     const parsed: StaffUser = JSON.parse(raw);
-    return parsed || INITIAL_STAFF_USERS[0];
+    if (!parsed) return INITIAL_STAFF_USERS[0];
+    // نسخ قديمة كانت تحفظ كلمة المرور هنا؛ لا نبقيها في المتصفح
+    const { password: _pw, ...rest } = parsed;
+    return rest as StaffUser;
   } catch (e) {
     return INITIAL_STAFF_USERS[0];
   }
@@ -276,7 +241,8 @@ export function loadActiveStaffUser(): StaffUser {
 
 export function saveActiveStaffUser(user: StaffUser): void {
   try {
-    localStorage.setItem(ACTIVE_USER_KEY, JSON.stringify(user));
+    const { password: _pw, ...rest } = user;
+    localStorage.setItem(ACTIVE_USER_KEY, JSON.stringify(rest));
   } catch (e) {
     console.error('Error saving active user:', e);
   }

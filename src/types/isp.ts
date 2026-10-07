@@ -132,7 +132,7 @@ export interface StaffUser {
   id: string;
   name: string;
   username: string;
-  password: string;
+  password?: string;      // تُستخدم فقط عند إرسال كلمة مرور جديدة للخادم، ولا تُحفظ في المتصفح
   role: UserRole;
   phone?: string;
   isActive: boolean;

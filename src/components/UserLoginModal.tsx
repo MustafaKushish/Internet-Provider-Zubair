@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { StaffUser } from '../types/isp';
+import { loginAndStore } from '../sync/api';
 import { X, Lock, Key, ShieldCheck, User, Check, AlertCircle } from 'lucide-react';
 
 interface UserLoginModalProps {
@@ -26,31 +27,22 @@ const UserLoginModalInner: React.FC<UserLoginModalProps> = ({
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const [busy, setBusy] = useState(false);
+
+  // التحقق يتم على الخادم؛ عند النجاح تُستبدل جلسة هذا الجهاز بجلسة الحساب الجديد
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-
-    const targetUser = users.find(
-      u => u.username.toLowerCase() === username.trim().toLowerCase()
-    );
-
-    if (!targetUser) {
-      setError('اسم المستخدم غير موجود في المنظومة.');
-      return;
+    setBusy(true);
+    try {
+      const user = await loginAndStore(username.trim(), password.trim());
+      onLoginSuccess(user);
+      onClose();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
     }
-
-    if (!targetUser.isActive) {
-      setError('هذا الحساب معطل حالياً من قبل الإدارة.');
-      return;
-    }
-
-    if (targetUser.password !== password.trim()) {
-      setError('كلمة المرور غير صحيحة.');
-      return;
-    }
-
-    onLoginSuccess(targetUser);
-    onClose();
   };
 
   // اختيار الحساب يملأ اسم المستخدم فقط؛ الدخول يتطلب كلمة المرور دائماً
