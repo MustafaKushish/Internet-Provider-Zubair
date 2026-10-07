@@ -39,7 +39,8 @@ import {
   getRemainingDebt,
   refreshSubscriberStatus,
   nextReceiptNumber,
-  nextTicketNumber
+  nextTicketNumber,
+  normalizeNameKey
 } from './utils/storage';
 import { todayStr, addMonthsToDateStr, parseLocalDate, uid } from './utils/dates';
 import {
@@ -758,8 +759,30 @@ export default function App() {
       setProviders(prev => [...prev, ...newProvidersToRegister]);
     }
 
+    // منع التكرار: نتجاوز أي صف يطابق مشتركاً موجوداً (أو صفاً سابقاً في نفس الملف) باسم المستخدم أو بالاسم
+    const seenUsernames = new Set<string>();
+    const seenNames = new Set<string>();
+    if (!replaceAll) {
+      subscribers.forEach(s => {
+        if (s.username) seenUsernames.add(s.username.trim().toLowerCase());
+        seenNames.add(normalizeNameKey(s.name));
+      });
+    }
+    const skippedNames: string[] = [];
+    const uniqueRows = importedRows.filter(row => {
+      const uname = row.username?.trim().toLowerCase();
+      const nameKey = normalizeNameKey(row.name || '');
+      if ((uname && seenUsernames.has(uname)) || (nameKey && seenNames.has(nameKey))) {
+        skippedNames.push(row.name || row.username || '');
+        return false;
+      }
+      if (uname) seenUsernames.add(uname);
+      if (nameKey) seenNames.add(nameKey);
+      return true;
+    });
+
     const today = todayStr();
-    const formatted: Subscriber[] = importedRows.map((row, idx) => {
+    const formatted: Subscriber[] = uniqueRows.map((row, idx) => {
       const sub: Subscriber = {
         id: uid(`sub_${idx}`),
         name: row.name || `مشترك ${idx + 1}`,
@@ -782,11 +805,15 @@ export default function App() {
         notes: row.notes || 'مستورد من إكسل',
         createdAt: today,
         cycleMonths: 1,
-        carriedDebt: 0,
+        carriedDebt: Math.max(0, row.carriedDebt ?? 0),
         currentCycleId: uid('cycle'),
       };
       return refreshSubscriberStatus(sub, settings.warningDaysBeforeExpiry);
     });
+
+    if (skippedNames.length > 0) {
+      alert(`تم استيراد ${formatted.length} مشترك. تم تجاوز ${skippedNames.length} مكرر:\n${skippedNames.slice(0, 20).join('، ')}${skippedNames.length > 20 ? ' …' : ''}`);
+    }
 
     if (replaceAll) {
       setSubscribers(formatted);

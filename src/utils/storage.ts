@@ -652,6 +652,18 @@ function normalizeIraqiPhone(raw: any): string {
   return p;
 }
 
+/** مفتاح مقارنة الأسماء: يتجاهل المسافات والهمزات والتاء المربوطة حتى لا يُستورد المشترك مرتين */
+export function normalizeNameKey(name: string): string {
+  return (name || '')
+    .trim()
+    .replace(/[إأآٱ]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/ى/g, 'ي')
+    .replace(/[\u064B-\u0652ـ]/g, '')
+    .replace(/\s+/g, '')
+    .toLowerCase();
+}
+
 export function parseExcelSubscribers(file: File): Promise<Partial<Subscriber>[]> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -677,6 +689,7 @@ export function parseExcelSubscribers(file: File): Promise<Partial<Subscriber>[]
             costPrice: pickNumber(row, ['كلفة الشراء (الجملة)', 'كلفة الشراء', 'كلفة المزود', 'سعر الجملة', 'Cost', 'cost'], 24000),
             salePrice: pickNumber(row, ['سعر البيع', 'السعر', 'قيمة الاشتراك', 'الاشتراك', 'Price', 'price'], 35000),
             paidAmount: pickNumber(row, ['المبلغ المدفوع', 'المدفوع', 'الواصل', 'Paid', 'paid'], 0),
+            carriedDebt: pickNumber(row, ['دين سابق', 'الدين السابق', 'ديون سابقة', 'Debt', 'debt'], 0),
             upstreamProvider: pickText(row, ['المزود الرئيسي', 'المزود', 'الشركة', 'الوكيل', 'سيرفر', 'Provider', 'provider'], 'إيرثلنك (Earthlink)'),
             planName: pickText(row, ['الباقة', 'نوع الباقة', 'النوع', 'Plan', 'plan'], 'ستاندرد (Standard)'),
             towerName: pickText(row, ['البرج / النقطة', 'البرج', 'السكتر', 'الكابينة', 'Tower', 'tower']),
