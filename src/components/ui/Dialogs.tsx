@@ -168,3 +168,28 @@ export const DialogHost: React.FC = () => {
     </>
   );
 };
+
+/** نسخ نص مع بديل للمتصفحات التي لا تسمح بالحافظة (http أو بعض الهواتف) */
+export async function copyText(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      if (!ok) throw new Error('copy failed');
+    }
+    notify('تم النسخ', 'success');
+    return true;
+  } catch {
+    notify('تعذر النسخ تلقائياً. حدد النص وانسخه يدوياً.', 'warning');
+    return false;
+  }
+}

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useEscapeKey } from './ui/useEscapeKey';
 import { StaffUser } from '../types/isp';
 import { loginAndStore } from '../sync/api';
 import { X, Lock, Key, ShieldCheck, User, Check, AlertCircle } from 'lucide-react';
@@ -22,6 +23,7 @@ const UserLoginModalInner: React.FC<UserLoginModalProps> = ({
   currentUser,
   onLoginSuccess,
 }) => {
+  useEscapeKey(onClose);
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');

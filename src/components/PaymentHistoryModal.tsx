@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useEscapeKey } from './ui/useEscapeKey';
 import { Subscriber, PaymentRecord, SystemSettings, StaffUser } from '../types/isp';
 import { formatCurrency, generateWhatsAppLink, getRemainingDebt, getAmountDue } from '../utils/storage';
 import { todayStr } from '../utils/dates';
@@ -47,6 +48,7 @@ const PaymentHistoryModalInner: React.FC<PaymentHistoryModalProps & { subscriber
   onPrintReceipt,
   onDeletePayment,
 }) => {
+  useEscapeKey(onClose);
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [newAmount, setNewAmount] = useState<number>(getRemainingDebt(subscriber) > 0 ? getRemainingDebt(subscriber) : subscriber.salePrice);

@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { copyText } from '../ui/Dialogs';
 import { NO_TOWER_LABEL, normTower } from '../../utils/towers';
 import { Subscriber, SystemSettings, StaffUser } from '../../types/isp';
 import { formatCurrency, getDaysRemaining, getRemainingDebt, getAmountDue } from '../../utils/storage';
@@ -98,7 +99,7 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
   };
 
   const copyToClipboard = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
+    void copyText(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
   };

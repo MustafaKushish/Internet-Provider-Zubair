@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useEscapeKey } from './ui/useEscapeKey';
 import { Subscriber } from '../types/isp';
 import { parseExcelSubscribers } from '../utils/storage';
 import { X, Upload, FileSpreadsheet, Check, AlertCircle, RefreshCw } from 'lucide-react';
@@ -18,6 +19,7 @@ const ExcelImportModalInner: React.FC<ExcelImportModalProps> = ({
   onClose,
   onImportComplete,
 }) => {
+  useEscapeKey(onClose);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

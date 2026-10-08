@@ -1,4 +1,5 @@
 import React from 'react';
+import { useEscapeKey } from './ui/useEscapeKey';
 import { Subscriber, SystemSettings } from '../types/isp';
 import { formatCurrency, getRemainingDebt } from '../utils/storage';
 import { todayStr } from '../utils/dates';
@@ -27,6 +28,7 @@ const ReceiptModalInner: React.FC<ReceiptModalProps & { subscriber: Subscriber }
   receiptNumber: receiptNumberProp,
   receiptDate,
 }) => {
+  useEscapeKey(onClose);
 
   // رقم الوصل الحقيقي من سجل الدفعات (وليس رقماً مشتقاً من معرّف المشترك)
   const receiptNumber = receiptNumberProp || '—';

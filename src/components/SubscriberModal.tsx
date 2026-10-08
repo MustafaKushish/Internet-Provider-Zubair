@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useEscapeKey } from './ui/useEscapeKey';
 import { todayStr, parseLocalDate, toLocalDateStr, addMonthsToDateStr } from '../utils/dates';
 import { getRemainingDebt } from '../utils/storage';
 import { Subscriber, UpstreamProvider, StaffUser } from '../types/isp';
@@ -25,6 +26,7 @@ export const SubscriberModal: React.FC<SubscriberModalProps> = ({
   currentUser,
   onOpenManageProviders,
 }) => {
+  useEscapeKey(onClose, isOpen);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [username, setUsername] = useState('');

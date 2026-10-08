@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useEscapeKey } from './ui/useEscapeKey';
 import { UpstreamProvider, ProviderPlan, Subscriber } from '../types/isp';
 import { Server, X, Plus, Edit2, Trash2, Check, AlertCircle, Phone, FileText, Gauge, DollarSign } from 'lucide-react';
 import { notify } from './ui/Dialogs';
@@ -22,6 +23,7 @@ const ProviderModalInner: React.FC<ProviderModalProps> = ({
   subscribers,
   onSave,
 }) => {
+  useEscapeKey(onClose);
 
   const isEditing = Boolean(providerToEdit);
   const oldName = providerToEdit?.name;

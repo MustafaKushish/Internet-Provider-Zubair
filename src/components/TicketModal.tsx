@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useEscapeKey } from './ui/useEscapeKey';
 import { todayStr } from '../utils/dates';
 import { SupportTicket, Subscriber, IssueType, TicketPriority, TicketStatus } from '../types/isp';
 import { X, Wrench, AlertTriangle, CheckCircle2, User, Phone, TowerControl, Send, ShieldAlert, FileText } from 'lucide-react';
@@ -26,6 +27,7 @@ const TicketModalInner: React.FC<TicketModalProps> = ({
   subscribers,
   onSaveTicket,
 }) => {
+  useEscapeKey(onClose);
 
   const [subscriberId, setSubscriberId] = useState('');
   const [subscriberName, setSubscriberName] = useState('');

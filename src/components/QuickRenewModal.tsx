@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useEscapeKey } from './ui/useEscapeKey';
 import { Subscriber } from '../types/isp';
 import { X, RefreshCw, Calendar, DollarSign, CreditCard, Send, CheckCircle2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
@@ -28,6 +29,7 @@ const QuickRenewModalInner: React.FC<QuickRenewModalProps & { subscriber: Subscr
   subscriber,
   onConfirmRenewal,
 }) => {
+  useEscapeKey(onClose);
 
   // دين الدورة الحالية غير المسدد يُرحَّل إلى الدورة الجديدة
   const previousDebt = getRemainingDebt(subscriber);

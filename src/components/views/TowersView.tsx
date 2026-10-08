@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useEscapeKey } from '../ui/useEscapeKey';
 import { PaymentRecord, Subscriber, SystemSettings, TowerPoint } from '../../types/isp';
 import { formatCurrency } from '../../utils/storage';
 import { computeTowerStats, NO_TOWER_LABEL, sortTowerStats, TowerSortKey, TowerStats } from '../../utils/towers';
@@ -51,6 +52,7 @@ export const TowersView: React.FC<TowersViewProps> = ({
   const [search, setSearch] = useState('');
   const [dialog, setDialog] = useState<MoveDialogState | null>(null);
   const [moveTarget, setMoveTarget] = useState('');
+  useEscapeKey(() => setDialog(null), !!dialog);
 
   const money = (n: number) => formatCurrency(Math.round(n), settings.currency);
 

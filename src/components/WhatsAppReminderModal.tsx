@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { copyText } from './ui/Dialogs';
+import { useEscapeKey } from './ui/useEscapeKey';
 import { Subscriber, SystemSettings } from '../types/isp';
 import { getWhatsAppTemplates, generateWhatsAppLink } from '../utils/storage';
 import { X, Send, Copy, Check, MessageSquare, Key, AlertCircle, Clock, Receipt, UserCheck } from 'lucide-react';
@@ -22,6 +24,7 @@ const WhatsAppReminderModalInner: React.FC<WhatsAppReminderModalProps & { subscr
   settings,
   defaultTab = 'expiry',
 }) => {
+  useEscapeKey(onClose);
 
   const [activeTab, setActiveTab] = useState<'expiry' | 'expired' | 'debt' | 'credentials' | 'receipt'>(defaultTab);
   const [customMessage, setCustomMessage] = useState('');
@@ -54,7 +57,7 @@ const WhatsAppReminderModalInner: React.FC<WhatsAppReminderModalProps & { subscr
   }, [activeTab, subscriber]);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(customMessage);
+    void copyText(customMessage);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };

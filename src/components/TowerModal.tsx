@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useEscapeKey } from './ui/useEscapeKey';
 import { TowerPoint, Subscriber } from '../types/isp';
 import { TowerControl, X, Save, AlertCircle, MapPin, Network, FileText, CheckCircle2 } from 'lucide-react';
 
@@ -21,6 +22,7 @@ const TowerModalInner: React.FC<TowerModalProps> = ({
   subscribers,
   onSave,
 }) => {
+  useEscapeKey(onClose);
 
   const [name, setName] = useState('');
   const [location, setLocation] = useState('');
