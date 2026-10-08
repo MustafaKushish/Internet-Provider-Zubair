@@ -57,7 +57,7 @@ interface PushResult {
 }
 
 const STATE_KEY = 'sas_plus_sync_state_v1';
-const PUSH_CHUNK = 40;
+const PUSH_CHUNK = 20;
 
 /** JSON بترتيب مفاتيح ثابت حتى تكون المقارنة موثوقة */
 function stable(value: any): string {

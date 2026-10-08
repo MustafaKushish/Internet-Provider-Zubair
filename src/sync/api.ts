@@ -57,7 +57,10 @@ export async function apiRequest<T>(path: string, options: { method?: string; bo
     // ليس JSON (مثلاً صفحة خطأ من الشبكة)
   }
   if (!res.ok) {
-    throw new ApiError(res.status, data?.error || `خطأ من الخادم (${res.status})`, res.status >= 502 && res.status <= 504);
+    const fallback = res.status >= 500
+      ? `الخادم لم يكمل الطلب (${res.status}). حاول مرة أخرى بعد قليل.`
+      : `خطأ من الخادم (${res.status})`;
+    throw new ApiError(res.status, data?.error || fallback, res.status >= 502 && res.status <= 504);
   }
   return data as T;
 }

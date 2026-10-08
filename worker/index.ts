@@ -28,12 +28,14 @@ const RULES: Record<Collection, { create: Role[]; update: Role[]; delete: Role[]
 };
 
 const SESSION_HOURS = 24;
-const PBKDF2_ITERATIONS = 100_000; // الحد الأعلى المسموح في Workers
+// الخطة المجانية في Cloudflare تسمح بـ 10ms من وقت المعالج لكل طلب؛ 5000 دورة ≈ 3ms.
+// الحماية من التخمين يوفرها أيضاً قفل الحساب بعد 10 محاولات خاطئة.
+const PBKDF2_ITERATIONS = 5_000;
 const MAX_FAILED_LOGINS = 10;
 const LOCKOUT_MINUTES = 15;
-const MAX_CHANGES_PER_PUSH = 40;
+const MAX_CHANGES_PER_PUSH = 20; // الخطة المجانية: 50 استعلاماً لكل طلب
 const MAX_RECORD_BYTES = 100_000;
-const PULL_LIMIT = 500;
+const PULL_LIMIT = 200;
 
 const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS staff_users (
@@ -121,15 +123,23 @@ async function sha256(text: string): Promise<string> {
   return toHex(await crypto.subtle.digest('SHA-256', enc.encode(text)));
 }
 
-async function hashPassword(password: string, saltHex: string): Promise<string> {
+async function pbkdf2(password: string, saltHex: string, iterations: number): Promise<string> {
   const key = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']);
   const salt = new Uint8Array(saltHex.match(/../g)!.map(h => parseInt(h, 16)));
-  const bits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', hash: 'SHA-256', salt, iterations: PBKDF2_ITERATIONS },
-    key,
-    256,
-  );
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations }, key, 256);
   return toHex(bits);
+}
+
+/** يُخزَّن عدد الدورات مع الهاش (pbkdf2$5000$...) حتى يمكن تغييره لاحقاً دون كسر الحسابات */
+async function hashPassword(password: string, saltHex: string): Promise<string> {
+  return `pbkdf2$${PBKDF2_ITERATIONS}$${await pbkdf2(password, saltHex, PBKDF2_ITERATIONS)}`;
+}
+
+async function verifyPassword(password: string, saltHex: string, stored: string): Promise<boolean> {
+  const m = /^pbkdf2\$(\d+)\$([0-9a-f]+)$/.exec(stored);
+  const iterations = m ? Number(m[1]) : 100_000; // صيغة قديمة بدون بادئة
+  const expected = m ? m[2] : stored;
+  return timingSafeEqual(await pbkdf2(password, saltHex, iterations), expected);
 }
 
 function timingSafeEqual(a: string, b: string): boolean {
@@ -251,7 +261,7 @@ async function handleLogin(req: Request, db: D1Database) {
   }
 
   const user = await db.prepare('SELECT * FROM staff_users WHERE username = ?').bind(username).first<UserRow>();
-  const ok = user ? timingSafeEqual(await hashPassword(password, user.password_salt), user.password_hash) : false;
+  const ok = user ? await verifyPassword(password, user.password_salt, user.password_hash) : false;
   if (!user || !ok) {
     const reset = !fail || now - fail.last_at >= LOCKOUT_MINUTES * 60_000;
     await db.prepare(`INSERT INTO login_failures (username, count, last_at) VALUES (?, 1, ?)
@@ -269,14 +279,15 @@ async function handleLogin(req: Request, db: D1Database) {
 async function handleChangeOwnPassword(req: Request, db: D1Database, user: UserRow, tokenHash: string) {
   const body = await readJson<{ currentPassword?: string; newPassword?: string }>(req);
   // عند التغيير الإجباري (أول دخول) تكفي الجلسة التي أُنشئت للتو بكلمة المرور المؤقتة
+  // حد أقصى عمليتا تشفير لكل طلب حتى يبقى ضمن حد وقت المعالج
+  const next = validatePassword(body.newPassword);
   if (!user.must_change_password) {
     const current = (body.currentPassword || '').trim();
-    if (!timingSafeEqual(await hashPassword(current, user.password_salt), user.password_hash)) {
+    if (!(await verifyPassword(current, user.password_salt, user.password_hash))) {
       throw new HttpError(400, 'كلمة المرور الحالية غير صحيحة.');
     }
-  }
-  const next = validatePassword(body.newPassword);
-  if (timingSafeEqual(await hashPassword(next, user.password_salt), user.password_hash)) {
+    if (next === current) throw new HttpError(400, 'كلمة المرور الجديدة يجب أن تختلف عن الحالية.');
+  } else if (await verifyPassword(next, user.password_salt, user.password_hash)) {
     throw new HttpError(400, 'كلمة المرور الجديدة يجب أن تختلف عن الحالية.');
   }
   const salt = randomHex(16);
