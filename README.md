@@ -35,6 +35,20 @@ Die installierte App startet ohne Browserleiste, hat ein eigenes Symbol, öffnet
 (mit den zuletzt gespeicherten Daten) und aktualisiert sich bei jedem Deploy automatisch.
 Der Windows-Installer ist eine Electron-Hülle (`desktop/`) um dieselbe Adresse.
 
+## Der KI-Berater („المستشار الذكي“)
+
+Ein Reiter für Admin und Buchhalter: Er beantwortet Fragen zu Marketing, Preisen, Zuschlägen, Schulden und dazu,
+welche Türme sich lohnen. Dafür nutzt er **Claude Opus 5.5** mit gründlichem Nachdenken und die aktuellen Zahlen der App.
+
+- **Datenschutz:** Gesendet wird nur eine Zahlenübersicht (Türme, Pakete, Preise, Gewinne, Schulden, Einnahmen pro Monat, Tickets).
+  Keine Namen, Telefonnummern, Benutzernamen oder Passwörter. In der App zeigt der Knopf „البيانات المرسلة“ genau, was gesendet wird.
+- **Kosten:** Pro Frage etwa 0,05–0,20 US-$, abgerechnet bei Anthropic. Pro Person sind höchstens 40 Fragen am Tag erlaubt.
+- **Einrichtung (einmalig):**
+  1. Auf <https://console.anthropic.com> ein Konto anlegen, Guthaben aufladen und unter *API Keys* einen Schlüssel erstellen.
+  2. Im Cloudflare-Dashboard unter *Workers & Pages → sas-plus-zubair → Settings → Variables and Secrets* den Eintrag **Add**
+     wählen, Typ **Secret**, Name `ANTHROPIC_API_KEY` und den Schlüssel als Wert eintragen, dann **Deploy**.
+     Der Schlüssel bleibt nur auf dem Server und übersteht alle späteren Deploys.
+
 ## Einmalige Einrichtung bei Cloudflare
 
 1. Kostenloses Konto auf <https://dash.cloudflare.com> anlegen.

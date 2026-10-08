@@ -7,9 +7,12 @@
  *   لكل منها رقم نسخة متصاعد، والأجهزة تسحب ما تغيّر منذ آخر رقم رأته
  */
 
+import { handleAdvisorChat } from './advisor';
+
 export interface Env {
   DB: D1Database;
   ASSETS?: Fetcher;
+  ANTHROPIC_API_KEY?: string; // سرّ في Cloudflare للمستشار الذكي
 }
 
 type Role = 'admin' | 'accountant' | 'technician';
@@ -75,6 +78,12 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
   `INSERT OR IGNORE INTO meta (key, value) VALUES ('version', '0')`,
   `INSERT OR IGNORE INTO meta (key, value) VALUES ('epoch', lower(hex(randomblob(8))))`,
+  `CREATE TABLE IF NOT EXISTS ai_usage (
+    user_id TEXT NOT NULL,
+    day TEXT NOT NULL,
+    count INTEGER NOT NULL,
+    PRIMARY KEY (user_id, day)
+  )`,
 ];
 
 let schemaReady: Promise<void> | null = null;
@@ -589,6 +598,7 @@ async function handleApi(req: Request, env: Env, url: URL): Promise<Response> {
 
   if (path === '/api/sync' && method === 'GET') return handlePull(url, db);
   if (path === '/api/sync' && method === 'POST') return handlePush(req, db, user);
+  if (path === '/api/ai/chat' && method === 'POST') return handleAdvisorChat(req, env, user);
 
   throw new HttpError(404, 'المسار غير موجود.');
 }

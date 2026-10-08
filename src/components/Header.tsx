@@ -22,6 +22,7 @@ import {
   LogOut,
   TowerControl,
   MonitorDown,
+  Sparkles,
   Share,
   X as CloseIcon,
 } from 'lucide-react';
@@ -290,10 +291,10 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Navigation Tabs */}
-        <nav className="flex items-center gap-1 sm:gap-2 mt-3 pt-2 border-t border-slate-800/80 overflow-x-auto scrollbar-none">
+        <nav aria-label="أقسام المنظومة" className="flex flex-wrap items-center gap-1 sm:gap-1.5 mt-3 pt-2 border-t border-slate-800/80">
           <button
             onClick={() => setActiveTab('subscribers')}
-            className={`px-3 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 whitespace-nowrap transition cursor-pointer ${
+            className={`px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 whitespace-nowrap transition cursor-pointer ${
               activeTab === 'subscribers'
                 ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
@@ -310,7 +311,7 @@ export const Header: React.FC<HeaderProps> = ({
           {currentUser.role !== 'technician' && (
             <button
               onClick={() => setActiveTab('dashboard')}
-              className={`px-3 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 whitespace-nowrap transition cursor-pointer ${
+              className={`px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 whitespace-nowrap transition cursor-pointer ${
                 activeTab === 'dashboard'
                   ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
@@ -325,7 +326,7 @@ export const Header: React.FC<HeaderProps> = ({
           {currentUser.role !== 'technician' && (
             <button
               onClick={() => setActiveTab('reports')}
-              className={`px-3 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 whitespace-nowrap transition cursor-pointer ${
+              className={`px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 whitespace-nowrap transition cursor-pointer ${
                 activeTab === 'reports'
                   ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
@@ -338,7 +339,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             onClick={() => setActiveTab('reminders')}
-            className={`px-3 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 whitespace-nowrap transition cursor-pointer relative ${
+            className={`px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 whitespace-nowrap transition cursor-pointer relative ${
               activeTab === 'reminders'
                 ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
@@ -353,7 +354,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             onClick={() => setActiveTab('tickets')}
-            className={`px-3 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 whitespace-nowrap transition cursor-pointer ${
+            className={`px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 whitespace-nowrap transition cursor-pointer ${
               activeTab === 'tickets'
                 ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
@@ -368,10 +369,25 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </button>
 
+          {/* AI Advisor Tab - admin & accountant */}
+          {currentUser.role !== 'technician' && (
+            <button
+              onClick={() => setActiveTab('advisor')}
+              className={`px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 whitespace-nowrap transition cursor-pointer ${
+                activeTab === 'advisor'
+                  ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40'
+                  : 'text-indigo-300/80 hover:text-indigo-200 hover:bg-slate-800/60'
+              }`}
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>المستشار الذكي</span>
+            </button>
+          )}
+
           {/* Towers Tab - visible to everyone (editing for admin/accountant) */}
           <button
             onClick={() => setActiveTab('towers')}
-            className={`px-3 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 whitespace-nowrap transition cursor-pointer ${
+            className={`px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 whitespace-nowrap transition cursor-pointer ${
               activeTab === 'towers'
                 ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
@@ -385,7 +401,7 @@ export const Header: React.FC<HeaderProps> = ({
           {currentUser.role !== 'technician' && (
             <button
               onClick={() => setActiveTab('providers')}
-              className={`px-3 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 whitespace-nowrap transition cursor-pointer ${
+              className={`px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 whitespace-nowrap transition cursor-pointer ${
                 activeTab === 'providers'
                   ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
@@ -400,7 +416,7 @@ export const Header: React.FC<HeaderProps> = ({
           {currentUser.role === 'admin' && (
             <button
               onClick={() => setActiveTab('users')}
-              className={`px-3 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 whitespace-nowrap transition cursor-pointer ${
+              className={`px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 whitespace-nowrap transition cursor-pointer ${
                 activeTab === 'users'
                   ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
@@ -415,7 +431,7 @@ export const Header: React.FC<HeaderProps> = ({
           {currentUser.role === 'admin' && (
             <button
               onClick={() => setActiveTab('settings')}
-              className={`px-3 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 whitespace-nowrap transition cursor-pointer ${
+              className={`px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 whitespace-nowrap transition cursor-pointer ${
                 activeTab === 'settings'
                   ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'

@@ -82,6 +82,8 @@ import { TicketsView } from './components/views/TicketsView';
 import { ProvidersView } from './components/views/ProvidersView';
 import { UsersManagementView } from './components/views/UsersManagementView';
 import { TowersView } from './components/views/TowersView';
+// المستشار الذكي يُحمَّل عند فتح التبويب فقط
+const AdvisorView = React.lazy(() => import('./components/views/AdvisorView').then(m => ({ default: m.AdvisorView })));
 import { NO_TOWER_LABEL, normTower } from './utils/towers';
 import { SettingsView } from './components/views/SettingsView';
 import { appConfirm, notify } from './components/ui/Dialogs';
@@ -95,6 +97,7 @@ const TAB_ACCESS: Record<string, UserRole[]> = {
   reports: ['admin', 'accountant'],
   providers: ['admin', 'accountant'],
   towers: ['admin', 'accountant', 'technician'],
+  advisor: ['admin', 'accountant'],
   users: ['admin'],
   settings: ['admin'],
 };
@@ -1164,6 +1167,19 @@ export default function App() {
               setActiveTab('subscribers');
             }}
           />
+        )}
+
+        {safeActiveTab === 'advisor' && (
+          <React.Suspense fallback={<div className="py-20 text-center text-xs text-slate-400">جارٍ تحميل المستشار…</div>}>
+            <AdvisorView
+              subscribers={subscribers}
+              payments={payments}
+              tickets={tickets}
+              providers={providers}
+              towers={towerPoints}
+              settings={settings}
+            />
+          </React.Suspense>
         )}
 
         {safeActiveTab === 'users' && (
