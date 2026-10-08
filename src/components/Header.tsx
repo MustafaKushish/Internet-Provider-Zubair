@@ -21,9 +21,14 @@ import {
   Lock,
   LogOut,
   TowerControl,
+  MonitorDown,
+  Share,
+  X as CloseIcon,
 } from 'lucide-react';
 import { getNotificationPermission, requestNotificationPermission } from '../utils/notifications';
 import { StaffUser } from '../types/isp';
+import { canPromptInstall, isStandalone, onInstallAvailabilityChange, requestInstall } from '../pwa';
+import { notify } from './ui/Dialogs';
 
 interface HeaderProps {
   activeTab: string;
@@ -63,6 +68,24 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenAddUser,
 }) => {
   const [notifPermission, setNotifPermission] = useState<NotificationPermission>('default');
+  // زر التثبيت يظهر ما دامت المنظومة مفتوحة في المتصفح وليس كتطبيق مثبت
+  const [showInstall, setShowInstall] = useState(() => !isStandalone());
+  const [iosHelpOpen, setIosHelpOpen] = useState(false);
+  useEffect(() => onInstallAvailabilityChange(() => setShowInstall(!isStandalone())), []);
+
+  const handleInstall = async () => {
+    const result = await requestInstall();
+    if (result === 'installed') {
+      setShowInstall(false);
+      notify('تم تثبيت التطبيق. ستجده في قائمة التطبيقات وعلى الشاشة الرئيسية.', 'success');
+    } else if (result === 'ios') {
+      setIosHelpOpen(true);
+    } else if (result === 'manual') {
+      notify(canPromptInstall()
+        ? 'اضغط زر التثبيت مرة أخرى.'
+        : 'للتثبيت: افتح قائمة المتصفح (⋮ أو …) واختر "تثبيت التطبيق" أو "إضافة إلى الشاشة الرئيسية". في ويندوز استخدم Edge أو Chrome.', 'info');
+    }
+  };
 
   useEffect(() => {
     setNotifPermission(getNotificationPermission());
@@ -227,6 +250,17 @@ export const Header: React.FC<HeaderProps> = ({
                   <BellOff className="w-4 h-4 text-amber-400" />
                 )}
               </button>
+
+              {showInstall && (
+                <button
+                  onClick={handleInstall}
+                  title="تثبيت المنظومة كتطبيق على هذا الجهاز"
+                  className="bg-slate-800 hover:bg-slate-700 border border-cyan-700 text-cyan-300 text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <MonitorDown className="w-4 h-4" />
+                  <span>تثبيت التطبيق</span>
+                </button>
+              )}
 
               <button
                 onClick={onOpenAddModal}
@@ -393,6 +427,24 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </nav>
       </div>
+      {iosHelpOpen && (
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm" onClick={() => setIosHelpOpen(false)}>
+          <div role="dialog" aria-modal="true" className="bg-slate-900 border border-slate-700 rounded-2xl max-w-sm w-full p-5 space-y-3 shadow-2xl text-sm" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h2 className="font-bold text-white">تثبيت التطبيق على آيفون / آيباد</h2>
+              <button type="button" onClick={() => setIosHelpOpen(false)} className="text-slate-400 hover:text-white cursor-pointer" aria-label="إغلاق">
+                <CloseIcon className="w-4 h-4" />
+              </button>
+            </div>
+            <ol className="space-y-2.5 text-slate-300 text-xs leading-relaxed list-decimal pr-4">
+              <li>افتح المنظومة في متصفح <strong className="text-white">Safari</strong>.</li>
+              <li>اضغط زر المشاركة <Share className="w-3.5 h-3.5 inline text-cyan-400" /> أسفل الشاشة.</li>
+              <li>اختر <strong className="text-white">«إضافة إلى الشاشة الرئيسية»</strong> ثم <strong className="text-white">«إضافة»</strong>.</li>
+              <li>افتح التطبيق من أيقونة <strong className="text-white">أولاد كشيش</strong> على الشاشة الرئيسية.</li>
+            </ol>
+          </div>
+        </div>
+      )}
     </header>
   );
 };

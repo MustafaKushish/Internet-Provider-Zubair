@@ -1,0 +1,40 @@
+name: Build Windows App
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['desktop/**', '.github/workflows/desktop.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Install Electron tooling
+        working-directory: desktop
+        run: npm install --no-audit --no-fund
+      - name: Build installer (.exe)
+        working-directory: desktop
+        run: npm run dist:win
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: AwladKushish-Windows-Setup
+          path: desktop/dist/*.exe
+      - name: Publish as GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="windows-v${{ github.run_number }}"
+          gh release create "$TAG" desktop/dist/*.exe \
+            --target "${{ github.sha }}" \
+            --title "تطبيق ويندوز - أولاد كشيش (نسخة ${{ github.run_number }})" \
+            --notes "ملف التثبيت لويندوز. حمّل ملف .exe وشغّله. التطبيق يفتح المنظومة على Cloudflare ويتحدث تلقائياً مع كل نشر جديد."

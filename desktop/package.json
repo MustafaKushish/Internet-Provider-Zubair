@@ -1,0 +1,33 @@
+{
+  "name": "awlad-kushish-desktop",
+  "productName": "Awlad Kushish",
+  "version": "1.0.0",
+  "description": "شبكة أولاد كشيش - تطبيق ويندوز لإدارة المشتركين",
+  "main": "main.js",
+  "private": true,
+  "author": "Awlad Kushish",
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win nsis --publish never"
+  },
+  "devDependencies": {
+    "electron": "^37.2.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "net.awladkushish.sasplus",
+    "productName": "Awlad Kushish",
+    "artifactName": "AwladKushish-Setup-${version}.${ext}",
+    "directories": { "output": "dist", "buildResources": "build" },
+    "files": ["main.js", "offline.html", "build/icon.png"],
+    "win": { "target": ["nsis"], "icon": "build/icon.png" },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "أولاد كشيش"
+    }
+  }
+}

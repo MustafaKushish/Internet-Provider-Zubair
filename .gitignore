@@ -9,3 +9,5 @@ coverage/
 .wrangler/
 .dev.vars
 dist-preview/
+desktop/node_modules/
+desktop/dist/

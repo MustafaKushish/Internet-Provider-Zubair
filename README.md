@@ -23,6 +23,18 @@ einer **Cloudflare-D1-Datenbank**.
   | Anbieter und Türme | ✓ | ✓ | – |
   | Einstellungen, Mitarbeiter | ✓ | – | – |
 
+## Als App installieren
+
+| Gerät | So geht's |
+|---|---|
+| **Android** | Adresse in **Chrome** öffnen → Knopf **„تثبيت التطبيق“** oben in der App (oder Chrome-Menü ⋮ → *App installieren*). |
+| **iPhone / iPad** | Adresse in **Safari** öffnen → Teilen-Symbol → **„Zum Home-Bildschirm“** → *Hinzufügen*. |
+| **Windows** | Entweder in **Edge/Chrome** auf „تثبيت التطبيق“ klicken, oder den Installer `AwladKushish-Setup-x.y.z.exe` aus den GitHub-Releases ausführen (Workflow *Build Windows App*). |
+
+Die installierte App startet ohne Browserleiste, hat ein eigenes Symbol, öffnet sich auch ohne Internet
+(mit den zuletzt gespeicherten Daten) und aktualisiert sich bei jedem Deploy automatisch.
+Der Windows-Installer ist eine Electron-Hülle (`desktop/`) um dieselbe Adresse.
+
 ## Einmalige Einrichtung bei Cloudflare
 
 1. Kostenloses Konto auf <https://dash.cloudflare.com> anlegen.
