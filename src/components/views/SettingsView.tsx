@@ -29,6 +29,7 @@ import {
   sendTestNotification,
   checkAndTriggerExpiryNotifications
 } from '../../utils/notifications';
+import { appConfirm, notify } from '../ui/Dialogs';
 
 interface SettingsViewProps {
   settings: SystemSettings;
@@ -194,12 +195,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             staffUsers: Array.isArray(parsed.staffUsers) ? parsed.staffUsers : undefined,
             towers: Array.isArray(parsed.towers) ? parsed.towers : undefined,
           });
-          alert('تم استعادة النسخة الاحتياطية بنجاح!');
+          notify('تم استعادة النسخة الاحتياطية بنجاح!', 'success');
         } else {
-          alert('الملف غير صالح أو لا يحتوي على بنية البيانات الصحيحة.');
+          notify('الملف غير صالح أو لا يحتوي على بنية البيانات الصحيحة.');
         }
       } catch (err) {
-        alert('حدث خطأ أثناء قراءة ملف النسخة الاحتياطية.');
+        notify('حدث خطأ أثناء قراءة ملف النسخة الاحتياطية.');
       }
     };
     reader.readAsText(file);
@@ -570,8 +571,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           {/* Clear All Data */}
           <button
             type="button"
-            onClick={() => {
-              if (confirm('تنبيه: هل أنت متأكد من تفريغ كافة بيانات المشتركين والوصولات للبدء من الصفر؟')) {
+            onClick={async () => {
+              if (await appConfirm('تنبيه: هل أنت متأكد من تفريغ كافة بيانات المشتركين والوصولات للبدء من الصفر؟')) {
                 onResetToDemoData();
               }
             }}

@@ -20,7 +20,8 @@ import {
   INITIAL_TOWERS
 } from '../data/initialData';
 import { TowerPoint } from '../types/isp';
-import * as XLSX from 'xlsx';
+// مكتبة الإكسل كبيرة؛ تُحمَّل فقط عند الاستيراد أو التصدير
+const loadXlsx = () => import('xlsx');
 import { toLocalDateStr, todayStr, parseLocalDate, diffDays } from './dates';
 
 // Clean production storage keys for شبكة أولاد كشيش لخدمات الإنترنت (البصرة - الزبير)
@@ -432,15 +433,16 @@ export function generatePeriodReport(
   subscribers.forEach(s => {
     if (!providerMap[s.upstreamProvider]) providerMap[s.upstreamProvider] = { revenue: 0, cost: 0, count: 0 };
     providerMap[s.upstreamProvider].count += 1;
-    if (!towerMap[s.towerName]) towerMap[s.towerName] = { userCount: 0, revenue: 0 };
-    towerMap[s.towerName].userCount += 1;
+    const towerKey = (s.towerName || '').trim() || 'بدون برج';
+    if (!towerMap[towerKey]) towerMap[towerKey] = { userCount: 0, revenue: 0 };
+    towerMap[towerKey].userCount += 1;
   });
 
   // توزيع كل الدفعات (جميعها وليس أول دفعة فقط) حتى تتطابق المجاميع مع إجمالي الإيرادات
   periodPayments.forEach(p => {
     const sub = subscribers.find(s => s.id === p.subscriberId);
     const provider = p.provider || sub?.upstreamProvider || DELETED_LABEL;
-    const tower = p.towerName || sub?.towerName || DELETED_LABEL;
+    const tower = (p.towerName || '').trim() || (sub ? (sub.towerName || '').trim() || 'بدون برج' : DELETED_LABEL);
     if (!providerMap[provider]) providerMap[provider] = { revenue: 0, cost: 0, count: 0 };
     providerMap[provider].revenue += p.amount;
     providerMap[provider].cost += getPaymentCost(p, subscribers);
@@ -479,7 +481,8 @@ export function generatePeriodReport(
 }
 
 // Export to Excel (XLSX)
-export function exportSubscribersToExcel(subscribers: Subscriber[], filename = 'مشتركي_الإنترنت.xlsx'): void {
+export async function exportSubscribersToExcel(subscribers: Subscriber[], filename = 'مشتركي_الإنترنت.xlsx'): Promise<void> {
+  const XLSX = await loadXlsx();
   const data = subscribers.map((s, idx) => ({
     'ت': idx + 1,
     'اسم المشترك': s.name,
@@ -513,7 +516,8 @@ export function exportSubscribersToExcel(subscribers: Subscriber[], filename = '
 }
 
 // Export Period Report to Excel
-export function exportReportToExcel(report: ReportSummary, filename = 'تقرير_الأرباح_والإيرادات.xlsx'): void {
+export async function exportReportToExcel(report: ReportSummary, filename = 'تقرير_الأرباح_والإيرادات.xlsx'): Promise<void> {
+  const XLSX = await loadXlsx();
   const summaryData = [
     { 'البيان': 'الفترة الزمنية', 'القيمة': report.periodLabel },
     { 'البيان': 'من تاريخ', 'القيمة': report.startDate },
@@ -633,8 +637,9 @@ export function normalizeNameKey(name: string): string {
 export function parseExcelSubscribers(file: File): Promise<Partial<Subscriber>[]> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
+        const XLSX = await loadXlsx();
         const buffer = e.target?.result;
         const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
         const firstSheet = workbook.SheetNames[0];

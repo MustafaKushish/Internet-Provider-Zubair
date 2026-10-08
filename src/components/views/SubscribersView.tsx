@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { NO_TOWER_LABEL, normTower } from '../../utils/towers';
 import { Subscriber, SystemSettings, StaffUser } from '../../types/isp';
 import { formatCurrency, getDaysRemaining, getRemainingDebt, getAmountDue } from '../../utils/storage';
 import {
@@ -31,6 +32,12 @@ interface SubscribersViewProps {
   providers: { id: string; name: string }[];
   towers: string[];
   currentUser?: StaffUser;
+  /** طلب فتح القائمة مفلترة على برج (من تبويب الأبراج) */
+  towerFilterRequest?: { name: string; nonce: number } | null;
+  /** تغيير برج مشترك أو عدة مشتركين */
+  onAssignTower?: (subscriberIds: string[], towerName: string) => void;
+  /** يُستدعى بعد تطبيق طلب الفلترة حتى لا يُطبَّق مرة أخرى عند العودة للتبويب */
+  onTowerFilterApplied?: () => void;
   onRenew: (sub: Subscriber) => void;
   onSendWhatsApp: (sub: Subscriber, defaultTab?: any) => void;
   onPrintReceipt: (sub: Subscriber) => void;
@@ -50,6 +57,9 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
   providers,
   towers,
   currentUser,
+  towerFilterRequest,
+  onAssignTower,
+  onTowerFilterApplied,
   onRenew,
   onSendWhatsApp,
   onPrintReceipt,
@@ -67,6 +77,19 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'paid' | 'pending' | 'overdue'>('all');
   const [providerFilter, setProviderFilter] = useState('all');
   const [towerFilter, setTowerFilter] = useState('all');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkTower, setBulkTower] = useState('');
+
+  // فتح القائمة على برج محدد عند الطلب من تبويب الأبراج
+  useEffect(() => {
+    if (!towerFilterRequest) return;
+    setTowerFilter(towerFilterRequest.name === NO_TOWER_LABEL ? '__none__' : towerFilterRequest.name);
+    setStatusFilter('all');
+    setPaymentFilter('all');
+    setProviderFilter('all');
+    setSearch('');
+    onTowerFilterApplied?.();
+  }, [towerFilterRequest?.nonce]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
 
@@ -89,7 +112,7 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
         sub.phone.includes(q) ||
         sub.username.toLowerCase().includes(q) ||
         (sub.ipAddress && sub.ipAddress.includes(q)) ||
-        sub.towerName.toLowerCase().includes(q);
+        (sub.towerName || '').toLowerCase().includes(q);
 
       // Status
       const matchesStatus = statusFilter === 'all' || sub.status === statusFilter;
@@ -101,7 +124,8 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
       const matchesProvider = providerFilter === 'all' || sub.upstreamProvider === providerFilter;
 
       // Tower
-      const matchesTower = towerFilter === 'all' || sub.towerName === towerFilter;
+      const subTower = normTower(sub.towerName);
+      const matchesTower = towerFilter === 'all' || (towerFilter === '__none__' ? !subTower : subTower === towerFilter);
 
       return matchesSearch && matchesStatus && matchesPayment && matchesProvider && matchesTower;
     });
@@ -227,6 +251,7 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
                 className="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1 text-slate-200 focus:outline-none focus:border-cyan-500"
               >
                 <option value="all">كافة الأبراج</option>
+                <option value="__none__">— {NO_TOWER_LABEL} ({subscribers.filter(s => !normTower(s.towerName)).length}) —</option>
                 {towers.map((t, idx) => (
                   <option key={idx} value={t}>{t}</option>
                 ))}
@@ -263,12 +288,58 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
         </div>
       </div>
 
+      {/* Bulk tower assignment for selected subscribers */}
+      {onAssignTower && selected.size > 0 && (
+        <div className="sticky top-2 z-20 bg-cyan-950/95 border border-cyan-800 rounded-2xl px-4 py-3 shadow-xl flex flex-wrap items-center gap-3 text-xs">
+          <span className="font-bold text-cyan-200">تم تحديد {selected.size} مشترك</span>
+          <div className="flex items-center gap-2 flex-wrap">
+            <label htmlFor="bulk-tower" className="text-cyan-300">نقل إلى البرج:</label>
+            <input
+              id="bulk-tower"
+              list="bulk-towers-list"
+              value={bulkTower}
+              onChange={(e) => setBulkTower(e.target.value)}
+              placeholder="اختر أو اكتب اسم برج جديد"
+              className="bg-slate-950 border border-cyan-800 rounded-lg px-2.5 py-1.5 text-white w-56 focus:outline-none focus:border-cyan-400"
+            />
+            <datalist id="bulk-towers-list">
+              {towers.map(t => <option key={t} value={t} />)}
+            </datalist>
+            <button
+              type="button"
+              onClick={() => {
+                onAssignTower([...selected], bulkTower);
+                setSelected(new Set());
+                setBulkTower('');
+              }}
+              className="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold cursor-pointer"
+            >
+              {normTower(bulkTower) ? 'نقل' : `نقل إلى «${NO_TOWER_LABEL}»`}
+            </button>
+          </div>
+          <button type="button" onClick={() => setSelected(new Set())} className="text-cyan-300 hover:text-white underline cursor-pointer mr-auto">
+            إلغاء التحديد
+          </button>
+        </div>
+      )}
+
       {/* Subscribers Table Card */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-right text-xs">
             <thead className="bg-slate-800/90 text-slate-300 font-bold border-b border-slate-700">
               <tr>
+                {onAssignTower && (
+                  <th className="py-3 pr-4 pl-1 w-8">
+                    <input
+                      type="checkbox"
+                      aria-label="تحديد كل المشتركين الظاهرين"
+                      checked={filteredSubscribers.length > 0 && filteredSubscribers.every(s => selected.has(s.id))}
+                      onChange={(e) => setSelected(e.target.checked ? new Set(filteredSubscribers.map(s => s.id)) : new Set())}
+                      className="rounded bg-slate-900 border-slate-600 accent-cyan-500 cursor-pointer"
+                    />
+                  </th>
+                )}
                 <th className="py-3 px-4">المشترك والاتصال</th>
                 <th className="py-3 px-3">اليوزر والباسورد (SAS)</th>
                 <th className="py-3 px-3">المزود والباقة</th>
@@ -290,7 +361,7 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
             <tbody className="divide-y divide-slate-800 text-slate-200">
               {filteredSubscribers.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-14 text-center text-slate-400">
+                  <td colSpan={onAssignTower ? 8 : 7} className="py-14 text-center text-slate-400">
                     <div className="max-w-md mx-auto space-y-3">
                       <div className="w-14 h-14 rounded-2xl bg-cyan-600/15 text-cyan-400 border border-cyan-500/30 flex items-center justify-center mx-auto">
                         <CheckCircle2 className="w-7 h-7" />
@@ -338,15 +409,43 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
                   const remainingDebt = getRemainingDebt(sub);
 
                   return (
-                    <tr key={sub.id} className="hover:bg-slate-800/50 transition">
+                    <tr key={sub.id} className={`hover:bg-slate-800/50 transition ${selected.has(sub.id) ? 'bg-cyan-950/30' : ''}`}>
+                      {onAssignTower && (
+                        <td className="py-3 pr-4 pl-1 align-top">
+                          <input
+                            type="checkbox"
+                            aria-label={`تحديد ${sub.name}`}
+                            checked={selected.has(sub.id)}
+                            onChange={(e) => setSelected(prev => {
+                              const next = new Set(prev);
+                              if (e.target.checked) next.add(sub.id); else next.delete(sub.id);
+                              return next;
+                            })}
+                            className="rounded bg-slate-900 border-slate-600 accent-cyan-500 cursor-pointer mt-1"
+                          />
+                        </td>
+                      )}
                       {/* Name & Phone & Tower */}
                       <td className="py-3 px-4">
                         <div className="font-bold text-white text-sm">{sub.name}</div>
                         <div className="flex items-center gap-1.5 text-slate-400 mt-0.5" dir="ltr">
                           <span className="font-mono text-[11px] text-left">{sub.phone}</span>
                         </div>
-                        <div className="text-[11px] text-cyan-400/90 mt-0.5 flex items-center gap-1">
-                          <span>📍 {sub.towerName}</span>
+                        <div className="text-[11px] mt-1 flex items-center gap-1">
+                          <TowerControl className={`w-3 h-3 flex-shrink-0 ${normTower(sub.towerName) ? 'text-cyan-400' : 'text-amber-400'}`} />
+                          {onAssignTower ? (
+                            <select
+                              aria-label={`برج ${sub.name}`}
+                              value={normTower(sub.towerName)}
+                              onChange={(e) => onAssignTower([sub.id], e.target.value)}
+                              className={`bg-transparent border border-transparent hover:border-slate-700 focus:border-cyan-500 rounded px-1 py-0.5 max-w-[190px] focus:outline-none cursor-pointer ${normTower(sub.towerName) ? 'text-cyan-300' : 'text-amber-300'}`}
+                            >
+                              <option value="" className="bg-slate-900">— {NO_TOWER_LABEL} —</option>
+                              {towers.map(t => <option key={t} value={t} className="bg-slate-900">{t}</option>)}
+                            </select>
+                          ) : (
+                            <span className={normTower(sub.towerName) ? 'text-cyan-400/90' : 'text-amber-300'}>{normTower(sub.towerName) || NO_TOWER_LABEL}</span>
+                          )}
                         </div>
                       </td>
 
@@ -411,7 +510,7 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
                           <td className="py-3 px-3">
                             <div className="font-semibold text-white flex items-center gap-1">
                               <TowerControl className="w-3.5 h-3.5 text-cyan-400" />
-                              <span>{sub.towerName || 'البرج الرئيسي'}</span>
+                              <span>{normTower(sub.towerName) || NO_TOWER_LABEL}</span>
                             </div>
                             <div className="text-[11px] text-slate-400 mt-0.5 truncate max-w-[150px]">
                               {sub.address || 'الزبير'}

@@ -18,6 +18,7 @@ import {
   Trash2,
   Lock
 } from 'lucide-react';
+import { appConfirm } from './ui/Dialogs';
 
 interface PaymentHistoryModalProps {
   isOpen: boolean;
@@ -319,8 +320,8 @@ ${settings.ispName} - ${settings.contactPhone}`;
                           {/* Delete Invoice Button - Strictly for Admin only */}
                           {currentUser.role === 'admin' ? (
                             <button
-                              onClick={() => {
-                                if (onDeletePayment && confirm(`تنبيه أمني للمدير العام: هل أنت متأكد من حذف الوصل رقم (${pay.receiptNumber}) بمبلغ (${formatCurrency(pay.amount, settings.currency)})؟ سيتم خصمه من رصيد المشترك.`)) {
+                              onClick={async () => {
+                                if (onDeletePayment && await appConfirm(`تنبيه أمني للمدير العام: هل أنت متأكد من حذف الوصل رقم (${pay.receiptNumber}) بمبلغ (${formatCurrency(pay.amount, settings.currency)})؟ سيتم خصمه من رصيد المشترك.`)) {
                                   onDeletePayment(pay.id);
                                 }
                               }}

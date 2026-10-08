@@ -90,7 +90,7 @@ export const SubscriberModal: React.FC<SubscriberModalProps> = ({
       const today = todayStr();
       setStartDate(today);
       setExpiryDate(addMonthsToDateStr(today, 1));
-      setTowerName(towers[0] || 'البرج الرئيسي');
+      setTowerName('');
       setIpAddress('');
       setMacAddress('');
       setAddress('');
@@ -483,7 +483,7 @@ export const SubscriberModal: React.FC<SubscriberModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">البرج أو السكتر المغذي</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">البرج أو السكتر المغذي <span className="text-slate-500 font-normal">(الاسم الجديد يُسجَّل كبرج تلقائياً)</span></label>
                 <div className="relative">
                   <TowerControl className="w-4 h-4 text-slate-400 absolute right-3 top-2.5" />
                   <input
@@ -491,7 +491,7 @@ export const SubscriberModal: React.FC<SubscriberModalProps> = ({
                     list="towers-list"
                     value={towerName}
                     onChange={(e) => setTowerName(e.target.value)}
-                    placeholder="مثال: برج الكرادة - سكتر 1"
+                    placeholder="اختر برجاً من القائمة أو اكتب اسم برج جديد"
                     className="w-full bg-slate-800 border border-slate-700 rounded-lg pr-9 pl-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
                   />
                   <datalist id="towers-list">

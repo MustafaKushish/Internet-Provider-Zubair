@@ -1,5 +1,6 @@
 import React from 'react';
-import { Subscriber, SystemSettings } from '../../types/isp';
+import { PaymentRecord, Subscriber, SystemSettings, TowerPoint } from '../../types/isp';
+import { computeTowerStats, sortTowerStats, NO_TOWER_LABEL } from '../../utils/towers';
 import { formatCurrency, getDaysRemaining, getAmountDue, getRemainingDebt } from '../../utils/storage';
 import {
   DollarSign,
@@ -19,14 +20,20 @@ import {
 
 interface DashboardViewProps {
   subscribers: Subscriber[];
+  payments: PaymentRecord[];
+  towerPoints: TowerPoint[];
   settings: SystemSettings;
+  onOpenTowers?: () => void;
   onRenew: (sub: Subscriber) => void;
   onSendWhatsApp: (sub: Subscriber, defaultTab?: any) => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
   subscribers,
+  payments,
+  towerPoints,
   settings,
+  onOpenTowers,
   onRenew,
   onSendWhatsApp,
 }) => {
@@ -66,11 +73,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return acc;
   }, {} as Record<string, number>);
 
-  // Group by Tower
-  const towerStats = subscribers.reduce((acc, s) => {
-    acc[s.towerName] = (acc[s.towerName] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  // إحصائيات الأبراج: الأعلى ربحاً شهرياً أولاً
+  const towerRanking = sortTowerStats(
+    computeTowerStats(subscribers, payments, towerPoints).filter(t => t.subscribers > 0),
+    'monthlyProfit',
+  );
+  const maxTowerProfit = Math.max(1, ...towerRanking.map(t => t.monthlyProfit));
 
   return (
     <div className="space-y-6">
@@ -300,28 +308,42 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        {/* By Tower / Sector */}
+        {/* By Tower: count, monthly profit and debts */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
-          <div className="flex items-center gap-2 mb-4">
-            <TowerControl className="w-5 h-5 text-cyan-400" />
-            <h3 className="font-bold text-white text-sm">توزيع المشتركين حسب الأبراج ونقاط البث</h3>
+          <div className="flex items-center justify-between gap-2 mb-4">
+            <div className="flex items-center gap-2">
+              <TowerControl className="w-5 h-5 text-cyan-400" />
+              <h3 className="font-bold text-white text-sm">الأبراج حسب الربح الشهري</h3>
+            </div>
+            {onOpenTowers && (
+              <button type="button" onClick={onOpenTowers} className="text-[11px] text-cyan-400 hover:text-cyan-300 font-bold cursor-pointer">
+                كل الأبراج ←
+              </button>
+            )}
           </div>
-          <div className="space-y-3">
-            {Object.entries(towerStats).map(([tower, count]) => {
-              const pct = subscribers.length > 0 ? Math.round((count / subscribers.length) * 100) : 0;
-              return (
-                <div key={tower} className="space-y-1">
-                  <div className="flex justify-between text-xs font-semibold">
-                    <span className="text-slate-200">{tower}</span>
-                    <span className="text-cyan-400">{count} مشترك ({pct}%)</span>
+          {towerRanking.length === 0 ? (
+            <p className="text-xs text-slate-500">لا يوجد مشتركون مربوطون بأبراج بعد.</p>
+          ) : (
+            <div className="space-y-3" style={{ fontVariantNumeric: 'tabular-nums' }}>
+              {towerRanking.slice(0, 8).map((t, idx) => (
+                <div key={t.name} className="space-y-1">
+                  <div className="flex justify-between gap-2 text-xs font-semibold">
+                    <span className={`truncate ${t.name === NO_TOWER_LABEL ? 'text-amber-300' : 'text-slate-200'}`}>
+                      <span className="text-slate-500 ml-1">{idx + 1}.</span>{t.name}
+                      <span className="text-slate-500 font-normal"> • {t.subscribers} مشترك</span>
+                    </span>
+                    <span className="text-emerald-400 whitespace-nowrap">{formatCurrency(t.monthlyProfit, settings.currency)}</span>
                   </div>
                   <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
-                    <div className="bg-cyan-500 h-2 rounded-full" style={{ width: `${pct}%` }} />
+                    <div className="bg-emerald-500 h-2 rounded-full" style={{ width: `${Math.max(2, Math.round((t.monthlyProfit / maxTowerProfit) * 100))}%` }} />
                   </div>
+                  {t.debts > 0 && (
+                    <div className="text-[10px] text-rose-400">ديون: {formatCurrency(t.debts, settings.currency)}</div>
+                  )}
                 </div>
-              );
-            })}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

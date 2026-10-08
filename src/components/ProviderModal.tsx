@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { UpstreamProvider, ProviderPlan, Subscriber } from '../types/isp';
 import { Server, X, Plus, Edit2, Trash2, Check, AlertCircle, Phone, FileText, Gauge, DollarSign } from 'lucide-react';
+import { notify } from './ui/Dialogs';
 
 interface ProviderModalProps {
   isOpen: boolean;
@@ -119,7 +120,7 @@ const ProviderModalInner: React.FC<ProviderModalProps> = ({
 
   const handleDeletePlanItem = (id: string) => {
     if (plans.length <= 1) {
-      alert('يجب الإبقاء على باقة واحدة على الأقل لهذا المزود.');
+      notify('يجب الإبقاء على باقة واحدة على الأقل لهذا المزود.');
       return;
     }
     setPlans(prev => prev.filter(p => p.id !== id));

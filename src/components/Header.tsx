@@ -19,7 +19,8 @@ import {
   UserCheck,
   ShieldCheck,
   Lock,
-  LogOut
+  LogOut,
+  TowerControl,
 } from 'lucide-react';
 import { getNotificationPermission, requestNotificationPermission } from '../utils/notifications';
 import { StaffUser } from '../types/isp';
@@ -331,6 +332,19 @@ export const Header: React.FC<HeaderProps> = ({
                 {stats.openTicketsCount}
               </span>
             )}
+          </button>
+
+          {/* Towers Tab - visible to everyone (editing for admin/accountant) */}
+          <button
+            onClick={() => setActiveTab('towers')}
+            className={`px-3 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 whitespace-nowrap transition cursor-pointer ${
+              activeTab === 'towers'
+                ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <TowerControl className="w-4 h-4" />
+            <span>الأبراج</span>
           </button>
 
           {/* Providers Tab - Hidden for Technician */}

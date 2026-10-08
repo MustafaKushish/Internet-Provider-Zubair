@@ -17,6 +17,7 @@ import {
   Phone,
   ShieldAlert
 } from 'lucide-react';
+import { notify } from '../ui/Dialogs';
 
 interface UsersManagementViewProps {
   currentUser: StaffUser;
@@ -94,7 +95,7 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
     if (!name.trim() || !username.trim()) return;
     if (!editingUser && !password.trim()) return;
     if (password.trim() && password.trim().length < 8) {
-      alert('يجب أن تتكون كلمة المرور من 8 خانات على الأقل.');
+      notify('يجب أن تتكون كلمة المرور من 8 خانات على الأقل.');
       return;
     }
 
@@ -281,7 +282,7 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                           type="button"
                           onClick={() => {
                             if (user.id === 'user_admin_1') {
-                              alert('لا يمكن تعطيل حساب المدير الأساسي للمنظومة!');
+                              notify('لا يمكن تعطيل حساب المدير الأساسي للمنظومة!');
                               return;
                             }
                             onSaveUser({ id: user.id, isActive: !user.isActive });
@@ -337,11 +338,7 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                         </button>
                         {user.id !== 'user_admin_1' && (
                           <button
-                            onClick={() => {
-                              if (confirm(`هل أنت متأكد من حذف حساب (${user.name})؟`)) {
-                                onDeleteUser(user.id);
-                              }
-                            }}
+                            onClick={() => onDeleteUser(user.id)}
                             title="حذف المستخدم"
                             className="p-1.5 bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-300 rounded-lg border border-slate-700 cursor-pointer"
                           >

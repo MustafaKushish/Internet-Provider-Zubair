@@ -75,12 +75,16 @@ import { useCloudSync } from './sync/useCloudSync';
 // Views
 import { SubscribersView } from './components/views/SubscribersView';
 import { DashboardView } from './components/views/DashboardView';
-import { ReportsView } from './components/views/ReportsView';
+// التقارير تحتوي على مكتبة الرسوم البيانية؛ تُحمَّل عند فتح التبويب فقط
+const ReportsView = React.lazy(() => import('./components/views/ReportsView').then(m => ({ default: m.ReportsView })));
 import { RemindersView } from './components/views/RemindersView';
 import { TicketsView } from './components/views/TicketsView';
 import { ProvidersView } from './components/views/ProvidersView';
 import { UsersManagementView } from './components/views/UsersManagementView';
+import { TowersView } from './components/views/TowersView';
+import { NO_TOWER_LABEL, normTower } from './utils/towers';
 import { SettingsView } from './components/views/SettingsView';
+import { appConfirm, notify } from './components/ui/Dialogs';
 
 // صلاحيات التبويبات حسب الدور (تُطبَّق على المحتوى نفسه وليس على أزرار القائمة فقط)
 const TAB_ACCESS: Record<string, UserRole[]> = {
@@ -90,6 +94,7 @@ const TAB_ACCESS: Record<string, UserRole[]> = {
   dashboard: ['admin', 'accountant'],
   reports: ['admin', 'accountant'],
   providers: ['admin', 'accountant'],
+  towers: ['admin', 'accountant', 'technician'],
   users: ['admin'],
   settings: ['admin'],
 };
@@ -297,28 +302,41 @@ export default function App() {
     }
   }, [subscribers, settings.warningDaysBeforeExpiry]);
 
-  // Unique towers
+  // قائمة الأبراج للاختيار والفلترة: المسجلة أولاً، ثم أسماء موجودة عند مشتركين ولم تُسجَّل بعد
   const towers = React.useMemo(() => {
-    const set = new Set<string>();
-    towerPoints.forEach(t => {
-      if (t.name) set.add(t.name);
-    });
+    const registered = towerPoints.map(t => normTower(t.name)).filter(Boolean);
+    const known = new Set(registered);
+    const orphans = new Set<string>();
     subscribers.forEach(s => {
-      if (s.towerName) set.add(s.towerName);
+      const n = normTower(s.towerName);
+      if (n && !known.has(n)) orphans.add(n);
     });
-    // Default Zubair / Basra towers if none registered yet
-    if (set.size === 0) {
-      return [
-        'برج الزبير الرئيسي - سكتر 1',
-        'برج سوق الزبير - شارع الجمهورية',
-        'كابينة خطوة الإمام علي - الزبير',
-        'برج حي الشهداء - الزبير',
-        'برج محلة الكوت - الزبير',
-        'سكتر حي الضباط - الزبير',
-      ];
-    }
-    return Array.from(set);
+    return [...registered, ...[...orphans].sort((x, y) => x.localeCompare(y, 'ar'))];
   }, [subscribers, towerPoints]);
+
+  const canEditTowers = currentUser.role === 'admin' || currentUser.role === 'accountant';
+
+  // يسجّل اسم برج جديد تلقائياً عند استخدامه لأول مرة (من نموذج المشترك أو النقل الجماعي)
+  const ensureTowerRegistered = (name: string) => {
+    const n = normTower(name);
+    if (!n || !canEditTowers) return;
+    setTowerPoints(prev => prev.some(t => normTower(t.name) === n)
+      ? prev
+      : [...prev, { id: uid('tow'), name: n }]);
+  };
+
+  // نقل مشتركين محددين إلى برج (أو بدون برج عند الاسم الفارغ)
+  const handleAssignTower = (subscriberIds: string[], towerName: string) => {
+    const ids = new Set(subscriberIds);
+    const n = normTower(towerName);
+    setSubscribers(prev => prev.map(s => ids.has(s.id) ? { ...s, towerName: n } : s));
+    ensureTowerRegistered(n);
+    notify(`تم نقل ${ids.size} مشترك إلى ${n || NO_TOWER_LABEL}.`, 'success');
+  };
+
+  // طلب فتح قائمة المشتركين مفلترة على برج معيّن (من تبويب الأبراج)
+  const [towerFilterRequest, setTowerFilterRequest] = useState<{ name: string; nonce: number } | null>(null);
+
 
   // آخر وصل مطابق للمشترك المعروض في نافذة الطباعة
   const receiptPayment = React.useMemo(() => {
@@ -360,6 +378,10 @@ export default function App() {
   // Handlers: Subscribers
   const handleSaveSubscriber = (subData: Partial<Subscriber>) => {
     const warn = settings.warningDaysBeforeExpiry;
+    if (subData.towerName !== undefined) {
+      subData = { ...subData, towerName: normTower(subData.towerName) };
+      ensureTowerRegistered(subData.towerName || '');
+    }
     if (subData.id) {
       // المبلغ المدفوع لا يُعدَّل من نموذج المشترك؛ أي دفعة تمر عبر سجل الدفعات حتى يبقى الدفتر مطابقاً
       const { paidAmount: _ignoredPaid, ...rest } = subData;
@@ -389,7 +411,7 @@ export default function App() {
         expiryDate: subData.expiryDate || addMonthsToDateStr(subData.startDate || today, 1),
         status: 'active',
         paymentStatus: 'pending',
-        towerName: subData.towerName || towers[0] || 'برج الزبير الرئيسي',
+        towerName: normTower(subData.towerName),
         ipAddress: subData.ipAddress || '',
         macAddress: subData.macAddress || '',
         address: subData.address || '',
@@ -427,12 +449,12 @@ export default function App() {
     }
   };
 
-  const handleDeleteSubscriber = (id: string) => {
+  const handleDeleteSubscriber = async (id: string) => {
     if (currentUser.role !== 'admin') {
-      alert('عذراً: صلاحية حذف المشتركين مخصصة للمدير العام فقط!');
+      notify('عذراً: صلاحية حذف المشتركين مخصصة للمدير العام فقط!');
       return;
     }
-    if (confirm('هل أنت متأكد من حذف هذا المشترك نهائياً من المنظومة؟\n(تبقى وصولاته المالية محفوظة في التقارير)')) {
+    if (await appConfirm('هل أنت متأكد من حذف هذا المشترك نهائياً من المنظومة؟\n(تبقى وصولاته المالية محفوظة في التقارير)')) {
       setSubscribers(prev => prev.filter(s => s.id !== id));
     }
   };
@@ -554,7 +576,7 @@ export default function App() {
   // Handler: Delete payment/invoice (Admin only)
   const handleDeletePayment = (paymentId: string) => {
     if (currentUser.role !== 'admin') {
-      alert('عذراً، فقط المدير العام يمتلك صلاحية حذف الفواتير ووصولات الدفع!');
+      notify('عذراً، فقط المدير العام يمتلك صلاحية حذف الفواتير ووصولات الدفع!');
       return;
     }
 
@@ -578,10 +600,10 @@ export default function App() {
     setPayments(prev => prev.filter(p => p.id !== paymentId));
 
     if (updatedSub) {
-      alert('تم حذف الوصل المالي وخصم مبلغه من رصيد الدورة الحالية للمشترك.' +
+      notify('تم حذف الوصل المالي وخصم مبلغه من رصيد الدورة الحالية للمشترك.' +
         (pay.paymentType === 'renewal' ? '\nتنبيه: تاريخ انتهاء الاشتراك لم يتغير، عدّله يدوياً إذا كان التجديد ملغياً.' : ''));
     } else {
-      alert('تم حذف الوصل المالي. الوصل يعود لدورة سابقة لذلك لم يتغير رصيد الدورة الحالية للمشترك.');
+      notify('تم حذف الوصل المالي. الوصل يعود لدورة سابقة لذلك لم يتغير رصيد الدورة الحالية للمشترك.');
     }
   };
 
@@ -642,8 +664,8 @@ export default function App() {
     }));
   };
 
-  const handleDeleteTicket = (ticketId: string) => {
-    if (confirm('هل أنت متأكد من حذف هذه التذكرة؟')) {
+  const handleDeleteTicket = async (ticketId: string) => {
+    if (await appConfirm('هل أنت متأكد من حذف هذه التذكرة؟')) {
       setTickets(prev => prev.filter(t => t.id !== ticketId));
     }
   };
@@ -687,7 +709,7 @@ export default function App() {
       return;
     }
     const target = staffUsers.find(u => u.id === userId);
-    if (confirm(`هل أنت متأكد من حذف حساب (${target?.name || ''})؟`)) {
+    if (await appConfirm(`هل أنت متأكد من حذف حساب (${target?.name || ''})؟`)) {
       try {
         const res = await usersApi.remove(userId);
         setStaffUsers(res.users);
@@ -747,13 +769,46 @@ export default function App() {
 
   // Handlers: Towers (الأبراج ونقاط البث)
   const handleSaveTower = (tower: TowerPoint, oldName?: string) => {
-    if (oldName && oldName.trim() !== tower.name.trim()) {
-      setSubscribers(prev => prev.map(sub => sub.towerName === oldName ? { ...sub, towerName: tower.name } : sub));
+    const name = normTower(tower.name);
+    const duplicate = towerPoints.some(t => normTower(t.name) === name && t.id !== tower.id);
+    if (duplicate) {
+      notify(`يوجد برج آخر بنفس الاسم «${name}».`, 'error');
+      return;
+    }
+    const old = normTower(oldName);
+    if (old && old !== name) {
+      // تغيير الاسم ينعكس على كل مشتركي البرج
+      setSubscribers(prev => prev.map(sub => normTower(sub.towerName) === old ? { ...sub, towerName: name } : sub));
     }
     setTowerPoints(prev => {
       const exists = prev.some(t => t.id === tower.id);
-      return exists ? prev.map(t => t.id === tower.id ? tower : t) : [...prev, { ...tower, id: tower.id || uid('tow') }];
+      const clean = { ...tower, name };
+      return exists ? prev.map(t => t.id === tower.id ? clean : t) : [...prev, { ...clean, id: tower.id || uid('tow') }];
     });
+    notify(oldName ? 'تم حفظ تعديلات البرج.' : `تمت إضافة البرج «${name}».`, 'success');
+  };
+
+  // حذف برج (تفكيك): مشتركوه ينتقلون إلى برج آخر أو يصبحون بدون برج
+  const handleDeleteTower = (tower: TowerPoint, moveTo: string) => {
+    const from = normTower(tower.name);
+    const to = normTower(moveTo);
+    const count = subscribers.filter(s => normTower(s.towerName) === from).length;
+    if (count > 0) {
+      setSubscribers(prev => prev.map(s => normTower(s.towerName) === from ? { ...s, towerName: to } : s));
+    }
+    setTowerPoints(prev => prev.filter(t => t.id !== tower.id));
+    notify(`تم حذف البرج «${from}»${count ? ` ونقل ${count} مشترك إلى ${to || NO_TOWER_LABEL}` : ''}.`, 'success');
+  };
+
+  const handleRegisterTower = (name: string) => {
+    ensureTowerRegistered(name);
+    notify(`تم تسجيل «${normTower(name)}» كبرج.`, 'success');
+  };
+
+  const handleMoveTowerSubscribers = (fromName: string, toName: string) => {
+    const from = normTower(fromName);
+    const ids = subscribers.filter(s => (normTower(s.towerName) || NO_TOWER_LABEL) === from).map(s => s.id);
+    handleAssignTower(ids, toName);
   };
 
   // Handlers: Excel Import
@@ -825,7 +880,7 @@ export default function App() {
         expiryDate: row.expiryDate || today,
         status: 'active',
         paymentStatus: 'pending',
-        towerName: row.towerName || towers[0] || 'برج الزبير الرئيسي',
+        towerName: normTower(row.towerName),
         ipAddress: row.ipAddress || '',
         macAddress: row.macAddress || '',
         address: row.address || '',
@@ -839,7 +894,7 @@ export default function App() {
     });
 
     if (skippedNames.length > 0) {
-      alert(`تم استيراد ${formatted.length} مشترك. تم تجاوز ${skippedNames.length} مكرر:\n${skippedNames.slice(0, 20).join('، ')}${skippedNames.length > 20 ? ' …' : ''}`);
+      notify(`تم استيراد ${formatted.length} مشترك. تم تجاوز ${skippedNames.length} مكرر:\n${skippedNames.slice(0, 20).join('، ')}${skippedNames.length > 20 ? ' …' : ''}`);
     }
 
     if (replaceAll) {
@@ -875,7 +930,7 @@ export default function App() {
     setSubscribers([]);
     setPayments([]);
     setTickets([]);
-    alert('تم مسح وتفريغ كافة البيانات بنجاح! المنظومة نظيفة وجاهزة للعمل الفعلي.');
+    notify('تم مسح وتفريغ كافة البيانات بنجاح! المنظومة نظيفة وجاهزة للعمل الفعلي.');
   };
 
   if (isLocked) {
@@ -931,6 +986,9 @@ export default function App() {
             providers={providers}
             towers={towers}
             currentUser={currentUser}
+            towerFilterRequest={towerFilterRequest}
+            onTowerFilterApplied={() => setTowerFilterRequest(null)}
+            onAssignTower={handleAssignTower}
             onRenew={(sub) => {
               setSubscriberToRenew(sub);
               setIsRenewModalOpen(true);
@@ -978,7 +1036,10 @@ export default function App() {
         {safeActiveTab === 'dashboard' && (
           <DashboardView
             subscribers={subscribers}
+            payments={payments}
+            towerPoints={towerPoints}
             settings={settings}
+            onOpenTowers={() => setActiveTab('towers')}
             onRenew={(sub) => {
               setSubscriberToRenew(sub);
               setIsRenewModalOpen(true);
@@ -992,6 +1053,7 @@ export default function App() {
         )}
 
         {safeActiveTab === 'reports' && (
+          <React.Suspense fallback={<div className="py-20 text-center text-xs text-slate-400">جارٍ تحميل التقارير…</div>}>
           <ReportsView
             subscribers={subscribers}
             payments={payments}
@@ -999,6 +1061,7 @@ export default function App() {
             currentUser={currentUser}
             onDeletePayment={handleDeletePayment}
           />
+          </React.Suspense>
         )}
 
         {safeActiveTab === 'reminders' && (
@@ -1051,6 +1114,7 @@ export default function App() {
               setTowerToEdit(null);
               setIsTowerModalOpen(true);
             }}
+            onOpenTowersTab={() => setActiveTab('towers')}
             onOpenEditProviderModal={(prov) => {
               setProviderToEdit(prov);
               setIsProviderModalOpen(true);
@@ -1060,6 +1124,31 @@ export default function App() {
               setIsProviderModalOpen(true);
             }}
             onNavigateToSubscribersWithProvider={() => {
+              setActiveTab('subscribers');
+            }}
+          />
+        )}
+
+        {safeActiveTab === 'towers' && (
+          <TowersView
+            subscribers={subscribers}
+            payments={payments}
+            towers={towerPoints}
+            settings={settings}
+            canEdit={canEditTowers}
+            onAddTower={() => {
+              setTowerToEdit(null);
+              setIsTowerModalOpen(true);
+            }}
+            onEditTower={(tow) => {
+              setTowerToEdit(tow);
+              setIsTowerModalOpen(true);
+            }}
+            onDeleteTower={handleDeleteTower}
+            onRegisterTower={handleRegisterTower}
+            onMoveSubscribers={handleMoveTowerSubscribers}
+            onShowSubscribers={(name) => {
+              setTowerFilterRequest({ name, nonce: Date.now() });
               setActiveTab('subscribers');
             }}
           />

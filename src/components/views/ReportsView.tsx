@@ -30,6 +30,7 @@ import {
   Legend,
 } from 'recharts';
 import { StaffUser } from '../../types/isp';
+import { appConfirm } from '../ui/Dialogs';
 
 interface ReportsViewProps {
   subscribers: Subscriber[];
@@ -568,8 +569,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                       {currentUser?.role === 'admin' && (
                         <td className="p-2.5 text-center no-print">
                           <button
-                            onClick={() => {
-                              if (onDeletePayment && confirm(`تأكيد للمدير العام: هل أنت متأكد من حذف الوصل (${tx.receiptNumber}) بمبلغ (${formatCurrency(tx.amount, settings.currency)})؟`)) {
+                            onClick={async () => {
+                              if (onDeletePayment && await appConfirm(`تأكيد للمدير العام: هل أنت متأكد من حذف الوصل (${tx.receiptNumber}) بمبلغ (${formatCurrency(tx.amount, settings.currency)})؟`)) {
                                 onDeletePayment(tx.id);
                               }
                             }}
