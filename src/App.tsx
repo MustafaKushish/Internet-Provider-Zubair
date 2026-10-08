@@ -69,7 +69,7 @@ import { ProviderModal } from './components/ProviderModal';
 import { TowerModal } from './components/TowerModal';
 import { ForcePasswordChange } from './components/ForcePasswordChange';
 import { SyncStatusBadge } from './components/SyncStatusBadge';
-import { authApi, usersApi, getToken, setToken, ApiError } from './sync/api';
+import { authApi, usersApi, getToken, setToken, ApiError, PREVIEW_MODE } from './sync/api';
 import { useCloudSync } from './sync/useCloudSync';
 
 // Views
@@ -142,6 +142,7 @@ export default function App() {
   const [ticketToEdit, setTicketToEdit] = useState<SupportTicket | null>(null);
 
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [ticketPrefillSubscriberId, setTicketPrefillSubscriberId] = useState<string | null>(null);
 
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [subscriberForHistory, setSubscriberForHistory] = useState<Subscriber | null>(null);
@@ -154,7 +155,7 @@ export default function App() {
   // Security Lock & Inactivity Auto-logout (5 minutes = 300,000 ms)
   // By default when opening the app, username and password are required
   const hasActiveSession = () =>
-    sessionStorage.getItem('sas_plus_authenticated_session') === 'active' && !!getToken();
+    PREVIEW_MODE || (sessionStorage.getItem('sas_plus_authenticated_session') === 'active' && !!getToken());
   const [isLocked, setIsLocked] = useState<boolean>(() => !hasActiveSession());
   const [lockReason, setLockReason] = useState<'manual' | 'inactivity' | 'auth_required' | 'session_expired' | null>(() => {
     return hasActiveSession() ? null : 'auth_required';
@@ -163,7 +164,7 @@ export default function App() {
   const [forceOpenAddUserModal, setForceOpenAddUserModal] = useState(false);
 
   useEffect(() => {
-    if (isLocked) return;
+    if (isLocked || PREVIEW_MODE) return;
 
     let timeoutId: any;
 
@@ -188,6 +189,10 @@ export default function App() {
 
   // القفل = إنهاء الجلسة على الخادم أيضاً؛ البيانات غير المرفوعة تبقى على الجهاز وتُرفع بعد الدخول
   function lockApp(reason: 'manual' | 'inactivity' | 'session_expired') {
+    if (PREVIEW_MODE) {
+      notify('وضع المعاينة: لا يوجد تسجيل دخول أو خروج. بعد النشر على Cloudflare يعمل الدخول بكلمة المرور.', 'info');
+      return;
+    }
     if (getToken()) authApi.logout().catch(() => undefined);
     setToken(null);
     sessionStorage.removeItem('sas_plus_authenticated_session');
@@ -214,6 +219,12 @@ export default function App() {
 
   // عند إعادة تحميل الصفحة: التأكد من أن الجلسة ما زالت صالحة (بدون إنترنت نكمل بالبيانات المحفوظة)
   useEffect(() => {
+    if (PREVIEW_MODE) {
+      const previewAdmin = { ...INITIAL_STAFF_USERS[0], mustChangePassword: false };
+      setCurrentUser(previewAdmin);
+      setStaffUsers([previewAdmin]);
+      return;
+    }
     if (isLocked) return;
     authApi.me()
       .then(r => {
@@ -231,7 +242,7 @@ export default function App() {
   const settingsAsList = useMemo(() => [{ ...settings, id: 'main' }], [settings]);
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
   const { status: syncStatus, syncNow } = useCloudSync({
-    enabled: !isLocked && !currentUser.mustChangePassword,
+    enabled: !PREVIEW_MODE && !isLocked && !currentUser.mustChangePassword,
     sources: {
       subscribers: {
         value: subscribers,
@@ -1010,6 +1021,7 @@ export default function App() {
             onDelete={handleDeleteSubscriber}
             onAddTicketForSubscriber={(sub) => {
               setTicketToEdit(null);
+              setTicketPrefillSubscriberId(sub.id);
               setIsTicketModalOpen(true);
             }}
             onViewPaymentHistory={(sub) => {
@@ -1195,6 +1207,7 @@ export default function App() {
       </footer>
 
       <SyncStatusBadge
+        previewMode={PREVIEW_MODE}
         status={syncStatus}
         notice={syncNotice}
         onDismissNotice={() => setSyncNotice(null)}
@@ -1258,8 +1271,10 @@ export default function App() {
         onClose={() => {
           setIsTicketModalOpen(false);
           setTicketToEdit(null);
+          setTicketPrefillSubscriberId(null);
         }}
         ticketToEdit={ticketToEdit}
+        initialSubscriberId={ticketPrefillSubscriberId}
         subscribers={subscribers}
         onSaveTicket={handleSaveTicket}
       />

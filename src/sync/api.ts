@@ -4,6 +4,12 @@ import { StaffUser } from '../types/isp';
 const API_BASE: string = (import.meta as any).env?.VITE_API_BASE || '';
 const TOKEN_KEY = 'sas_plus_api_token_v1';
 
+/**
+ * وضع المعاينة: نسخة تعمل بدون خادم (للتجربة فقط). تُبنى بـ VITE_PREVIEW_MODE=true
+ * لا تسجيل دخول ولا مزامنة؛ البيانات محفوظة في هذا المتصفح فقط.
+ */
+export const PREVIEW_MODE: boolean = (import.meta as any).env?.VITE_PREVIEW_MODE === 'true';
+
 export class ApiError extends Error {
   constructor(public status: number, message: string, public offline = false) {
     super(message);

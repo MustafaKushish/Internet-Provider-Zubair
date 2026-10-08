@@ -3,6 +3,7 @@ import { Cloud, CloudOff, RefreshCw, AlertTriangle, CheckCircle2, X } from 'luci
 import { SyncStatus } from '../sync/syncEngine';
 
 interface SyncStatusBadgeProps {
+  previewMode?: boolean;
   status: SyncStatus;
   notice: string | null;
   onDismissNotice: () => void;
@@ -19,8 +20,19 @@ function timeAgo(ts: number | null): string {
 }
 
 // شارة صغيرة ثابتة تبيّن حالة المزامنة مع الخادم
-export const SyncStatusBadge: React.FC<SyncStatusBadgeProps> = ({ status, notice, onDismissNotice, onSyncNow }) => {
+export const SyncStatusBadge: React.FC<SyncStatusBadgeProps> = ({ previewMode, status, notice, onDismissNotice, onSyncNow }) => {
   const { phase, pending, lastSyncAt, message } = status;
+
+  if (previewMode) {
+    return (
+      <div className="fixed bottom-3 left-3 z-40 no-print max-w-[calc(100vw-1.5rem)]">
+        <div className="flex items-center gap-1.5 rounded-full border border-amber-800 bg-amber-950/95 px-3 py-1.5 text-[11px] font-semibold text-amber-300 shadow-lg">
+          <CloudOff className="w-3.5 h-3.5" />
+          <span className="truncate">وضع المعاينة • البيانات على هذا الجهاز فقط</span>
+        </div>
+      </div>
+    );
+  }
 
   let icon = <Cloud className="w-3.5 h-3.5" />;
   let label = 'متصل بالخادم';

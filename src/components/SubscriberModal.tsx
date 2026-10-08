@@ -96,7 +96,9 @@ export const SubscriberModal: React.FC<SubscriberModalProps> = ({
       setAddress('');
       setNotes('');
     }
-  }, [subscriberToEdit, isOpen, providers, towers]);
+    // يُملأ النموذج عند الفتح فقط؛ تحديثات المزامنة لا تمسح ما يكتبه المستخدم
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subscriberToEdit?.id, isOpen]);
 
   function generateRandomPassword() {
     const chars = 'abcdefghjkmnpqrstuvwxyz23456789@#';

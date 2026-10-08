@@ -9,6 +9,8 @@ interface TicketModalProps {
   onClose: () => void;
   ticketToEdit?: SupportTicket | null;
   subscribers: Subscriber[];
+  /** عند فتح بلاغ جديد من صف مشترك: يُختار هذا المشترك مسبقاً */
+  initialSubscriberId?: string | null;
   onSaveTicket: (ticket: Partial<SupportTicket>) => void;
 }
 
@@ -20,6 +22,7 @@ const TicketModalInner: React.FC<TicketModalProps> = ({
   isOpen,
   onClose,
   ticketToEdit,
+  initialSubscriberId,
   subscribers,
   onSaveTicket,
 }) => {
@@ -53,7 +56,7 @@ const TicketModalInner: React.FC<TicketModalProps> = ({
       setReportedBy(ticketToEdit.reportedBy || 'user');
     } else {
       if (subscribers.length > 0) {
-        const first = subscribers[0];
+        const first = subscribers.find(s => s.id === initialSubscriberId) || subscribers[0];
         setSubscriberId(first.id);
         setSubscriberName(first.name);
         setPhone(first.phone);
@@ -68,7 +71,9 @@ const TicketModalInner: React.FC<TicketModalProps> = ({
       setResolutionNotes('');
       setReportedBy('user');
     }
-  }, [ticketToEdit, subscribers, isOpen]);
+    // يُملأ النموذج عند الفتح فقط؛ تحديثات المزامنة لا تمسح ما يكتبه المستخدم
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ticketToEdit?.id, isOpen]);
 
   const handleSubscriberSelect = (subId: string) => {
     const sub = subscribers.find((s) => s.id === subId);
