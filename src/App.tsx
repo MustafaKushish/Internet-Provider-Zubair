@@ -155,7 +155,7 @@ export default function App() {
   const [isProviderModalOpen, setIsProviderModalOpen] = useState(false);
   const [providerToEdit, setProviderToEdit] = useState<UpstreamProvider | null>(null);
 
-  // Security Lock & Inactivity Auto-logout (5 minutes = 300,000 ms)
+  // Security Lock & Inactivity Auto-logout (60 minutes)
   // By default when opening the app, username and password are required
   const hasActiveSession = () =>
     PREVIEW_MODE || (sessionStorage.getItem('sas_plus_authenticated_session') === 'active' && !!getToken());
@@ -175,7 +175,7 @@ export default function App() {
       clearTimeout(timeoutId);
       timeoutId = setTimeout(() => {
         lockApp('inactivity');
-      }, 5 * 60 * 1000); // 5 minutes of no activity
+      }, 60 * 60 * 1000); // 60 minutes of no activity
     };
 
     const activityEvents = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click'];

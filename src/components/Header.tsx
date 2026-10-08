@@ -159,7 +159,7 @@ export const Header: React.FC<HeaderProps> = ({
               {/* Logout Button */}
               <button
                 onClick={onLogout}
-                title="تسجيل الخروج وقفل المنظومة (أمان) • يتم القفل تلقائياً بعد 5 دقائق من الخمول"
+                title="تسجيل الخروج وقفل المنظومة (أمان) • يتم القفل تلقائياً بعد 60 دقيقة من الخمول"
                 className="bg-rose-950/70 hover:bg-rose-900 border border-rose-800/80 text-rose-300 hover:text-white px-2.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-md shadow-rose-950/40"
               >
                 <LogOut className="w-4 h-4 text-rose-400" />

@@ -131,10 +131,10 @@ export const LockScreen: React.FC<LockScreenProps> = ({
             <Clock className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5 animate-pulse" />
             <div>
               <strong className="block text-amber-300 font-bold mb-0.5">
-                قفل أمني تلقائي (بعد 5 دقائق من الخمول)
+                قفل أمني تلقائي (بعد 60 دقيقة من الخمول)
               </strong>
               <p className="text-amber-200/90 leading-relaxed text-[11px]">
-                تم قفل المنظومة وتسجيل الخروج تلقائياً لعدم تحريك الماوس أو الضغط على الأزرار لمدة 5 دقائق لحماية البيانات.
+                تم قفل المنظومة وتسجيل الخروج تلقائياً لعدم تحريك الماوس أو الضغط على الأزرار لمدة 60 دقيقة لحماية البيانات.
               </p>
             </div>
           </div>
