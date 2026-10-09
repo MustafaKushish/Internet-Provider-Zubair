@@ -24,6 +24,8 @@ einer **Cloudflare-D1-Datenbank**.
   | Schulden ändern oder erlassen | ✓ | – | – |
   | Anbieter und Türme | ✓ | ✓ | – |
   | Einstellungen, Mitarbeiter | ✓ | – | – |
+  | Ausgaben erfassen/ändern | ✓ | ✓ | – |
+  | Ausgaben löschen | ✓ | – | – |
 
 ## Als App installieren
 
@@ -45,6 +47,18 @@ Der Windows-Installer ist eine Electron-Hülle (`desktop/`) um dieselbe Adresse.
 - **Kundenliste:** 25 pro Seite (umstellbar), sortierbar nach Name, Ablauf, Schulden oder neueste.
 - **Erinnerungen:** nach Dringlichkeit sortiert, Suche und Turmfilter; „heute gesendet“ bleibt bis Mitternacht markiert.
 - **Übersicht:** „ملخص اليوم“ zeigt heutige Einnahmen nach Zahlungsart, Verlängerungen und wer heute oder morgen abläuft.
+
+## Kasse und Ausgaben („الصندوق والمصاريف“, Admin und Buchhalter)
+
+- **Kassenabschluss pro Tag:** Was jeder Mitarbeiter kassiert hat, getrennt nach Bar, Zain Cash, Qi Card und Überweisung,
+  abzüglich der Ausgaben, die er bar bezahlt hat = Betrag, den er abgeben muss. Per WhatsApp teilen oder kopieren.
+- **Ausgaben:** Miete, Generator, Strom, Wartung, Geräte, Gehälter, Leitung, Werbung … optional einem Turm zugeordnet.
+  „Monatlich fest“ markierte Ausgaben schlägt die App im nächsten Monat zur Übernahme mit einem Klick vor.
+- **Echter Nettogewinn** = Gewinn aus Belegen (nach Großhandelskosten) − Ausgaben. Erscheint in der Übersicht, bei den Türmen
+  (Netto pro Turm), im Finanzbericht und beim KI-Berater.
+- Rechte: Admin und Buchhalter erfassen und ändern, **löschen nur der Admin**. Techniker sehen Ausgaben nicht (der Server schickt sie ihnen gar nicht).
+- **Serienversand bei Erinnerungen:** „إرسال متتالي“ geht die Liste Kunde für Kunde durch (Senden und weiter / Überspringen).
+- **Backup-Erinnerung:** Der Admin wird wöchentlich an eine JSON-Sicherung erinnert (zusätzlich zur 30-Tage-Sicherung von Cloudflare D1).
 
 ## Der KI-Berater („المستشار الذكي“)
 

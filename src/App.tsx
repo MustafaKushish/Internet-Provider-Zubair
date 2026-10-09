@@ -12,6 +12,7 @@ import {
   SystemSettings,
   StaffUser,
   TowerPoint,
+  Expense,
   UserRole
 } from './types/isp';
 import {
@@ -35,6 +36,8 @@ import {
   getWhatsAppTemplates,
   loadTowers,
   saveTowers,
+  loadExpenses,
+  saveExpenses,
   getRemainingDebt,
   getDaysRemaining,
   refreshSubscriberStatus,
@@ -72,6 +75,7 @@ import { TowerModal } from './components/TowerModal';
 import { ForcePasswordChange } from './components/ForcePasswordChange';
 import { SyncStatusBadge } from './components/SyncStatusBadge';
 import { QuickSearch } from './components/QuickSearch';
+import { backupReminderDue, daysSinceBackup, downloadFullBackup, snoozeBackupReminder } from './utils/backup';
 import { authApi, usersApi, getToken, setToken, ApiError, PREVIEW_MODE } from './sync/api';
 import { useCloudSync } from './sync/useCloudSync';
 
@@ -86,6 +90,7 @@ import { ProvidersView } from './components/views/ProvidersView';
 import { UsersManagementView } from './components/views/UsersManagementView';
 import { TowersView } from './components/views/TowersView';
 // المستشار الذكي يُحمَّل عند فتح التبويب فقط
+const CashView = React.lazy(() => import('./components/views/CashView').then(m => ({ default: m.CashView })));
 const AdvisorView = React.lazy(() => import('./components/views/AdvisorView').then(m => ({ default: m.AdvisorView })));
 import { NO_TOWER_LABEL, normTower } from './utils/towers';
 import { withRemainingDebt } from './utils/debt';
@@ -103,6 +108,7 @@ const TAB_ACCESS: Record<string, UserRole[]> = {
   providers: ['admin', 'accountant'],
   towers: ['admin', 'accountant', 'technician'],
   advisor: ['admin', 'accountant'],
+  cash: ['admin', 'accountant'],
   users: ['admin'],
   settings: ['admin'],
 };
@@ -120,6 +126,7 @@ export default function App() {
   const [staffUsers, setStaffUsers] = useState<StaffUser[]>([]);
   const [currentUser, setCurrentUser] = useState<StaffUser>(loadActiveStaffUser);
   const [towerPoints, setTowerPoints] = useState<TowerPoint[]>(loadTowers);
+  const [expenses, setExpenses] = useState<Expense[]>(loadExpenses);
 
   const [activeTab, setActiveTabRaw] = useState<string>('subscribers');
   // لا يمكن فتح تبويب غير مسموح لدور المستخدم الحالي
@@ -157,6 +164,7 @@ export default function App() {
 
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isQuickSearchOpen, setIsQuickSearchOpen] = useState(false);
+  const [backupDue, setBackupDue] = useState(backupReminderDue);
 
   const [isProviderModalOpen, setIsProviderModalOpen] = useState(false);
   const [providerToEdit, setProviderToEdit] = useState<UpstreamProvider | null>(null);
@@ -280,6 +288,7 @@ export default function App() {
       tickets: { value: tickets, set: setTickets },
       providers: { value: providers, set: setProviders },
       towers: { value: towerPoints, set: setTowerPoints },
+      expenses: { value: expenses, set: setExpenses },
       settings: {
         value: settingsAsList,
         set: (updater: any) => setSettings(prev => {
@@ -323,6 +332,10 @@ export default function App() {
   useEffect(() => {
     saveTowers(towerPoints);
   }, [towerPoints]);
+
+  useEffect(() => {
+    saveExpenses(expenses);
+  }, [expenses]);
 
   // إعادة حساب الحالات عند تغيير أيام التنبيه، ومرة كل ساعة (لتحديث الحالات بعد منتصف الليل)
   useEffect(() => {
@@ -980,6 +993,7 @@ export default function App() {
     settings: SystemSettings;
     staffUsers?: StaffUser[];
     towers?: TowerPoint[];
+    expenses?: Expense[];
   }) => {
     if (currentUser.role !== 'admin') return;
     const restoredSettings = { ...INITIAL_SETTINGS, ...(data.settings || {}) };
@@ -989,6 +1003,7 @@ export default function App() {
     setProviders(data.providers || INITIAL_PROVIDERS);
     setSettings(restoredSettings);
     if (Array.isArray(data.towers)) setTowerPoints(data.towers);
+    if (Array.isArray(data.expenses)) setExpenses(data.expenses);
     // حسابات الموظفين تُدار على الخادم ولا تُستعاد من ملف النسخة الاحتياطية
   };
 
@@ -1066,6 +1081,31 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
+        {/* تذكير أسبوعي للمدير بأخذ نسخة احتياطية (إضافة إلى نسخ الخادم التلقائية) */}
+        {currentUser.role === 'admin' && backupDue && subscribers.length > 0 && !PREVIEW_MODE && (
+          <div className="mb-4 bg-amber-950/50 border border-amber-800 rounded-2xl px-4 py-3 flex flex-wrap items-center justify-between gap-2 text-xs no-print">
+            <span className="text-amber-200">
+              {daysSinceBackup() === null ? 'لم تُحفظ نسخة احتياطية على هذا الجهاز بعد.' : `آخر نسخة احتياطية قبل ${daysSinceBackup()} يوماً.`}
+              {' '}البيانات محفوظة على الخادم، ونسخة أسبوعية على جهازك تزيد الأمان.
+            </span>
+            <span className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  downloadFullBackup({ settings, subscribers, payments, tickets, providers, staffUsers, towers: towerPoints, expenses });
+                  setBackupDue(false);
+                  notify('تم تنزيل النسخة الاحتياطية.', 'success');
+                }}
+                className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-bold cursor-pointer"
+              >
+                تنزيل نسخة الآن
+              </button>
+              <button type="button" onClick={() => { snoozeBackupReminder(); setBackupDue(false); }} className="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 cursor-pointer">
+                لاحقاً
+              </button>
+            </span>
+          </div>
+        )}
         {safeActiveTab === 'subscribers' && (
           <SubscribersView
             subscribers={subscribers}
@@ -1126,6 +1166,8 @@ export default function App() {
           <DashboardView
             subscribers={subscribers}
             payments={payments}
+            expenses={expenses}
+            onOpenCash={() => setActiveTab('cash')}
             towerPoints={towerPoints}
             settings={settings}
             onOpenTowers={() => setActiveTab('towers')}
@@ -1150,6 +1192,7 @@ export default function App() {
             settings={settings}
             currentUser={currentUser}
             onDeletePayment={handleDeletePayment}
+            expenses={expenses}
           />
           </React.Suspense>
         )}
@@ -1220,10 +1263,36 @@ export default function App() {
           />
         )}
 
+        {safeActiveTab === 'cash' && (
+          <React.Suspense fallback={<div className="py-16 text-center text-sm text-slate-400">جارٍ التحميل…</div>}>
+            <CashView
+              payments={payments}
+              expenses={expenses}
+              subscribers={subscribers}
+              towers={towerPoints}
+              settings={settings}
+              currentUser={currentUser}
+              onSaveExpense={(exp) => {
+                if (currentUser.role === 'technician') return;
+                setExpenses(prev => prev.some(e => e.id === exp.id) ? prev.map(e => (e.id === exp.id ? exp : e)) : [exp, ...prev]);
+              }}
+              onSaveExpenses={(list) => {
+                if (currentUser.role === 'technician') return;
+                setExpenses(prev => [...list, ...prev]);
+              }}
+              onDeleteExpense={(id) => {
+                if (currentUser.role !== 'admin') return;
+                setExpenses(prev => prev.filter(e => e.id !== id));
+              }}
+            />
+          </React.Suspense>
+        )}
+
         {safeActiveTab === 'towers' && (
           <TowersView
             subscribers={subscribers}
             payments={payments}
+            expenses={canEditTowers ? expenses : []}
             towers={towerPoints}
             settings={settings}
             canEdit={canEditTowers}
@@ -1254,6 +1323,7 @@ export default function App() {
               providers={providers}
               towers={towerPoints}
               settings={settings}
+              expenses={expenses}
               currentUser={currentUser}
               onChangeProvider={(p) => {
                 if (currentUser.role !== 'admin') return;
@@ -1297,6 +1367,7 @@ export default function App() {
             onNavigateToProviders={() => setActiveTab('providers')}
             staffUsers={staffUsers}
             towers={towerPoints}
+            expenses={expenses}
           />
         )}
       </main>

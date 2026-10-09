@@ -25,6 +25,7 @@ import {
   Sparkles,
   Share,
   MoreHorizontal,
+  Wallet,
   Search,
   X as CloseIcon,
 } from 'lucide-react';
@@ -52,6 +53,7 @@ const TABS: TabDef[] = [
   { id: 'subscribers', label: 'المشتركين والاشتراكات', short: 'المشتركون', icon: Users, roles: ALL },
   { id: 'dashboard', label: 'لوحة المؤشرات', short: 'المؤشرات', icon: LayoutDashboard, roles: OFFICE },
   { id: 'reports', label: 'التقارير المالية والجرد الدوري', short: 'التقارير', icon: BarChart3, roles: OFFICE },
+  { id: 'cash', label: 'الصندوق والمصاريف', short: 'الصندوق', icon: Wallet, roles: OFFICE },
   { id: 'reminders', label: 'تذكيرات الواتساب والديون', short: 'التذكيرات', icon: MessageSquare, roles: ALL },
   { id: 'tickets', label: 'البلاغات والدعم الفني', short: 'البلاغات', icon: Wrench, roles: ALL },
   { id: 'advisor', label: 'المستشار الذكي', short: 'المستشار', icon: Sparkles, roles: OFFICE, accent: 'indigo' },

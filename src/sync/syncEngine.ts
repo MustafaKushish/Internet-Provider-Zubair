@@ -10,8 +10,8 @@ import { apiRequest, ApiError } from './api';
  * - البيانات تبقى محفوظة في المتصفح، فالعمل يستمر بدون إنترنت ويُرفع عند عودة الاتصال
  */
 
-export type CollectionName = 'subscribers' | 'payments' | 'tickets' | 'providers' | 'towers' | 'settings';
-export const COLLECTIONS: CollectionName[] = ['subscribers', 'payments', 'tickets', 'providers', 'towers', 'settings'];
+export type CollectionName = 'subscribers' | 'payments' | 'tickets' | 'providers' | 'towers' | 'settings' | 'expenses';
+export const COLLECTIONS: CollectionName[] = ['subscribers', 'payments', 'tickets', 'providers', 'towers', 'settings', 'expenses'];
 
 type Item = { id: string; [key: string]: any };
 

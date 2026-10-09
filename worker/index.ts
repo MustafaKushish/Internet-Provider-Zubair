@@ -20,7 +20,7 @@ export interface Env {
 }
 
 type Role = 'admin' | 'accountant' | 'technician';
-type Collection = 'subscribers' | 'payments' | 'tickets' | 'providers' | 'towers' | 'settings';
+type Collection = 'subscribers' | 'payments' | 'tickets' | 'providers' | 'towers' | 'settings' | 'expenses';
 
 const ALL: Role[] = ['admin', 'accountant', 'technician'];
 
@@ -32,6 +32,13 @@ const RULES: Record<Collection, { create: Role[]; update: Role[]; delete: Role[]
   providers: { create: ['admin', 'accountant'], update: ['admin', 'accountant'], delete: ['admin', 'accountant'] },
   towers: { create: ['admin', 'accountant'], update: ['admin', 'accountant'], delete: ['admin', 'accountant'] },
   settings: { create: ['admin'], update: ['admin'], delete: [] },
+  // المصاريف التشغيلية (إيجار، مولد، رواتب…): يسجلها المكتب، والحذف للمدير فقط
+  expenses: { create: ['admin', 'accountant'], update: ['admin', 'accountant'], delete: ['admin'] },
+};
+
+// مجموعات مالية لا تُرسل للفني عند السحب
+const HIDDEN_FROM: Partial<Record<Collection, Role[]>> = {
+  expenses: ['technician'],
 };
 
 const SESSION_HOURS = 24;
@@ -422,7 +429,7 @@ async function getMeta(db: D1Database) {
   return { version: Number(m.version || 0), epoch: m.epoch || '' };
 }
 
-async function handlePull(url: URL, db: D1Database) {
+async function handlePull(url: URL, db: D1Database, role: Role) {
   const since = Math.max(0, Number(url.searchParams.get('since') || 0) || 0);
   const meta = await getMeta(db);
   const { results } = await db
@@ -430,9 +437,10 @@ async function handlePull(url: URL, db: D1Database) {
     .bind(since, PULL_LIMIT)
     .all<RecordRow>();
   const cursor = results.length ? results[results.length - 1].version : since;
+  const visible = results.filter(r => !HIDDEN_FROM[r.collection]?.includes(role));
   return json({
     epoch: meta.epoch,
-    records: results.map(outRecord),
+    records: visible.map(outRecord),
     cursor,
     hasMore: results.length === PULL_LIMIT,
   });
@@ -660,7 +668,7 @@ async function handleApi(req: Request, env: Env, url: URL): Promise<Response> {
   if (userMatch && method === 'PUT') { requireAdmin(user); return handleUpdateUser(req, db, user, decodeURIComponent(userMatch[1])); }
   if (userMatch && method === 'DELETE') { requireAdmin(user); return handleDeleteUser(db, user, decodeURIComponent(userMatch[1])); }
 
-  if (path === '/api/sync' && method === 'GET') return handlePull(url, db);
+  if (path === '/api/sync' && method === 'GET') return handlePull(url, db, user.role);
   if (path === '/api/sync' && method === 'POST') return handlePush(req, db, user);
   if (path === '/api/ai/chat' && method === 'POST') return handleAdvisorChat(req, env, user);
   if (path === '/api/ai/status' && method === 'GET') return json(advisorStatus(env));

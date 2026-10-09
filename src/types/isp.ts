@@ -109,6 +109,22 @@ export interface TowerPoint {
   ipRange?: string;
 }
 
+/** مصروف تشغيلي (إيجار برج، مولد، رواتب…) لحساب صافي الربح الحقيقي */
+export type ExpenseCategory = 'rent' | 'generator' | 'electricity' | 'maintenance' | 'equipment' | 'salaries' | 'bandwidth' | 'marketing' | 'transport' | 'other';
+
+export interface Expense {
+  id: string;
+  date: string;              // YYYY-MM-DD
+  amount: number;
+  category: ExpenseCategory;
+  towerName?: string;        // اختياري: لربط المصروف ببرج (فارغ = مصروف عام)
+  note?: string;
+  paidBy?: string;           // من دفعه من الصندوق (لتسليم الصندوق اليومي)
+  recurring?: boolean;       // مصروف شهري ثابت يُنسخ للشهر التالي بضغطة
+  createdBy?: string;
+  createdAt: string;
+}
+
 export interface SystemSettings {
   ispName: string;
   agentName: string;

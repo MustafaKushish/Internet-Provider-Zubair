@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { useEscapeKey } from '../ui/useEscapeKey';
-import { PaymentRecord, Subscriber, SystemSettings, TowerPoint } from '../../types/isp';
+import { Expense, PaymentRecord, Subscriber, SystemSettings, TowerPoint } from '../../types/isp';
+import { expensesByTower } from '../../utils/expenses';
+import { todayStr } from '../../utils/dates';
 import { formatCurrency } from '../../utils/storage';
 import { computeTowerStats, NO_TOWER_LABEL, sortTowerStats, TowerSortKey, TowerStats } from '../../utils/towers';
 import {
@@ -20,6 +22,8 @@ interface TowersViewProps {
   onRegisterTower: (name: string) => void;
   onMoveSubscribers: (fromName: string, toName: string) => void;
   onShowSubscribers: (towerName: string) => void;
+  /** مصاريف تشغيلية (للمكتب فقط) لحساب صافي كل برج */
+  expenses?: Expense[];
 }
 
 const SORTS: { key: TowerSortKey; label: string }[] = [
@@ -47,6 +51,7 @@ export const TowersView: React.FC<TowersViewProps> = ({
   onRegisterTower,
   onMoveSubscribers,
   onShowSubscribers,
+  expenses = [],
 }) => {
   const [sortKey, setSortKey] = useState<TowerSortKey>('subscribers');
   const [search, setSearch] = useState('');
@@ -56,6 +61,7 @@ export const TowersView: React.FC<TowersViewProps> = ({
 
   const money = (n: number) => formatCurrency(Math.round(n), settings.currency);
 
+  const towerExpenses = useMemo(() => expensesByTower(expenses, todayStr().slice(0, 7)), [expenses]);
   const allStats = useMemo(() => computeTowerStats(subscribers, payments, towers), [subscribers, payments, towers]);
   const sorted = useMemo(() => sortTowerStats(allStats, sortKey), [allStats, sortKey]);
   const visible = sorted.filter(s => {
@@ -262,7 +268,15 @@ export const TowersView: React.FC<TowersViewProps> = ({
                       <div className="text-[10px] mt-0.5"><span className="text-emerald-400">{s.active} نشط</span> • <span className="text-rose-400">{s.expired} منتهي</span></div>
                     </td>
                     <td className="py-3 px-3 font-mono">{money(s.monthlyRevenue)}</td>
-                    <td className="py-3 px-3 font-mono font-bold text-emerald-400"><TrendingUp className="w-3 h-3 inline ml-1" />{money(s.monthlyProfit)}</td>
+                    <td className="py-3 px-3 font-mono font-bold text-emerald-400">
+                      <TrendingUp className="w-3 h-3 inline ml-1" />{money(s.monthlyProfit)}
+                      {(towerExpenses.get(s.name) || 0) > 0 && (
+                        <div className="text-[10px] font-normal mt-0.5 whitespace-nowrap">
+                          <span className="text-rose-300">مصاريف {money(towerExpenses.get(s.name) || 0)}</span>
+                          <span className={`block font-bold ${s.monthlyProfit - (towerExpenses.get(s.name) || 0) >= 0 ? 'text-white' : 'text-rose-400'}`}>الصافي {money(s.monthlyProfit - (towerExpenses.get(s.name) || 0))}</span>
+                        </div>
+                      )}
+                    </td>
                     <td className="py-3 px-3 font-mono text-cyan-300"><Wallet className="w-3 h-3 inline ml-1" />{money(s.collectedThisMonth)}</td>
                     <td className={`py-3 px-3 font-mono ${s.debts > 0 ? 'text-rose-400 font-bold' : 'text-slate-500'}`}>{money(s.debts)}</td>
                     <td className="py-3 px-3">

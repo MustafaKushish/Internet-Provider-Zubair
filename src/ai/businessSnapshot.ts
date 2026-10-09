@@ -1,4 +1,5 @@
-import { PaymentRecord, Subscriber, SupportTicket, SystemSettings, TowerPoint, UpstreamProvider } from '../types/isp';
+import { Expense, PaymentRecord, Subscriber, SupportTicket, SystemSettings, TowerPoint, UpstreamProvider } from '../types/isp';
+import { EXPENSE_CATEGORIES, expensesByTower, expensesInMonth, netProfitInMonth, sumAmounts } from '../utils/expenses';
 import { getDaysRemaining, getPaymentCost, getRemainingDebt } from '../utils/storage';
 import { computeTowerStats, sortTowerStats, NO_TOWER_LABEL, normTower } from '../utils/towers';
 import { todayStr } from '../utils/dates';
@@ -49,8 +50,10 @@ export function buildBusinessSnapshot(input: {
   providers: UpstreamProvider[];
   towers: TowerPoint[];
   settings: SystemSettings;
+  expenses?: Expense[];
 }): string {
   const { subscribers, payments, tickets, providers, towers, settings } = input;
+  const expenses = input.expenses || [];
   const today = todayStr();
   const lines: string[] = [];
   const cur = settings.currency === 'USD' ? 'دولار' : 'دينار عراقي';
@@ -181,6 +184,24 @@ export function buildBusinessSnapshot(input: {
   }
   const newPerMonth = months.map(m => `${m}: ${subscribers.filter(s => monthKey(s.createdAt) === m).length}`);
   lines.push(`مشتركون جدد مسجلون في المنظومة حسب الشهر: ${newPerMonth.join(' | ')}`);
+
+  // ---------- المصاريف وصافي الربح الحقيقي ----------
+  const exMonths = lastMonths(3);
+  lines.push('');
+  lines.push('## المصاريف التشغيلية وصافي الربح الحقيقي (ربح الوصولات بعد كلفة الجملة − المصاريف)');
+  if (!expenses.length) {
+    lines.push('لم تُسجل أي مصاريف تشغيلية في المنظومة بعد (إيجار، مولد، رواتب…)، لذلك الربح أعلاه قبل المصاريف.');
+  } else {
+    exMonths.forEach(m => {
+      const r = netProfitInMonth(payments, subscribers, expenses, m);
+      lines.push(`- ${m}: ربح الوصولات ${n(r.profit)} | المصاريف ${n(r.expenses)} | الصافي ${n(r.net)}`);
+    });
+    const recent = exMonths.flatMap(m => expensesInMonth(expenses, m));
+    const cats = EXPENSE_CATEGORIES.map(c => [c.label, sumAmounts(recent.filter(e => e.category === c.id))] as const).filter(([, t]) => t > 0);
+    if (cats.length) lines.push(`المصاريف حسب النوع (آخر 3 أشهر): ${cats.map(([l, t]) => `${l} ${n(t)}`).join('، ')}`);
+    const byTower = [...expensesByTower(expenses, exMonths[exMonths.length - 1]).entries()];
+    if (byTower.length) lines.push(`مصاريف هذا الشهر حسب البرج: ${byTower.map(([t, v]) => `${t || 'عامة'} ${n(v)}`).join('، ')}`);
+  }
 
   // ---------- الدعم الفني ----------
   const since = new Date();

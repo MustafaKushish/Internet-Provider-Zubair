@@ -8,7 +8,8 @@ import {
   PaymentStatus,
   ReportPeriod,
   ReportSummary,
-  StaffUser
+  StaffUser,
+  Expense
 } from '../types/isp';
 import {
   INITIAL_SUBSCRIBERS,
@@ -30,6 +31,7 @@ const PAYMENTS_KEY = 'sas_plus_payments_kashish_v1';
 const TICKETS_KEY = 'sas_plus_tickets_kashish_v1';
 const PROVIDERS_KEY = 'sas_plus_providers_kashish_v1';
 const TOWERS_KEY = 'sas_plus_towers_kashish_v1';
+const EXPENSES_KEY = 'sas_plus_expenses_kashish_v1';
 const SETTINGS_KEY = 'sas_plus_settings_kashish_v1';
 const ACTIVE_USER_KEY = 'sas_plus_active_user_kashish_v1';
 
@@ -201,6 +203,24 @@ export function saveTowers(towers: TowerPoint[]): void {
     localStorage.setItem(TOWERS_KEY, JSON.stringify(towers));
   } catch (e) {
     console.error('Error saving towers:', e);
+  }
+}
+
+// المصاريف التشغيلية
+export function loadExpenses(): Expense[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(EXPENSES_KEY) || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveExpenses(expenses: Expense[]): void {
+  try {
+    localStorage.setItem(EXPENSES_KEY, JSON.stringify(expenses));
+  } catch (e) {
+    console.error('Error saving expenses:', e);
   }
 }
 

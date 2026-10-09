@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Subscriber, PaymentRecord, SystemSettings, ReportPeriod } from '../../types/isp';
+import { Subscriber, PaymentRecord, SystemSettings, ReportPeriod, Expense } from '../../types/isp';
+import { EXPENSE_CATEGORIES, sumAmounts } from '../../utils/expenses';
 import { generatePeriodReport, formatCurrency, exportReportToExcel, getPaymentCost } from '../../utils/storage';
 import { toLocalDateStr, todayStr } from '../../utils/dates';
 import {
@@ -38,6 +39,7 @@ interface ReportsViewProps {
   settings: SystemSettings;
   currentUser?: StaffUser;
   onDeletePayment?: (paymentId: string) => void;
+  expenses?: Expense[];
 }
 
 export const ReportsView: React.FC<ReportsViewProps> = ({
@@ -46,6 +48,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   settings,
   currentUser,
   onDeletePayment,
+  expenses = [],
 }) => {
   const [period, setPeriod] = useState<ReportPeriod>('this_month');
   const [customStart, setCustomStart] = useState(() => {
@@ -111,6 +114,14 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       .filter(p => p.date >= report.startDate && p.date <= report.endDate)
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [payments, report]);
+
+  // المصاريف التشغيلية للفترة وصافي الربح الحقيقي بعدها
+  const periodExpenses = useMemo(
+    () => expenses.filter(e => e.date >= report.startDate && e.date <= report.endDate),
+    [expenses, report],
+  );
+  const periodExpensesTotal = sumAmounts(periodExpenses);
+  const realNet = report.totalNetProfit - periodExpensesTotal;
 
   const handlePrintReport = () => {
     window.print();
@@ -361,6 +372,24 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             <span className="text-[10px] text-rose-400 font-semibold block mt-1">
               إجمالي المتأخرات: {formatCurrency(report.overdueTotalAmount, settings.currency)}
             </span>
+          </div>
+        </div>
+
+        {/* المصاريف التشغيلية وصافي الربح الحقيقي */}
+        <div className="bg-slate-950/70 print:bg-slate-50 border border-slate-800 print:border-slate-200 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+          <div>
+            <div className="text-slate-400 print:text-slate-600">المصاريف التشغيلية للفترة ({periodExpenses.length})</div>
+            <div className="text-lg font-black text-rose-300 print:text-rose-700 font-mono">{formatCurrency(periodExpensesTotal, settings.currency)}</div>
+            {periodExpenses.length > 0 && (
+              <div className="text-[10px] text-slate-500 mt-0.5">
+                {EXPENSE_CATEGORIES.map(c => ({ c, t: sumAmounts(periodExpenses.filter(e => e.category === c.id)) })).filter(x => x.t > 0).map(x => `${x.c.label} ${formatCurrency(x.t, settings.currency)}`).join(' • ')}
+              </div>
+            )}
+          </div>
+          <div className="md:text-left">
+            <div className="text-slate-400 print:text-slate-600">صافي الربح الحقيقي (بعد كلفة الجملة والمصاريف)</div>
+            <div className={`text-2xl font-black font-mono ${realNet >= 0 ? 'text-emerald-400 print:text-emerald-700' : 'text-rose-400 print:text-rose-700'}`}>{formatCurrency(realNet, settings.currency)}</div>
+            {periodExpenses.length === 0 && <div className="text-[10px] text-amber-400 no-print">لم تُسجل مصاريف لهذه الفترة (قسم «الصندوق والمصاريف»).</div>}
           </div>
         </div>
 

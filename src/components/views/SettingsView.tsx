@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { SystemSettings, Subscriber, PaymentRecord, SupportTicket, UpstreamProvider, StaffUser, TowerPoint } from '../../types/isp';
+import { SystemSettings, Subscriber, PaymentRecord, SupportTicket, UpstreamProvider, StaffUser, TowerPoint, Expense } from '../../types/isp';
+import { downloadFullBackup } from '../../utils/backup';
 import { todayStr } from '../../utils/dates';
 import {
   Settings,
@@ -48,7 +49,9 @@ interface SettingsViewProps {
     settings: SystemSettings;
     staffUsers?: StaffUser[];
     towers?: TowerPoint[];
+    expenses?: Expense[];
   }) => void;
+  expenses?: Expense[];
   onResetToDemoData: () => void;
   onUpdateAdminPassword?: (currentPassword: string, newPassword: string) => Promise<string | null>;
   onNavigateToProviders?: () => void;
@@ -71,6 +74,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onNavigateToProviders,
   staffUsers,
   towers,
+  expenses,
 }) => {
   const [formData, setFormData] = useState<SystemSettings>({ ...settings });
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -155,9 +159,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   // Export full JSON backup
   const handleExportBackup = () => {
-    const backupData = {
-      version: '1.1',
-      exportedAt: new Date().toISOString(),
+    downloadFullBackup({
       settings,
       subscribers,
       payments,
@@ -165,15 +167,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       providers,
       staffUsers: staffUsers || [],
       towers: towers || [],
-    };
-
-    const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `منظومة_إنترنت_نسخة_احتياطية_${todayStr()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+      expenses: expenses || [],
+    });
   };
 
   // Restore JSON backup
@@ -194,6 +189,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             settings: parsed.settings || settings,
             staffUsers: Array.isArray(parsed.staffUsers) ? parsed.staffUsers : undefined,
             towers: Array.isArray(parsed.towers) ? parsed.towers : undefined,
+            expenses: Array.isArray(parsed.expenses) ? parsed.expenses : undefined,
           });
           notify('تم استعادة النسخة الاحتياطية بنجاح!', 'success');
         } else {

@@ -1,5 +1,6 @@
 import React from 'react';
-import { PaymentRecord, Subscriber, SystemSettings, TowerPoint } from '../../types/isp';
+import { Expense, PaymentRecord, Subscriber, SystemSettings, TowerPoint } from '../../types/isp';
+import { netProfitInMonth } from '../../utils/expenses';
 import { computeTowerStats, sortTowerStats, NO_TOWER_LABEL } from '../../utils/towers';
 import { debtInMonths, formatMonthsAr, monthsLate } from '../../utils/debt';
 import { formatCurrency, getDaysRemaining, getAmountDue, getRemainingDebt, getPaymentCost } from '../../utils/storage';
@@ -29,6 +30,8 @@ interface DashboardViewProps {
   onOpenDebt?: (sub: Subscriber) => void;
   onRenew: (sub: Subscriber) => void;
   onSendWhatsApp: (sub: Subscriber, defaultTab?: any) => void;
+  expenses?: Expense[];
+  onOpenCash?: () => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -40,6 +43,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenDebt,
   onRenew,
   onSendWhatsApp,
+  expenses = [],
+  onOpenCash,
 }) => {
   // Financial metrics
   // المبيعات المتوقعة = المستحق الفعلي لكل مشترك في دورته الحالية
@@ -97,6 +102,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     acc[p.paymentMethod] = (acc[p.paymentMethod] || 0) + (p.amount || 0);
     return acc;
   }, {});
+  const monthNet = netProfitInMonth(payments, subscribers, expenses, today.slice(0, 7));
   const METHOD: Record<string, string> = { cash: 'نقداً', zain_cash: 'زين كاش', qi_card: 'كي كارد', transfer: 'تحويل' };
 
   return (
@@ -115,6 +121,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </span>
             )}
           </div>
+          <button
+            type="button"
+            onClick={onOpenCash}
+            className="w-full mb-2.5 text-right rounded-xl border border-slate-700 bg-slate-950/60 hover:bg-slate-800/60 px-3 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs cursor-pointer"
+          >
+            <span className="text-slate-300">
+              هذا الشهر: ربح الوصولات <b className="text-emerald-400">{formatCurrency(monthNet.profit, settings.currency)}</b>
+              {' − '}المصاريف <b className="text-rose-300">{formatCurrency(monthNet.expenses, settings.currency)}</b>
+            </span>
+            <span className="font-bold">
+              الصافي الحقيقي: <span className={monthNet.net >= 0 ? 'text-white' : 'text-rose-400'}>{formatCurrency(monthNet.net, settings.currency)}</span>
+              {monthNet.expenses === 0 && <span className="block text-[10px] font-normal text-amber-400">سجّل مصاريفك في «الصندوق والمصاريف» لترى الصافي الحقيقي</span>}
+            </span>
+          </button>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs">
             <div className="bg-emerald-950/40 border border-emerald-800/50 rounded-xl p-3">
               <div className="text-emerald-300">المقبوض اليوم</div>

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { PaymentRecord, Subscriber, SupportTicket, SystemSettings, TowerPoint, UpstreamProvider } from '../../types/isp';
+import { Expense, PaymentRecord, Subscriber, SupportTicket, SystemSettings, TowerPoint, UpstreamProvider } from '../../types/isp';
 import { buildBusinessSnapshot, ADVISOR_NOTES_MAX } from '../../ai/businessSnapshot';
 import { NO_TOWER_LABEL, normTower } from '../../utils/towers';
 import { askAdvisor, AdvisorMessage, AdvisorProvider, PROVIDER_LABELS } from '../../ai/advisorApi';
@@ -14,6 +14,7 @@ interface AdvisorViewProps {
   providers: UpstreamProvider[];
   towers: TowerPoint[];
   settings: SystemSettings;
+  expenses?: Expense[];
   currentUser: StaffUser;
   onChangeProvider: (provider: AdvisorProvider) => void;
   onSaveNotes: (notes: string) => void;
@@ -146,7 +147,7 @@ export const AdvisorView: React.FC<AdvisorViewProps> = (props) => {
     apiRequest<{ gemini: boolean; workers: boolean; claude: boolean }>('/api/ai/status').then(setEngineStatus).catch(() => undefined);
   }, []);
 
-  const snapshot = useMemo(() => buildBusinessSnapshot(props), [props.subscribers, props.payments, props.tickets, props.providers, props.towers, props.settings]);
+  const snapshot = useMemo(() => buildBusinessSnapshot(props), [props.subscribers, props.payments, props.tickets, props.providers, props.towers, props.settings, props.expenses]);
 
   useEffect(() => {
     try { localStorage.setItem(HISTORY_KEY, JSON.stringify(messages.slice(-40))); } catch { /* التخزين غير متاح */ }
