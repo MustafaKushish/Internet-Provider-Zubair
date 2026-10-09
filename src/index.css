@@ -22,6 +22,14 @@
   background: #475569;
 }
 
+/* شريط أفقي قابل للسحب بدون شريط تمرير ظاهر (الهاتف) */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* Print Styles for Receipts */
 @media print {
   body {

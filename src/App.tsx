@@ -36,6 +36,7 @@ import {
   loadTowers,
   saveTowers,
   getRemainingDebt,
+  getDaysRemaining,
   refreshSubscriberStatus,
   nextReceiptNumber,
   nextTicketNumber,
@@ -70,6 +71,7 @@ import { ProviderModal } from './components/ProviderModal';
 import { TowerModal } from './components/TowerModal';
 import { ForcePasswordChange } from './components/ForcePasswordChange';
 import { SyncStatusBadge } from './components/SyncStatusBadge';
+import { QuickSearch } from './components/QuickSearch';
 import { authApi, usersApi, getToken, setToken, ApiError, PREVIEW_MODE } from './sync/api';
 import { useCloudSync } from './sync/useCloudSync';
 
@@ -154,6 +156,7 @@ export default function App() {
   const [subscriberForHistory, setSubscriberForHistory] = useState<Subscriber | null>(null);
 
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isQuickSearchOpen, setIsQuickSearchOpen] = useState(false);
 
   const [isProviderModalOpen, setIsProviderModalOpen] = useState(false);
   const [providerToEdit, setProviderToEdit] = useState<UpstreamProvider | null>(null);
@@ -168,6 +171,24 @@ export default function App() {
   });
 
   const [forceOpenAddUserModal, setForceOpenAddUserModal] = useState(false);
+
+  // البحث السريع: Ctrl+K (أو ⌘K) من أي مكان، أو «/» خارج حقول الكتابة
+  useEffect(() => {
+    if (isLocked) return;
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      const typing = !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsQuickSearchOpen(true);
+      } else if (e.key === '/' && !typing && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        setIsQuickSearchOpen(true);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isLocked]);
 
   useEffect(() => {
     if (isLocked || PREVIEW_MODE) return;
@@ -1009,6 +1030,7 @@ export default function App() {
         setActiveTab={setActiveTab}
         stats={stats}
         ispName={settings.ispName}
+        contactPhone={settings.contactPhone}
         currentUser={currentUser}
         onOpenAddModal={() => {
           setSubscriberToEdit(null);
@@ -1020,11 +1042,30 @@ export default function App() {
           checkAndTriggerExpiryNotifications(subscribers, settings, true);
         }}
         onOpenLoginModal={() => setIsLoginModalOpen(true)}
+        onOpenSearch={() => setIsQuickSearchOpen(true)}
         onLogout={handleLogout}
       />
 
+      <QuickSearch
+        open={isQuickSearchOpen}
+        onClose={() => setIsQuickSearchOpen(false)}
+        subscribers={subscribers}
+        currentUser={currentUser}
+        currency={settings.currency}
+        onRenew={(sub) => { setSubscriberToRenew(sub); setIsRenewModalOpen(true); }}
+        onWhatsApp={(sub) => {
+          setSubscriberForWhatsApp(sub);
+          setWhatsAppDefaultTab(getRemainingDebt(sub) > 0 ? 'debt' : getDaysRemaining(sub.expiryDate) < 0 ? 'expired' : 'expiry');
+          setIsWhatsAppModalOpen(true);
+        }}
+        onHistory={(sub) => { setSubscriberForHistory(sub); setIsHistoryModalOpen(true); }}
+        onDebt={(sub) => setDebtSubscriberId(sub.id)}
+        onEdit={(sub) => { setSubscriberToEdit(sub); setIsSubscriberModalOpen(true); }}
+        onTicket={(sub) => { setTicketToEdit(null); setTicketPrefillSubscriberId(sub.id); setIsTicketModalOpen(true); }}
+      />
+
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
         {safeActiveTab === 'subscribers' && (
           <SubscribersView
             subscribers={subscribers}
@@ -1261,10 +1302,10 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-slate-900 bg-slate-950 py-4 text-center text-xs text-slate-500 no-print">
+      <footer className="border-t border-slate-900 bg-slate-950 py-4 pb-24 md:pb-4 text-center text-xs text-slate-500 no-print">
         <p>
-          {settings.ispName} (العراق - البصرة - قضاء الزبير) © {new Date().getFullYear()} • هاتف وواتساب:{' '}
-          <span className="font-mono text-cyan-400 font-semibold" dir="ltr">+964 771 979 7455</span>
+          {settings.ispName} (العراق - البصرة - قضاء الزبير) © {new Date().getFullYear()}
+          {settings.contactPhone && <> • هاتف وواتساب:{' '}<span className="font-mono text-cyan-400 font-semibold" dir="ltr">{settings.contactPhone}</span></>}
         </p>
       </footer>
 

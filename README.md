@@ -37,6 +37,15 @@ Die installierte App startet ohne Browserleiste, hat ein eigenes Symbol, öffnet
 (mit den zuletzt gespeicherten Daten) und aktualisiert sich bei jedem Deploy automatisch.
 Der Windows-Installer ist eine Electron-Hülle (`desktop/`) um dieselbe Adresse.
 
+## Bedienung
+
+- **Schnellsuche:** Lupe oben oder `Strg+K` (bzw. `/`). Findet Kunden nach Name, Telefon (mit oder ohne 0, auch arabische Ziffern),
+  Benutzername oder IP. „احمد“ findet auch „أحمد“. `Enter` öffnet direkt die Verlängerung.
+- **Handy:** kompakte Kopfzeile, Leiste unten mit den wichtigsten Bereichen, alles Weitere unter „المزيد“.
+- **Kundenliste:** 25 pro Seite (umstellbar), sortierbar nach Name, Ablauf, Schulden oder neueste.
+- **Erinnerungen:** nach Dringlichkeit sortiert, Suche und Turmfilter; „heute gesendet“ bleibt bis Mitternacht markiert.
+- **Übersicht:** „ملخص اليوم“ zeigt heutige Einnahmen nach Zahlungsart, Verlängerungen und wer heute oder morgen abläuft.
+
 ## Der KI-Berater („المستشار الذكي“)
 
 Ein Reiter für Admin und Buchhalter: Er beantwortet Fragen zu Marketing, Preisen, Zuschlägen, Schulden und dazu,

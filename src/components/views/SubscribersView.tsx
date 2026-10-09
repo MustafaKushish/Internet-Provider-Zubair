@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { copyText } from '../ui/Dialogs';
 import { NO_TOWER_LABEL, normTower } from '../../utils/towers';
+import { matchesSubscriber } from '../../utils/search';
 import { debtInMonths, formatMonthsAr, monthsLate } from '../../utils/debt';
 import { Subscriber, SystemSettings, StaffUser } from '../../types/isp';
 import { formatCurrency, getDaysRemaining, getRemainingDebt, getAmountDue } from '../../utils/storage';
@@ -25,8 +26,12 @@ import {
   History,
   Send,
   TowerControl,
-  Server
+  Server,
+  MoreHorizontal
 } from 'lucide-react';
+
+type SortKey = 'name' | 'expiry' | 'debt' | 'newest';
+const PAGE_SIZE = 25;
 
 interface SubscribersViewProps {
   subscribers: Subscriber[];
@@ -83,6 +88,11 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
   const [providerFilter, setProviderFilter] = useState('all');
   const [towerFilter, setTowerFilter] = useState('all');
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [sortBy, setSortBy] = useState<SortKey>('name');
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState<number>(PAGE_SIZE);
+  const [filtersOpen, setFiltersOpen] = useState(false);   // الهاتف: الفلاتر الإضافية مطوية
+  const [moreActionsFor, setMoreActionsFor] = useState<string | null>(null);
   const [bulkTower, setBulkTower] = useState('');
 
   // فتح القائمة على برج محدد عند الطلب من تبويب الأبراج
@@ -111,13 +121,7 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
   const filteredSubscribers = useMemo(() => {
     return subscribers.filter((sub) => {
       // Search
-      const q = search.toLowerCase().trim();
-      const matchesSearch = !q ||
-        sub.name.toLowerCase().includes(q) ||
-        sub.phone.includes(q) ||
-        sub.username.toLowerCase().includes(q) ||
-        (sub.ipAddress && sub.ipAddress.includes(q)) ||
-        (sub.towerName || '').toLowerCase().includes(q);
+      const matchesSearch = matchesSubscriber(sub, search);
 
       // Status
       const matchesStatus = statusFilter === 'all' || sub.status === statusFilter;
@@ -136,7 +140,87 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
     });
   }, [subscribers, search, statusFilter, paymentFilter, providerFilter, towerFilter]);
 
+  const sortedSubscribers = useMemo(() => {
+    const list = [...filteredSubscribers];
+    switch (sortBy) {
+      case 'expiry': return list.sort((a, b) => (a.expiryDate || '').localeCompare(b.expiryDate || ''));
+      case 'debt': return list.sort((a, b) => getRemainingDebt(b) - getRemainingDebt(a));
+      case 'newest': return list.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+      default: return list.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+    }
+  }, [filteredSubscribers, sortBy]);
+
+  // الرجوع للصفحة الأولى عند تغيير البحث أو الفلاتر أو الترتيب
+  useEffect(() => { setPage(0); }, [search, statusFilter, paymentFilter, providerFilter, towerFilter, sortBy, pageSize]);
+  const pageCount = Math.max(1, Math.ceil(sortedSubscribers.length / pageSize));
+  const safePage = Math.min(page, pageCount - 1);
+  const pageItems = sortedSubscribers.slice(safePage * pageSize, safePage * pageSize + pageSize);
+
   const overdueCount = subscribers.filter(s => s.paymentStatus === 'overdue' || s.status === 'expired').length;
+
+  // أزرار العمليات حسب الصلاحية؛ في الهاتف أزرار أكبر مع نص للعمليات الأساسية
+  const renderActions = (sub: Subscriber, days: number, remainingDebt: number, mobile: boolean) => {
+    const pad = mobile ? 'h-9 px-3' : 'p-1.5';
+    const ic = mobile ? 'w-4 h-4' : 'w-3.5 h-3.5';
+    const label = (t: string) => (mobile ? <span className="text-[11px] font-bold">{t}</span> : null);
+    const ghost = `bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white ${pad} rounded-lg border border-slate-700 transition cursor-pointer flex items-center gap-1`;
+    if (currentUser?.role === 'technician') {
+      return (
+        <>
+          <button onClick={() => onSendWhatsApp(sub, 'expiry')} title="مراسلة المشترك عبر الواتساب"
+            className={`bg-emerald-600 hover:bg-emerald-500 text-white ${pad} rounded-lg transition shadow-md shadow-emerald-600/20 cursor-pointer flex items-center gap-1`}>
+            <MessageSquare className={ic} />{label('واتساب')}
+          </button>
+          <button onClick={() => onAddTicketForSubscriber(sub)} title="تسجيل بلاغ صيانة وعطل لهذا المشترك" className={`${ghost} text-amber-300`}>
+            <AlertCircle className={ic} />{label('بلاغ')}
+          </button>
+          <button onClick={() => onEdit(sub)} title="تعديل البيانات الفنية، البرج، الآي بي والماك" className={`${ghost} text-cyan-300`}>
+            <Wrench className={ic} />{mobile ? label('تعديل فني') : <span className="text-[10px] hidden xl:inline">تعديل فني</span>}
+          </button>
+        </>
+      );
+    }
+    const showAll = !mobile || moreActionsFor === sub.id;
+    return (
+      <>
+        <button onClick={() => onRenew(sub)} title="تجديد الاشتراك فوراً"
+          className={`bg-cyan-600 hover:bg-cyan-500 text-white ${pad} rounded-lg transition shadow-md shadow-cyan-600/20 cursor-pointer flex items-center gap-1`}>
+          <RefreshCw className={ic} />{label('تجديد')}
+        </button>
+        <button onClick={() => onSendWhatsApp(sub, remainingDebt > 0 ? 'debt' : days <= 0 ? 'expired' : 'expiry')} title="إرسال تذكير أو إشعار واتساب"
+          className={`bg-emerald-600 hover:bg-emerald-500 text-white ${pad} rounded-lg transition shadow-md shadow-emerald-600/20 cursor-pointer flex items-center gap-1`}>
+          <MessageSquare className={ic} />{label('واتساب')}
+        </button>
+        <button onClick={() => onViewPaymentHistory(sub)} title="عرض سجل المدفوعات والوصولات السابقة"
+          className={`bg-indigo-600/30 hover:bg-indigo-600 text-indigo-300 hover:text-white ${pad} rounded-lg border border-indigo-500/40 transition cursor-pointer flex items-center gap-1`}>
+          <History className={ic} />
+        </button>
+        <button onClick={() => onEdit(sub)} title="تعديل بيانات المشترك والاشتراك" className={ghost}>
+          <Edit className={ic} />
+        </button>
+        {!showAll && (
+          <button onClick={() => setMoreActionsFor(sub.id)} title="المزيد من العمليات" aria-label="المزيد من العمليات" className={ghost}>
+            <MoreHorizontal className={ic} />
+          </button>
+        )}
+        {showAll && (
+          <button onClick={() => onPrintReceipt(sub)} title="طباعة وصل قبض" className={ghost}>
+            <Printer className={ic} />{label('وصل')}
+          </button>
+        )}
+        {showAll && (
+          <button onClick={() => onAddTicketForSubscriber(sub)} title="تسجيل بلاغ عطل لهذا المشترك" className={`${ghost} hover:text-amber-300`}>
+            <Wrench className={ic} />{label('بلاغ')}
+          </button>
+        )}
+        {showAll && currentUser?.role === 'admin' && (
+          <button onClick={() => onDelete(sub.id)} title="حذف المشترك (صلاحية المدير فقط)" className={`${ghost} hover:bg-rose-900/60 hover:text-rose-300 text-slate-400`}>
+            <Trash2 className={ic} />
+          </button>
+        )}
+      </>
+    );
+  };
 
   return (
     <div className="space-y-4">
@@ -203,8 +287,20 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
           </div>
         </div>
 
+        <button
+          type="button"
+          onClick={() => setFiltersOpen(o => !o)}
+          aria-expanded={filtersOpen}
+          className="md:hidden w-full flex items-center justify-between text-xs text-slate-300 bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-2 cursor-pointer"
+        >
+          <span className="flex items-center gap-1.5"><Filter className="w-3.5 h-3.5" /> الفلاتر والترتيب
+            {(paymentFilter !== 'all' || providerFilter !== 'all' || towerFilter !== 'all' || sortBy !== 'name') && <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />}
+          </span>
+          <span className="text-slate-500">{filtersOpen ? 'إخفاء' : 'إظهار'}</span>
+        </button>
+
         {/* Second Row of Filters */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-800/80 text-xs">
+        <div className={`${filtersOpen ? 'flex' : 'hidden'} md:flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-800/80 text-xs`}>
           <div className="flex flex-wrap items-center gap-3">
             {/* Payment status filter (Paid, Pending, Overdue) */}
             <div className="flex items-center gap-1">
@@ -260,6 +356,22 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
                 {towers.map((t, idx) => (
                   <option key={idx} value={t}>{t}</option>
                 ))}
+              </select>
+            </div>
+
+            {/* Sort */}
+            <div className="flex items-center gap-1">
+              <span className="text-slate-400">الترتيب:</span>
+              <select
+                id="subscribers-sort"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as SortKey)}
+                className="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1 text-slate-200 focus:outline-none focus:border-cyan-500"
+              >
+                <option value="name">الاسم (أ - ي)</option>
+                <option value="expiry">الأقرب انتهاءً / الأكثر تأخراً</option>
+                <option value="debt">الأكبر ديناً</option>
+                <option value="newest">الأحدث إضافة</option>
               </select>
             </div>
 
@@ -328,8 +440,74 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
         </div>
       )}
 
+      {/* الهاتف: بطاقات بدل الجدول العريض */}
+      <div className="md:hidden space-y-2.5">
+        {pageItems.length === 0 ? (
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-center text-slate-400 text-sm space-y-3">
+            <p>{subscribers.length === 0 ? 'لا يوجد مشتركون بعد.' : 'لا يوجد مشتركون مطابقون للبحث.'}</p>
+            {subscribers.length === 0 && onOpenAddModal && (
+              <button onClick={onOpenAddModal} className="px-4 py-2 bg-cyan-600 text-white text-xs font-bold rounded-xl cursor-pointer">+ إضافة أول مشترك</button>
+            )}
+          </div>
+        ) : pageItems.map(sub => {
+          const days = getDaysRemaining(sub.expiryDate);
+          const remainingDebt = getRemainingDebt(sub);
+          return (
+            <div key={sub.id} className={`bg-slate-900 border rounded-2xl p-3.5 shadow-lg ${selected.has(sub.id) ? 'border-cyan-700' : 'border-slate-800'}`}>
+              <div className="flex items-start gap-2">
+                {onAssignTower && (
+                  <input
+                    type="checkbox"
+                    aria-label={`تحديد ${sub.name}`}
+                    checked={selected.has(sub.id)}
+                    onChange={(e) => setSelected(prev => {
+                      const next = new Set(prev);
+                      if (e.target.checked) next.add(sub.id); else next.delete(sub.id);
+                      return next;
+                    })}
+                    className="mt-1 accent-cyan-500"
+                  />
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="font-bold text-white text-sm truncate">{sub.name}</div>
+                      <div className="text-[11px] text-slate-400 mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                        {sub.phone && <a href={`tel:${sub.phone}`} className="font-mono text-cyan-300" dir="ltr">{sub.phone}</a>}
+                        <span className="flex items-center gap-1"><TowerControl className="w-3 h-3" />{normTower(sub.towerName) || NO_TOWER_LABEL}</span>
+                      </div>
+                    </div>
+                    <ExpiryChip days={days} expiryDate={sub.expiryDate} />
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+                    <span className="text-slate-300">{sub.planName}</span>
+                    <button type="button" onClick={() => copyToClipboard(sub.username, `user_${sub.id}`)} className="font-mono text-indigo-300 flex items-center gap-1 cursor-pointer" dir="ltr">
+                      {sub.username}
+                      {copiedId === `user_${sub.id}` ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-slate-500" />}
+                    </button>
+                    {currentUser?.role !== 'technician' && (
+                      remainingDebt > 0 ? (
+                        <button type="button" onClick={() => onOpenDebt?.(sub)} className="text-rose-400 font-bold cursor-pointer">
+                          دين {formatCurrency(remainingDebt, settings.currency)}{sub.salePrice > 0 && ` (×${debtInMonths(sub)})`}
+                        </button>
+                      ) : (
+                        <span className="text-emerald-400 font-semibold">خالص • {formatCurrency(sub.salePrice, settings.currency)}</span>
+                      )
+                    )}
+                    {currentUser?.role === 'technician' && sub.ipAddress && <span className="font-mono text-cyan-300" dir="ltr">{sub.ipAddress}</span>}
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3 pt-2.5 border-t border-slate-800 flex flex-wrap items-center gap-1.5">
+                {renderActions(sub, days, remainingDebt, true)}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
       {/* Subscribers Table Card */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
+      <div className="hidden md:block bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-right text-xs">
             <thead className="bg-slate-800/90 text-slate-300 font-bold border-b border-slate-700">
@@ -338,9 +516,9 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
                   <th className="py-3 pr-4 pl-1 w-8">
                     <input
                       type="checkbox"
-                      aria-label="تحديد كل المشتركين الظاهرين"
-                      checked={filteredSubscribers.length > 0 && filteredSubscribers.every(s => selected.has(s.id))}
-                      onChange={(e) => setSelected(e.target.checked ? new Set(filteredSubscribers.map(s => s.id)) : new Set())}
+                      aria-label="تحديد كل المشتركين المطابقين للفلتر"
+                      checked={sortedSubscribers.length > 0 && sortedSubscribers.every(s => selected.has(s.id))}
+                      onChange={(e) => setSelected(e.target.checked ? new Set(sortedSubscribers.map(s => s.id)) : new Set())}
                       className="rounded bg-slate-900 border-slate-600 accent-cyan-500 cursor-pointer"
                     />
                   </th>
@@ -364,7 +542,7 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800 text-slate-200">
-              {filteredSubscribers.length === 0 ? (
+              {pageItems.length === 0 ? (
                 <tr>
                   <td colSpan={onAssignTower ? 8 : 7} className="py-14 text-center text-slate-400">
                     <div className="max-w-md mx-auto space-y-3">
@@ -408,7 +586,7 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
                   </td>
                 </tr>
               ) : (
-                filteredSubscribers.map((sub) => {
+                pageItems.map((sub) => {
                   const days = getDaysRemaining(sub.expiryDate);
                   const netProfit = sub.salePrice - sub.costPrice;
                   const remainingDebt = getRemainingDebt(sub);
@@ -434,7 +612,7 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
                       <td className="py-3 px-4">
                         <div className="font-bold text-white text-sm">{sub.name}</div>
                         <div className="flex items-center gap-1.5 text-slate-400 mt-0.5" dir="ltr">
-                          <span className="font-mono text-[11px] text-left">{sub.phone}</span>
+                          {sub.phone ? <a href={`tel:${sub.phone}`} className="font-mono text-[11px] text-left hover:text-cyan-300">{sub.phone}</a> : <span className="text-[11px] text-amber-400/80">بدون رقم</span>}
                         </div>
                         <div className="text-[11px] mt-1 flex items-center gap-1">
                           <TowerControl className={`w-3 h-3 flex-shrink-0 ${normTower(sub.towerName) ? 'text-cyan-400' : 'text-amber-400'}`} />
@@ -601,97 +779,7 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
                       {/* Operations & Actions based on Authority */}
                       <td className="py-3 px-4">
                         <div className="flex items-center justify-center gap-1">
-                          {currentUser?.role === 'technician' ? (
-                            <>
-                              {/* Technician Actions */}
-                              <button
-                                onClick={() => onEdit(sub)}
-                                title="تعديل البيانات الفنية، البرج، الآي بي والماك"
-                                className="bg-slate-800 hover:bg-slate-700 text-cyan-300 hover:text-white p-1.5 rounded-lg border border-slate-700 transition cursor-pointer flex items-center gap-1"
-                              >
-                                <Wrench className="w-3.5 h-3.5" />
-                                <span className="text-[10px] hidden xl:inline">تعديل فني</span>
-                              </button>
-
-                              <button
-                                onClick={() => onAddTicketForSubscriber(sub)}
-                                title="تسجيل بلاغ صيانة وعطل لهذا المشترك"
-                                className="bg-slate-800 hover:bg-amber-900/60 text-amber-300 hover:text-white p-1.5 rounded-lg border border-slate-700 transition cursor-pointer"
-                              >
-                                <AlertCircle className="w-3.5 h-3.5" />
-                              </button>
-
-                              <button
-                                onClick={() => onSendWhatsApp(sub, 'expiry')}
-                                title="مراسلة المشترك عبر الواتساب"
-                                className="bg-emerald-600 hover:bg-emerald-500 text-white p-1.5 rounded-lg transition shadow-md shadow-emerald-600/20 cursor-pointer"
-                              >
-                                <MessageSquare className="w-3.5 h-3.5" />
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              {/* Admin and Accountant Actions */}
-                              <button
-                                onClick={() => onViewPaymentHistory(sub)}
-                                title="عرض سجل المدفوعات والوصولات السابقة"
-                                className="bg-indigo-600/30 hover:bg-indigo-600 text-indigo-300 hover:text-white p-1.5 rounded-lg border border-indigo-500/40 transition cursor-pointer"
-                              >
-                                <History className="w-3.5 h-3.5" />
-                              </button>
-
-                              <button
-                                onClick={() => onRenew(sub)}
-                                title="تجديد الاشتراك فوراً"
-                                className="bg-cyan-600 hover:bg-cyan-500 text-white p-1.5 rounded-lg transition shadow-md shadow-cyan-600/20 cursor-pointer"
-                              >
-                                <RefreshCw className="w-3.5 h-3.5" />
-                              </button>
-
-                              <button
-                                onClick={() => onSendWhatsApp(sub, remainingDebt > 0 ? 'debt' : days <= 0 ? 'expired' : 'expiry')}
-                                title="إرسال تذكير أو إشعار واتساب"
-                                className="bg-emerald-600 hover:bg-emerald-500 text-white p-1.5 rounded-lg transition shadow-md shadow-emerald-600/20 cursor-pointer"
-                              >
-                                <MessageSquare className="w-3.5 h-3.5" />
-                              </button>
-
-                              <button
-                                onClick={() => onPrintReceipt(sub)}
-                                title="طباعة وصل قبض"
-                                className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white p-1.5 rounded-lg border border-slate-700 transition cursor-pointer"
-                              >
-                                <Printer className="w-3.5 h-3.5" />
-                              </button>
-
-                              <button
-                                onClick={() => onAddTicketForSubscriber(sub)}
-                                title="تسجيل بلاغ عطل لهذا المشترك"
-                                className="bg-slate-800 hover:bg-amber-900/60 text-slate-300 hover:text-amber-300 p-1.5 rounded-lg border border-slate-700 transition cursor-pointer"
-                              >
-                                <Wrench className="w-3.5 h-3.5" />
-                              </button>
-
-                              <button
-                                onClick={() => onEdit(sub)}
-                                title="تعديل بيانات المشترك والاشتراك"
-                                className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white p-1.5 rounded-lg border border-slate-700 transition cursor-pointer"
-                              >
-                                <Edit className="w-3.5 h-3.5" />
-                              </button>
-
-                              {/* Delete is strictly Admin only */}
-                              {currentUser?.role === 'admin' && (
-                                <button
-                                  onClick={() => onDelete(sub.id)}
-                                  title="حذف المشترك (صلاحية المدير فقط)"
-                                  className="bg-slate-800 hover:bg-rose-900/60 text-slate-400 hover:text-rose-300 p-1.5 rounded-lg border border-slate-700 transition cursor-pointer"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-                            </>
-                          )}
+                          {renderActions(sub, days, remainingDebt, false)}
                         </div>
                       </td>
                     </tr>
@@ -702,6 +790,44 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
           </table>
         </div>
       </div>
+
+      {sortedSubscribers.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
+          <span>
+            عرض {safePage * pageSize + 1}–{Math.min(sortedSubscribers.length, (safePage + 1) * pageSize)} من {sortedSubscribers.length}
+            {sortedSubscribers.length !== subscribers.length && ` (من أصل ${subscribers.length})`}
+          </span>
+          <div className="flex items-center gap-1.5">
+            <select
+              aria-label="عدد المشتركين في الصفحة"
+              value={pageSize}
+              onChange={(e) => setPageSize(Number(e.target.value))}
+              className="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-slate-200"
+            >
+              <option value={25}>25 بالصفحة</option>
+              <option value={50}>50 بالصفحة</option>
+              <option value={100}>100 بالصفحة</option>
+              <option value={100000}>الكل</option>
+            </select>
+            {pageCount > 1 && (
+              <>
+                <button type="button" disabled={safePage === 0} onClick={() => { setPage(safePage - 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  className="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 disabled:opacity-40 cursor-pointer">السابق</button>
+                <span className="px-1 font-semibold text-slate-300">{safePage + 1} / {pageCount}</span>
+                <button type="button" disabled={safePage >= pageCount - 1} onClick={() => { setPage(safePage + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  className="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 disabled:opacity-40 cursor-pointer">التالي</button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
+};
+
+/** شارة الصلاحية: الأيام المتبقية أو أشهر التأخير */
+const ExpiryChip: React.FC<{ days: number; expiryDate: string }> = ({ days, expiryDate }) => {
+  if (days > 3) return <span className="flex-shrink-0 text-[10px] font-semibold text-emerald-300 bg-emerald-950/60 border border-emerald-800/60 px-2 py-0.5 rounded-full">متبقي {days} يوم</span>;
+  if (days >= 0) return <span className="flex-shrink-0 text-[10px] font-bold text-amber-300 bg-amber-950/70 border border-amber-800 px-2 py-0.5 rounded-full">{days === 0 ? 'ينتهي اليوم' : `متبقي ${days} يوم`}</span>;
+  return <span className="flex-shrink-0 text-[10px] font-bold text-rose-300 bg-rose-950/70 border border-rose-800 px-2 py-0.5 rounded-full">متأخر {formatMonthsAr(monthsLate(expiryDate))}</span>;
 };

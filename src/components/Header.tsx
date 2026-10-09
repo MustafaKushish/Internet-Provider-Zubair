@@ -24,12 +24,45 @@ import {
   MonitorDown,
   Sparkles,
   Share,
+  MoreHorizontal,
+  Search,
   X as CloseIcon,
 } from 'lucide-react';
 import { getNotificationPermission, requestNotificationPermission } from '../utils/notifications';
 import { StaffUser } from '../types/isp';
 import { canPromptInstall, isStandalone, onInstallAvailabilityChange, requestInstall } from '../pwa';
 import { notify } from './ui/Dialogs';
+import { useEscapeKey } from './ui/useEscapeKey';
+
+type Role = StaffUser['role'];
+const ALL: Role[] = ['admin', 'accountant', 'technician'];
+const OFFICE: Role[] = ['admin', 'accountant'];
+
+interface TabDef {
+  id: string;
+  label: string;   // الاسم الكامل (الحاسوب)
+  short: string;   // اسم قصير لشريط الهاتف السفلي
+  icon: React.ComponentType<{ className?: string }>;
+  roles: Role[];
+  accent?: 'indigo';
+}
+
+// ترتيب الأقسام؛ الصلاحيات نفسها تُفرض أيضاً في App (TAB_ACCESS) وعلى الخادم
+const TABS: TabDef[] = [
+  { id: 'subscribers', label: 'المشتركين والاشتراكات', short: 'المشتركون', icon: Users, roles: ALL },
+  { id: 'dashboard', label: 'لوحة المؤشرات', short: 'المؤشرات', icon: LayoutDashboard, roles: OFFICE },
+  { id: 'reports', label: 'التقارير المالية والجرد الدوري', short: 'التقارير', icon: BarChart3, roles: OFFICE },
+  { id: 'reminders', label: 'تذكيرات الواتساب والديون', short: 'التذكيرات', icon: MessageSquare, roles: ALL },
+  { id: 'tickets', label: 'البلاغات والدعم الفني', short: 'البلاغات', icon: Wrench, roles: ALL },
+  { id: 'advisor', label: 'المستشار الذكي', short: 'المستشار', icon: Sparkles, roles: OFFICE, accent: 'indigo' },
+  { id: 'towers', label: 'الأبراج', short: 'الأبراج', icon: TowerControl, roles: ALL },
+  { id: 'providers', label: 'المزودون وباقات الزبير', short: 'المزودون', icon: Server, roles: OFFICE },
+  { id: 'users', label: 'المستخدمون والمشرفون', short: 'المستخدمون', icon: ShieldCheck, roles: ['admin'], accent: 'indigo' },
+  { id: 'settings', label: 'إعدادات المنظومة', short: 'الإعدادات', icon: Settings, roles: ['admin'] },
+];
+
+// الأقسام الظاهرة مباشرة في شريط الهاتف السفلي (الباقي في «المزيد»)
+const MOBILE_PRIMARY = ['subscribers', 'reminders', 'dashboard', 'tickets', 'towers'];
 
 interface HeaderProps {
   activeTab: string;
@@ -44,12 +77,14 @@ interface HeaderProps {
     openTicketsCount: number;
   };
   ispName: string;
+  contactPhone: string;
   currentUser: StaffUser;
   onOpenAddModal: () => void;
   onExportExcel: () => void;
   onOpenImportModal: () => void;
   onTriggerNotificationCheck: () => void;
   onOpenLoginModal: () => void;
+  onOpenSearch: () => void;
   onLogout: () => void;
   onOpenAddUser?: () => void;
 }
@@ -59,12 +94,14 @@ export const Header: React.FC<HeaderProps> = ({
   setActiveTab,
   stats,
   ispName,
+  contactPhone,
   currentUser,
   onOpenAddModal,
   onExportExcel,
   onOpenImportModal,
   onTriggerNotificationCheck,
   onOpenLoginModal,
+  onOpenSearch,
   onLogout,
   onOpenAddUser,
 }) => {
@@ -72,6 +109,23 @@ export const Header: React.FC<HeaderProps> = ({
   // زر التثبيت يظهر ما دامت المنظومة مفتوحة في المتصفح وليس كتطبيق مثبت
   const [showInstall, setShowInstall] = useState(() => !isStandalone());
   const [iosHelpOpen, setIosHelpOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+
+  const visibleTabs = TABS.filter(t => t.roles.includes(currentUser.role));
+  const primaryTabs = visibleTabs.filter(t => MOBILE_PRIMARY.includes(t.id)).slice(0, 4);
+  const moreTabs = visibleTabs.filter(t => !primaryTabs.includes(t));
+  const alertsCount = stats.expiringSoonCount + stats.expiredCount;
+  const badgeFor = (id: string): React.ReactNode => {
+    if (id === 'subscribers') return <span className="text-xs px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-300 font-normal">{stats.totalSubscribers}</span>;
+    if (id === 'tickets' && stats.openTicketsCount > 0) return <span className="text-xs px-1.5 py-0.2 rounded-full bg-rose-500/30 text-rose-300 border border-rose-500/40">{stats.openTicketsCount}</span>;
+    if (id === 'reminders' && alertsCount > 0) return <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping absolute top-2 right-2"></span>;
+    return null;
+  };
+  const go = (id: string) => {
+    setActiveTab(id);
+    setMoreOpen(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
   useEffect(() => onInstallAvailabilityChange(() => setShowInstall(!isStandalone())), []);
 
   const handleInstall = async () => {
@@ -105,9 +159,72 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="bg-slate-900 border-b border-slate-800 sticky top-0 z-30 shadow-xl backdrop-blur-md bg-opacity-95 no-print">
+    <>
+    <header className="bg-slate-900 border-b border-slate-800 md:sticky md:top-0 z-30 shadow-xl backdrop-blur-md bg-opacity-95 no-print">
+      {/* الهاتف: شريط علوي مضغوط */}
+      <div className="md:hidden px-3 pt-3 pb-2 space-y-2">
+        <div className="flex items-center gap-2">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-600 via-blue-600 to-indigo-600 flex items-center justify-center text-white flex-shrink-0">
+            <Wifi className="w-5 h-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-sm font-bold text-white truncate">{ispName}</h1>
+            <p className="text-[10px] text-slate-400 truncate">{currentUser.name} • {currentUser.role === 'admin' ? 'المدير' : currentUser.role === 'accountant' ? 'محاسب' : 'فني'}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onOpenSearch}
+            aria-label="بحث سريع عن مشترك"
+            className="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 flex items-center justify-center cursor-pointer"
+          >
+            <Search className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={onOpenAddModal}
+            aria-label="إضافة مشترك"
+            className="h-9 px-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold flex items-center gap-1 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" /> <span>مشترك</span>
+          </button>
+          <button
+            type="button"
+            onClick={onLogout}
+            aria-label="تسجيل الخروج"
+            className="w-9 h-9 rounded-xl bg-rose-950/70 border border-rose-800/80 text-rose-300 flex items-center justify-center cursor-pointer"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-3 px-3 pb-0.5">
+          <span className="flex-shrink-0 bg-slate-800/80 border border-slate-700/60 rounded-lg px-2.5 py-1 text-[11px] text-slate-300">
+            نشط <b className="text-white">{stats.activeCount}</b> من {stats.totalSubscribers}
+          </span>
+          {currentUser.role !== 'technician' && (
+            <span className="flex-shrink-0 bg-emerald-950/40 border border-emerald-800/40 rounded-lg px-2.5 py-1 text-[11px] text-emerald-300">
+              ربح شهري <b className="text-emerald-400">{stats.totalProfit.toLocaleString()}</b>
+            </span>
+          )}
+          {currentUser.role !== 'technician' && stats.totalDebts > 0 && (
+            <button type="button" onClick={() => go('reminders')} className="flex-shrink-0 bg-rose-950/40 border border-rose-800/40 rounded-lg px-2.5 py-1 text-[11px] text-rose-300 cursor-pointer">
+              ديون <b className="text-rose-400">{stats.totalDebts.toLocaleString()}</b>
+            </button>
+          )}
+          {alertsCount > 0 && (
+            <button type="button" onClick={() => go('reminders')} className="flex-shrink-0 bg-amber-950/50 border border-amber-700/50 rounded-lg px-2.5 py-1 text-[11px] text-amber-300 cursor-pointer">
+              {stats.expiringSoonCount} قريباً • {stats.expiredCount} متأخر
+            </button>
+          )}
+          {stats.openTicketsCount > 0 && (
+            <button type="button" onClick={() => go('tickets')} className="flex-shrink-0 bg-amber-950/50 border border-amber-700/50 rounded-lg px-2.5 py-1 text-[11px] text-amber-300 cursor-pointer">
+              {stats.openTicketsCount} عطل مفتوح
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Top Banner */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+      <div className="hidden md:block max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           {/* Logo & Brand */}
           <div className="flex items-center gap-3">
@@ -122,7 +239,7 @@ export const Header: React.FC<HeaderProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                إدارة المشتركين والأبراج • هاتف وواتساب: <span className="text-cyan-400 font-mono font-semibold" dir="ltr">+964 771 979 7455</span>
+                إدارة المشتركين والأبراج{contactPhone ? <> • هاتف وواتساب: <span className="text-cyan-400 font-mono font-semibold" dir="ltr">{contactPhone}</span></> : null}
               </p>
             </div>
           </div>
@@ -231,6 +348,15 @@ export const Header: React.FC<HeaderProps> = ({
 
             {/* Quick Actions */}
             <div className="flex items-center gap-1.5 ms-auto md:ms-2">
+              <button
+                onClick={onOpenSearch}
+                title="بحث سريع عن مشترك (Ctrl+K)"
+                className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white text-xs px-2.5 py-2 rounded-lg flex items-center gap-1.5 transition cursor-pointer"
+              >
+                <Search className="w-4 h-4" />
+                <span className="hidden lg:inline">بحث</span>
+                <kbd className="hidden lg:inline text-[9px] font-mono bg-slate-900 border border-slate-700 rounded px-1 text-slate-400">Ctrl K</kbd>
+              </button>
               {/* Browser Notification Bell Toggle */}
               <button
                 onClick={handleNotificationClick}
@@ -292,155 +418,24 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Navigation Tabs */}
         <nav aria-label="أقسام المنظومة" className="flex flex-wrap items-center gap-1 sm:gap-1.5 mt-3 pt-2 border-t border-slate-800/80">
-          <button
-            onClick={() => setActiveTab('subscribers')}
-            className={`px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 whitespace-nowrap transition cursor-pointer ${
-              activeTab === 'subscribers'
-                ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-            }`}
-          >
-            <Users className="w-4 h-4" />
-            <span>المشتركين والاشتراكات</span>
-            <span className="text-xs px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-300 font-normal">
-              {stats.totalSubscribers}
-            </span>
-          </button>
-
-          {/* Dashboard Tab - Hidden for Technician */}
-          {currentUser.role !== 'technician' && (
-            <button
-              onClick={() => setActiveTab('dashboard')}
-              className={`px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 whitespace-nowrap transition cursor-pointer ${
-                activeTab === 'dashboard'
-                  ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-              }`}
-            >
-              <LayoutDashboard className="w-4 h-4" />
-              <span>لوحة المؤشرات</span>
-            </button>
-          )}
-
-          {/* Financial Reports Tab - Hidden for Technician */}
-          {currentUser.role !== 'technician' && (
-            <button
-              onClick={() => setActiveTab('reports')}
-              className={`px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 whitespace-nowrap transition cursor-pointer ${
-                activeTab === 'reports'
-                  ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-              }`}
-            >
-              <BarChart3 className="w-4 h-4" />
-              <span>التقارير المالية والجرد الدوري</span>
-            </button>
-          )}
-
-          <button
-            onClick={() => setActiveTab('reminders')}
-            className={`px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 whitespace-nowrap transition cursor-pointer relative ${
-              activeTab === 'reminders'
-                ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-            }`}
-          >
-            <MessageSquare className="w-4 h-4" />
-            <span>تذكيرات الواتساب والديون</span>
-            {stats.expiringSoonCount + stats.expiredCount > 0 && (
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping absolute top-2 right-2"></span>
-            )}
-          </button>
-
-          <button
-            onClick={() => setActiveTab('tickets')}
-            className={`px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 whitespace-nowrap transition cursor-pointer ${
-              activeTab === 'tickets'
-                ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-            }`}
-          >
-            <Wrench className="w-4 h-4" />
-            <span>البلاغات والدعم الفني</span>
-            {stats.openTicketsCount > 0 && (
-              <span className="text-xs px-1.5 py-0.2 rounded-full bg-rose-500/30 text-rose-300 border border-rose-500/40">
-                {stats.openTicketsCount}
-              </span>
-            )}
-          </button>
-
-          {/* AI Advisor Tab - admin & accountant */}
-          {currentUser.role !== 'technician' && (
-            <button
-              onClick={() => setActiveTab('advisor')}
-              className={`px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 whitespace-nowrap transition cursor-pointer ${
-                activeTab === 'advisor'
-                  ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40'
-                  : 'text-indigo-300/80 hover:text-indigo-200 hover:bg-slate-800/60'
-              }`}
-            >
-              <Sparkles className="w-4 h-4" />
-              <span>المستشار الذكي</span>
-            </button>
-          )}
-
-          {/* Towers Tab - visible to everyone (editing for admin/accountant) */}
-          <button
-            onClick={() => setActiveTab('towers')}
-            className={`px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 whitespace-nowrap transition cursor-pointer ${
-              activeTab === 'towers'
-                ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-            }`}
-          >
-            <TowerControl className="w-4 h-4" />
-            <span>الأبراج</span>
-          </button>
-
-          {/* Providers Tab - Hidden for Technician */}
-          {currentUser.role !== 'technician' && (
-            <button
-              onClick={() => setActiveTab('providers')}
-              className={`px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 whitespace-nowrap transition cursor-pointer ${
-                activeTab === 'providers'
-                  ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-              }`}
-            >
-              <Server className="w-4 h-4" />
-              <span>المزودون وباقات الزبير</span>
-            </button>
-          )}
-
-          {/* Users & Staff Management Tab (Admin only) */}
-          {currentUser.role === 'admin' && (
-            <button
-              onClick={() => setActiveTab('users')}
-              className={`px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 whitespace-nowrap transition cursor-pointer ${
-                activeTab === 'users'
-                  ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-              }`}
-            >
-              <ShieldCheck className="w-4 h-4 text-indigo-400" />
-              <span>المستخدمون والمشرفون</span>
-            </button>
-          )}
-
-          {/* Settings Tab (Admin only) */}
-          {currentUser.role === 'admin' && (
-            <button
-              onClick={() => setActiveTab('settings')}
-              className={`px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 whitespace-nowrap transition cursor-pointer ${
-                activeTab === 'settings'
-                  ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-              }`}
-            >
-              <Settings className="w-4 h-4" />
-              <span>إعدادات المنظومة</span>
-            </button>
-          )}
+          {visibleTabs.map(t => {
+            const Icon = t.icon;
+            const active = activeTab === t.id;
+            const activeCls = t.accent === 'indigo' ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40' : 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30';
+            const idleCls = t.id === 'advisor' ? 'text-indigo-300/80 hover:text-indigo-200 hover:bg-slate-800/60' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60';
+            return (
+              <button
+                key={t.id}
+                onClick={() => setActiveTab(t.id)}
+                aria-current={active ? 'page' : undefined}
+                className={`px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 whitespace-nowrap transition cursor-pointer relative ${active ? activeCls : idleCls}`}
+              >
+                <Icon className={`w-4 h-4 ${t.id === 'users' ? 'text-indigo-400' : ''}`} />
+                <span>{t.label}</span>
+                {badgeFor(t.id)}
+              </button>
+            );
+          })}
         </nav>
       </div>
       {iosHelpOpen && (
@@ -462,5 +457,114 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       )}
     </header>
+
+    {/* الهاتف: شريط تنقل سفلي ثابت */}
+    <nav
+      aria-label="التنقل السريع"
+      className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 no-print"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+    >
+      <div className="grid" style={{ gridTemplateColumns: `repeat(${primaryTabs.length + (moreTabs.length ? 1 : 0)}, minmax(0, 1fr))` }}>
+        {primaryTabs.map(t => {
+          const Icon = t.icon;
+          const active = activeTab === t.id;
+          const count = t.id === 'tickets' ? stats.openTicketsCount : t.id === 'reminders' ? alertsCount : 0;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => go(t.id)}
+              aria-current={active ? 'page' : undefined}
+              className={`relative flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-semibold cursor-pointer ${active ? 'text-cyan-400' : 'text-slate-400'}`}
+            >
+              {active && <span className="absolute top-0 inset-x-4 h-0.5 rounded-full bg-cyan-400" />}
+              <span className="relative">
+                <Icon className="w-5 h-5" />
+                {count > 0 && (
+                  <span className="absolute -top-1.5 -left-2.5 min-w-[16px] h-4 px-1 rounded-full bg-rose-600 text-white text-[9px] leading-4 text-center">
+                    {count > 99 ? '99+' : count}
+                  </span>
+                )}
+              </span>
+              <span>{t.short}</span>
+            </button>
+          );
+        })}
+        {moreTabs.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setMoreOpen(true)}
+            aria-expanded={moreOpen}
+            className={`flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-semibold cursor-pointer ${moreTabs.some(t => t.id === activeTab) ? 'text-cyan-400' : 'text-slate-400'}`}
+          >
+            <MoreHorizontal className="w-5 h-5" />
+            <span>المزيد</span>
+          </button>
+        )}
+      </div>
+    </nav>
+
+    {moreOpen && (
+      <MoreSheet onClose={() => setMoreOpen(false)}>
+        <div className="grid grid-cols-3 gap-2">
+          {moreTabs.map(t => {
+            const Icon = t.icon;
+            const active = activeTab === t.id;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => go(t.id)}
+                className={`flex flex-col items-center gap-1.5 rounded-2xl border p-3 text-[11px] font-semibold cursor-pointer ${active ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300' : 'bg-slate-800/60 border-slate-700 text-slate-200'}`}
+              >
+                <Icon className="w-5 h-5" />
+                <span className="text-center leading-tight">{t.short}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
+          <button type="button" onClick={() => { setMoreOpen(false); onOpenLoginModal(); }} className="flex items-center gap-2 rounded-xl bg-slate-800 border border-slate-700 px-3 py-2.5 text-slate-200 cursor-pointer">
+            <UserCheck className="w-4 h-4 text-indigo-300" /> تبديل المستخدم
+          </button>
+          <button type="button" onClick={() => { setMoreOpen(false); void handleNotificationClick(); }} className="flex items-center gap-2 rounded-xl bg-slate-800 border border-slate-700 px-3 py-2.5 text-slate-200 cursor-pointer">
+            {notifPermission === 'granted' ? <Bell className="w-4 h-4 text-emerald-400" /> : <BellOff className="w-4 h-4 text-amber-400" />}
+            {notifPermission === 'granted' ? 'فحص التنبيهات' : 'تفعيل الإشعارات'}
+          </button>
+          <button type="button" onClick={() => { setMoreOpen(false); onExportExcel(); }} className="flex items-center gap-2 rounded-xl bg-slate-800 border border-slate-700 px-3 py-2.5 text-slate-200 cursor-pointer">
+            <Download className="w-4 h-4 text-cyan-300" /> تصدير إكسل
+          </button>
+          <button type="button" onClick={() => { setMoreOpen(false); onOpenImportModal(); }} className="flex items-center gap-2 rounded-xl bg-slate-800 border border-slate-700 px-3 py-2.5 text-slate-200 cursor-pointer">
+            <Upload className="w-4 h-4 text-cyan-300" /> استيراد إكسل
+          </button>
+          {showInstall && (
+            <button type="button" onClick={() => { setMoreOpen(false); void handleInstall(); }} className="col-span-2 flex items-center justify-center gap-2 rounded-xl bg-slate-800 border border-cyan-700 px-3 py-2.5 text-cyan-300 font-bold cursor-pointer">
+              <MonitorDown className="w-4 h-4" /> تثبيت التطبيق على هذا الجهاز
+            </button>
+          )}
+        </div>
+      </MoreSheet>
+    )}
+    </>
+  );
+};
+
+/** لوحة «المزيد» تنزلق من أسفل الشاشة في الهاتف */
+const MoreSheet: React.FC<{ onClose: () => void; children: React.ReactNode }> = ({ onClose, children }) => {
+  useEscapeKey(onClose);
+  return (
+    <div className="md:hidden fixed inset-0 z-50 flex items-end bg-slate-950/70 backdrop-blur-sm no-print" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="المزيد من الأقسام"
+        className="w-full bg-slate-900 border-t border-slate-700 rounded-t-3xl p-4 shadow-2xl"
+        style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-700" />
+        {children}
+      </div>
+    </div>
   );
 };

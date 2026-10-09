@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useEscapeKey } from './ui/useEscapeKey';
 import { StaffUser } from '../types/isp';
 import { loginAndStore } from '../sync/api';
-import { X, Lock, Key, ShieldCheck, User, Check, AlertCircle } from 'lucide-react';
+import { X, Lock, Key, User, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
 interface UserLoginModalProps {
   isOpen: boolean;
@@ -30,6 +30,7 @@ const UserLoginModalInner: React.FC<UserLoginModalProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   const [busy, setBusy] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // التحقق يتم على الخادم؛ عند النجاح تُستبدل جلسة هذا الجهاز بجلسة الحساب الجديد
   const handleLogin = async (e: React.FormEvent) => {
@@ -130,7 +131,8 @@ const UserLoginModalInner: React.FC<UserLoginModalProps> = ({
                   required
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="admin"
+                  autoComplete="username"
+                  placeholder="اسم المستخدم"
                   className="w-full bg-slate-950 border border-slate-700 rounded-lg pr-9 pl-3 py-2 text-white font-mono text-left focus:border-indigo-500"
                   dir="ltr"
                 />
@@ -142,14 +144,23 @@ const UserLoginModalInner: React.FC<UserLoginModalProps> = ({
               <div className="relative">
                 <Key className="w-4 h-4 text-slate-400 absolute right-3 top-2.5" />
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   required
+                  autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg pr-9 pl-3 py-2 text-white font-mono text-left focus:border-indigo-500"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg pr-9 pl-10 py-2 text-white font-mono text-left focus:border-indigo-500"
                   dir="ltr"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(v => !v)}
+                  aria-label={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
+                  className="absolute left-3 top-2.5 text-slate-500 hover:text-slate-300 cursor-pointer"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
             </div>
 
@@ -162,28 +173,12 @@ const UserLoginModalInner: React.FC<UserLoginModalProps> = ({
 
             <button
               type="submit"
-              className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition shadow-md shadow-indigo-600/30 cursor-pointer mt-1"
+              disabled={busy}
+              className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 disabled:cursor-wait text-white rounded-xl font-bold transition shadow-md shadow-indigo-600/30 cursor-pointer mt-1"
             >
-              تسجيل الدخول
+              {busy ? 'جارٍ التحقق…' : 'تسجيل الدخول'}
             </button>
 
-            {/* Admin Credentials Helper */}
-            <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-[11px] text-slate-400 flex items-center justify-between">
-              <div>
-                <span className="text-slate-300 font-semibold block">حساب المدير الافتراضي:</span>
-                <span className="font-mono text-cyan-400" dir="ltr">admin / admin@2026</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setUsername('admin');
-                  setPassword('admin@2026');
-                }}
-                className="text-cyan-400 hover:text-cyan-300 font-bold underline cursor-pointer text-[10px]"
-              >
-                تعبئة بيانات المدير
-              </button>
-            </div>
           </form>
         </div>
       </div>

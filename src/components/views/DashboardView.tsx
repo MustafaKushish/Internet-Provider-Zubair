@@ -2,7 +2,8 @@ import React from 'react';
 import { PaymentRecord, Subscriber, SystemSettings, TowerPoint } from '../../types/isp';
 import { computeTowerStats, sortTowerStats, NO_TOWER_LABEL } from '../../utils/towers';
 import { debtInMonths, formatMonthsAr, monthsLate } from '../../utils/debt';
-import { formatCurrency, getDaysRemaining, getAmountDue, getRemainingDebt } from '../../utils/storage';
+import { formatCurrency, getDaysRemaining, getAmountDue, getRemainingDebt, getPaymentCost } from '../../utils/storage';
+import { todayStr } from '../../utils/dates';
 import {
   DollarSign,
   TrendingUp,
@@ -83,8 +84,62 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   );
   const maxTowerProfit = Math.max(1, ...towerRanking.map(t => t.monthlyProfit));
 
+  // ---------- ملخص اليوم ----------
+  const today = todayStr();
+  const todaysPayments = payments.filter(p => (p.date || '').slice(0, 10) === today);
+  const collectedToday = todaysPayments.reduce((a, p) => a + (p.amount || 0), 0);
+  const profitToday = todaysPayments.reduce((a, p) => a + (p.amount || 0) - getPaymentCost(p, subscribers), 0);
+  const renewalsToday = todaysPayments.filter(p => p.paymentType === 'renewal' || p.paymentType === 'initial').length;
+  const debtPaymentsToday = todaysPayments.filter(p => p.paymentType === 'debt_installment').length;
+  const expiresToday = subscribers.filter(s => getDaysRemaining(s.expiryDate) === 0).length;
+  const expiresTomorrow = subscribers.filter(s => getDaysRemaining(s.expiryDate) === 1).length;
+  const byMethod = todaysPayments.reduce<Record<string, number>>((acc, p) => {
+    acc[p.paymentMethod] = (acc[p.paymentMethod] || 0) + (p.amount || 0);
+    return acc;
+  }, {});
+  const METHOD: Record<string, string> = { cash: 'نقداً', zain_cash: 'زين كاش', qi_card: 'كي كارد', transfer: 'تحويل' };
+
   return (
     <div className="space-y-6">
+      {/* ملخص اليوم: أول ما يحتاجه صاحب الشبكة كل يوم */}
+      {subscribers.length > 0 && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <h2 className="text-sm font-bold text-white flex items-center gap-2">
+              <Clock className="w-4 h-4 text-cyan-400" /> ملخص اليوم
+              <span className="text-[11px] font-normal text-slate-500 font-mono" dir="ltr">{today}</span>
+            </h2>
+            {Object.keys(byMethod).length > 0 && (
+              <span className="text-[11px] text-slate-400">
+                {Object.entries(byMethod).map(([k, v]) => `${METHOD[k] || k}: ${formatCurrency(v, settings.currency)}`).join(' • ')}
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs">
+            <div className="bg-emerald-950/40 border border-emerald-800/50 rounded-xl p-3">
+              <div className="text-emerald-300">المقبوض اليوم</div>
+              <div className="text-lg font-bold text-emerald-400 mt-0.5">{formatCurrency(collectedToday, settings.currency)}</div>
+              <div className="text-[11px] text-slate-400">{todaysPayments.length} وصل • ربح {formatCurrency(profitToday, settings.currency)}</div>
+            </div>
+            <div className="bg-cyan-950/40 border border-cyan-800/50 rounded-xl p-3">
+              <div className="text-cyan-300">تجديدات اليوم</div>
+              <div className="text-lg font-bold text-cyan-300 mt-0.5">{renewalsToday}</div>
+              <div className="text-[11px] text-slate-400">تسديد ديون: {debtPaymentsToday}</div>
+            </div>
+            <div className={`rounded-xl p-3 border ${expiresToday ? 'bg-amber-950/40 border-amber-700/60' : 'bg-slate-800/50 border-slate-700'}`}>
+              <div className="text-amber-300">ينتهي اليوم</div>
+              <div className="text-lg font-bold text-amber-300 mt-0.5">{expiresToday}</div>
+              <div className="text-[11px] text-slate-400">وغداً: {expiresTomorrow}</div>
+            </div>
+            <div className={`rounded-xl p-3 border ${expiredCount ? 'bg-rose-950/40 border-rose-800/60' : 'bg-slate-800/50 border-slate-700'}`}>
+              <div className="text-rose-300">منتهي ولم يجدد</div>
+              <div className="text-lg font-bold text-rose-400 mt-0.5">{expiredCount}</div>
+              <div className="text-[11px] text-slate-400">ديون: {formatCurrency(totalDebts, settings.currency)}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Clean Slate Alert when no subscribers yet */}
       {subscribers.length === 0 && (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-center space-y-3 shadow-xl">

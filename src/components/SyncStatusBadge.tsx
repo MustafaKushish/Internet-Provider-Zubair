@@ -25,7 +25,7 @@ export const SyncStatusBadge: React.FC<SyncStatusBadgeProps> = ({ previewMode, s
 
   if (previewMode) {
     return (
-      <div className="fixed bottom-3 left-3 z-40 no-print max-w-[calc(100vw-1.5rem)]">
+      <div className="fixed bottom-[4.75rem] md:bottom-3 left-3 z-40 no-print max-w-[calc(100vw-1.5rem)]">
         <div className="flex items-center gap-1.5 rounded-full border border-amber-800 bg-amber-950/95 px-3 py-1.5 text-[11px] font-semibold text-amber-300 shadow-lg">
           <CloudOff className="w-3.5 h-3.5" />
           <span className="truncate">وضع المعاينة • البيانات على هذا الجهاز فقط</span>
@@ -56,8 +56,11 @@ export const SyncStatusBadge: React.FC<SyncStatusBadgeProps> = ({ previewMode, s
     tone = 'border-rose-800 text-rose-300 bg-rose-950/95';
   }
 
+  // عند الحفظ بنجاح تكفي أيقونة صغيرة حتى لا تغطي الأزرار؛ النص يظهر عند المرور بالماوس
+  const quiet = phase === 'synced' || phase === 'idle';
+
   return (
-    <div className="fixed bottom-3 left-3 z-40 flex flex-col items-start gap-2 no-print max-w-[calc(100vw-1.5rem)]">
+    <div className="fixed bottom-[4.75rem] md:bottom-3 left-3 z-40 flex flex-col items-start gap-2 no-print max-w-[calc(100vw-1.5rem)]">
       {notice && (
         <div role="alert" className="flex items-start gap-2 rounded-xl border border-rose-800 bg-rose-950/95 px-3 py-2 text-xs text-rose-200 shadow-lg">
           <AlertTriangle className="w-4 h-4 flex-shrink-0 text-rose-400 mt-0.5" />
@@ -70,11 +73,12 @@ export const SyncStatusBadge: React.FC<SyncStatusBadgeProps> = ({ previewMode, s
       <button
         type="button"
         onClick={onSyncNow}
-        title="مزامنة الآن"
-        className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold shadow-lg cursor-pointer ${tone}`}
+        title={`${label} • اضغط للمزامنة الآن`}
+        aria-label={label}
+        className={`group flex items-center gap-1.5 rounded-full border text-[11px] font-semibold shadow-lg cursor-pointer ${quiet ? 'p-2 opacity-80 hover:opacity-100 hover:px-3 hover:py-1.5' : 'px-3 py-1.5'} ${tone}`}
       >
         {icon}
-        <span className="truncate">{label}</span>
+        <span className={quiet ? 'hidden group-hover:inline truncate' : 'truncate'}>{label}</span>
       </button>
     </div>
   );
