@@ -47,6 +47,8 @@ interface SubscribersViewProps {
   onTowerFilterApplied?: () => void;
   /** فتح نافذة إدارة الدين */
   onOpenDebt?: (sub: Subscriber) => void;
+  /** فتح ملف المشترك الكامل */
+  onOpenProfile?: (sub: Subscriber) => void;
   onRenew: (sub: Subscriber) => void;
   onSendWhatsApp: (sub: Subscriber, defaultTab?: any) => void;
   onPrintReceipt: (sub: Subscriber) => void;
@@ -70,6 +72,7 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
   onAssignTower,
   onTowerFilterApplied,
   onOpenDebt,
+  onOpenProfile,
   onRenew,
   onSendWhatsApp,
   onPrintReceipt,
@@ -471,7 +474,7 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="font-bold text-white text-sm truncate">{sub.name}</div>
+                      <button type="button" onClick={() => onOpenProfile?.(sub)} className="block max-w-full font-bold text-white text-sm truncate text-right cursor-pointer">{sub.name}</button>
                       <div className="text-[11px] text-slate-400 mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
                         {sub.phone && <a href={`tel:${sub.phone}`} className="font-mono text-cyan-300" dir="ltr">{sub.phone}</a>}
                         <span className="flex items-center gap-1"><TowerControl className="w-3 h-3" />{normTower(sub.towerName) || NO_TOWER_LABEL}</span>
@@ -610,7 +613,7 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
                       )}
                       {/* Name & Phone & Tower */}
                       <td className="py-3 px-4">
-                        <div className="font-bold text-white text-sm">{sub.name}</div>
+                        <button type="button" onClick={() => onOpenProfile?.(sub)} title="فتح ملف المشترك" className="font-bold text-white text-sm hover:text-cyan-300 hover:underline cursor-pointer text-right">{sub.name}</button>
                         <div className="flex items-center gap-1.5 text-slate-400 mt-0.5" dir="ltr">
                           {sub.phone ? <a href={`tel:${sub.phone}`} className="font-mono text-[11px] text-left hover:text-cyan-300">{sub.phone}</a> : <span className="text-[11px] text-amber-400/80">بدون رقم</span>}
                         </div>

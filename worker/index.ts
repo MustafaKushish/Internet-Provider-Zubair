@@ -530,6 +530,10 @@ function reducesDebtWithoutPayment(oldJson: string | null, next: any): string | 
   if (JSON.stringify(prev.debtLog || []) !== JSON.stringify(next.debtLog || [])) {
     return 'تعديل الديون وحذفها مخصص للمدير العام فقط.';
   }
+  // خطط التقسيط اتفاق على الدين: إنشاؤها وإلغاؤها للمدير فقط (تسجيل الأقساط متاح للجميع)
+  if (JSON.stringify(prev.installmentPlan ?? null) !== JSON.stringify(next.installmentPlan ?? null)) {
+    return 'إنشاء خطط تقسيط الديون وإلغاؤها مخصص للمدير العام فقط.';
+  }
   const sameCycle = (prev.currentCycleId || '') === (next.currentCycleId || '');
   if (!sameCycle) return null;
   if (num(next.carriedDebt) < num(prev.carriedDebt) || num(next.paidAmount) < num(prev.paidAmount)

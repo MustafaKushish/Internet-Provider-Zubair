@@ -1,6 +1,7 @@
 import React from 'react';
 import { Expense, PaymentRecord, Subscriber, SystemSettings, TowerPoint } from '../../types/isp';
 import { netProfitInMonth } from '../../utils/expenses';
+import { planProgress } from '../../utils/installments';
 import { computeTowerStats, sortTowerStats, NO_TOWER_LABEL } from '../../utils/towers';
 import { debtInMonths, formatMonthsAr, monthsLate } from '../../utils/debt';
 import { formatCurrency, getDaysRemaining, getAmountDue, getRemainingDebt, getPaymentCost } from '../../utils/storage';
@@ -102,6 +103,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     acc[p.paymentMethod] = (acc[p.paymentMethod] || 0) + (p.amount || 0);
     return acc;
   }, {});
+  const plans = subscribers.map(s => ({ sub: s, pr: planProgress(s, payments) })).filter(x => x.pr && x.pr.status !== 'done');
+  const latePlans = plans.filter(x => x.pr!.status === 'late');
+  const arrearsTotal = latePlans.reduce((a, x) => a + x.pr!.arrears, 0);
   const monthNet = netProfitInMonth(payments, subscribers, expenses, today.slice(0, 7));
   const METHOD: Record<string, string> = { cash: 'نقداً', zain_cash: 'زين كاش', qi_card: 'كي كارد', transfer: 'تحويل' };
 
@@ -157,6 +161,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="text-[11px] text-slate-400">ديون: {formatCurrency(totalDebts, settings.currency)}</div>
             </div>
           </div>
+          {plans.length > 0 && (
+            <div className="mt-2.5 rounded-xl border border-indigo-900/70 bg-indigo-950/30 px-3 py-2.5 text-xs flex flex-wrap items-center justify-between gap-2">
+              <span className="text-indigo-200">
+                خطط التقسيط النشطة: <b>{plans.length}</b>
+                {latePlans.length > 0 && <> • متأخرة: <b className="text-rose-300">{latePlans.length}</b> بمبلغ <b className="text-rose-300">{formatCurrency(arrearsTotal, settings.currency)}</b></>}
+              </span>
+              <span className="flex flex-wrap gap-1.5">
+                {latePlans.slice(0, 4).map(x => (
+                  <button key={x.sub.id} type="button" onClick={() => onOpenDebt?.(x.sub)}
+                    className="px-2 py-1 rounded-lg bg-rose-900/60 border border-rose-800 text-rose-100 cursor-pointer">
+                    {x.sub.name.split(' ').slice(0, 2).join(' ')} ({formatCurrency(x.pr!.arrears, settings.currency)})
+                  </button>
+                ))}
+              </span>
+            </div>
+          )}
         </div>
       )}
 

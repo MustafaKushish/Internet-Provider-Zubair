@@ -48,6 +48,18 @@ Der Windows-Installer ist eine Electron-Hülle (`desktop/`) um dieselbe Adresse.
 - **Erinnerungen:** nach Dringlichkeit sortiert, Suche und Turmfilter; „heute gesendet“ bleibt bis Mitternacht markiert.
 - **Übersicht:** „ملخص اليوم“ zeigt heutige Einnahmen nach Zahlungsart, Verlängerungen und wer heute oder morgen abläuft.
 
+## Kundenprofil, Ratenpläne und Kundenbewegung
+
+- **Kundenprofil:** Auf den Namen tippen (Liste, Erinnerungen) oder in der Schnellsuche „الملف“. Zeigt alle Daten, Kunde seit,
+  Gesamtzahlungen, letzte Zahlung, Ratenplan und den kompletten Verlauf (Belege, Schuldenänderungen, Störungen) mit allen Aktionen.
+- **Ratenpläne für alte Schulden** (im Schuldenfenster): Der Admin wählt 2–12 Monatsraten und das Datum der ersten Rate.
+  Jede Schuldenzahlung zählt automatisch als Rate. Die App zeigt Fortschritt, nächste Rate und Rückstand; Erinnerungen
+  schicken dann die Raten-Nachricht statt der ganzen Schuld. Anlegen und Aufheben nur durch den Admin (vom Server erzwungen),
+  Raten kassieren darf jeder.
+- **Kundenbewegung** (Finanzbericht und KI-Berater): pro Monat neue, verlängerte, zurückgewonnene und verlorene Kunden,
+  Nettowachstum und Bindungsquote, dazu pro Turm. „Verloren“ = abgelaufen und 30 Tage nicht verlängert.
+  Aus Excel importierte Kunden zählen nicht als neu.
+
 ## Kasse und Ausgaben („الصندوق والمصاريف“, Admin und Buchhalter)
 
 - **Kassenabschluss pro Tag:** Was jeder Mitarbeiter kassiert hat, getrennt nach Bar, Zain Cash, Qi Card und Überweisung,

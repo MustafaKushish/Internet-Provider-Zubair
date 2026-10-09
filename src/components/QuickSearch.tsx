@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Search, RefreshCw, MessageSquare, History, Edit, Wallet, Wrench, X, TowerControl } from 'lucide-react';
+import { Search, RefreshCw, MessageSquare, History, Edit, Wallet, Wrench, X, TowerControl, UserRound } from 'lucide-react';
 import { StaffUser, Subscriber } from '../types/isp';
 import { formatCurrency, getDaysRemaining, getRemainingDebt } from '../utils/storage';
 import { formatMonthsAr, monthsLate } from '../utils/debt';
@@ -19,6 +19,7 @@ interface QuickSearchProps {
   onDebt: (sub: Subscriber) => void;
   onEdit: (sub: Subscriber) => void;
   onTicket: (sub: Subscriber) => void;
+  onProfile: (sub: Subscriber) => void;
 }
 
 const MAX_RESULTS = 8;
@@ -27,7 +28,7 @@ const MAX_RESULTS = 8;
 export const QuickSearch: React.FC<QuickSearchProps> = props => (props.open ? <QuickSearchInner {...props} /> : null);
 
 const QuickSearchInner: React.FC<QuickSearchProps> = ({
-  onClose, subscribers, currentUser, currency, onRenew, onWhatsApp, onHistory, onDebt, onEdit, onTicket,
+  onClose, subscribers, currentUser, currency, onRenew, onWhatsApp, onHistory, onDebt, onEdit, onTicket, onProfile,
 }) => {
   useEscapeKey(onClose);
   const [query, setQuery] = useState('');
@@ -123,6 +124,7 @@ const QuickSearchInner: React.FC<QuickSearchProps> = ({
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-1.5 mt-2">
+                      <button type="button" onClick={() => run(onProfile, sub)} className={`${btn} bg-indigo-600/30 hover:bg-indigo-600 text-indigo-200 border border-indigo-500/40`}><UserRound className="w-3.5 h-3.5" />الملف</button>
                       {office ? (
                         <>
                           <button type="button" onClick={() => run(onRenew, sub)} className={`${btn} bg-cyan-600 hover:bg-cyan-500 text-white`}><RefreshCw className="w-3.5 h-3.5" />تجديد</button>

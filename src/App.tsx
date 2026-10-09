@@ -13,6 +13,7 @@ import {
   StaffUser,
   TowerPoint,
   Expense,
+  InstallmentPlan,
   UserRole
 } from './types/isp';
 import {
@@ -45,7 +46,7 @@ import {
   nextTicketNumber,
   normalizeNameKey
 } from './utils/storage';
-import { todayStr, addMonthsToDateStr, parseLocalDate, uid } from './utils/dates';
+import { todayStr, addMonthsToDateStr, parseLocalDate, uid, diffDays } from './utils/dates';
 import {
   checkAndTriggerExpiryNotifications,
   getNotificationPermission
@@ -75,6 +76,7 @@ import { TowerModal } from './components/TowerModal';
 import { ForcePasswordChange } from './components/ForcePasswordChange';
 import { SyncStatusBadge } from './components/SyncStatusBadge';
 import { QuickSearch } from './components/QuickSearch';
+import { SubscriberProfile } from './components/SubscriberProfile';
 import { backupReminderDue, daysSinceBackup, downloadFullBackup, snoozeBackupReminder } from './utils/backup';
 import { authApi, usersApi, getToken, setToken, ApiError, PREVIEW_MODE } from './sync/api';
 import { useCloudSync } from './sync/useCloudSync';
@@ -164,6 +166,7 @@ export default function App() {
 
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isQuickSearchOpen, setIsQuickSearchOpen] = useState(false);
+  const [profileSubscriberId, setProfileSubscriberId] = useState<string | null>(null);
   const [backupDue, setBackupDue] = useState(backupReminderDue);
 
   const [isProviderModalOpen, setIsProviderModalOpen] = useState(false);
@@ -558,6 +561,7 @@ export default function App() {
       paymentMethod: renewalData.paymentMethod,
       paymentType: 'renewal',
       cycleMonths: months,
+      lateDays: Math.max(0, diffDays(sub.expiryDate, today)) || undefined,
       notes: renewalData.notes,
       collectedBy: currentUser.name || settings.agentName,
       remainingBalanceAfter: getRemainingDebt(updatedSub),
@@ -641,6 +645,20 @@ export default function App() {
     notify(newDebt <= 0
       ? `تم حذف دين ${sub.name} (${formatCurrency(from, settings.currency)}).`
       : `دين ${sub.name} أصبح ${formatCurrency(getRemainingDebt(updated), settings.currency)}.`, 'success');
+  };
+
+  // خطة تقسيط دين: إنشاء أو إلغاء (للمدير فقط، والخادم يرفضها من غيره)
+  const handleSetInstallmentPlan = (subscriberId: string, plan: InstallmentPlan | null) => {
+    if (currentUser.role !== 'admin') {
+      notify('إنشاء خطط التقسيط وإلغاؤها مخصص للمدير العام فقط.', 'error');
+      return;
+    }
+    setSubscribers(prev => prev.map(s => {
+      if (s.id !== subscriberId) return s;
+      const { installmentPlan: _old, ...rest } = s;
+      return plan ? { ...rest, installmentPlan: plan } : rest;
+    }));
+    notify(plan ? `تم إنشاء خطة تقسيط: ${plan.count} أقساط × ${formatCurrency(plan.amount, settings.currency)}.` : 'تم إلغاء خطة التقسيط.', 'success');
   };
 
   const [debtSubscriberId, setDebtSubscriberId] = useState<string | null>(null);
@@ -966,6 +984,7 @@ export default function App() {
         address: row.address || '',
         notes: row.notes || 'مستورد من إكسل',
         createdAt: today,
+        source: 'import',
         cycleMonths: 1,
         carriedDebt: Math.max(0, row.carriedDebt ?? 0),
         currentCycleId: uid('cycle'),
@@ -1077,6 +1096,26 @@ export default function App() {
         onDebt={(sub) => setDebtSubscriberId(sub.id)}
         onEdit={(sub) => { setSubscriberToEdit(sub); setIsSubscriberModalOpen(true); }}
         onTicket={(sub) => { setTicketToEdit(null); setTicketPrefillSubscriberId(sub.id); setIsTicketModalOpen(true); }}
+        onProfile={(sub) => setProfileSubscriberId(sub.id)}
+      />
+
+      <SubscriberProfile
+        subscriber={profileSubscriberId ? subscribers.find(s => s.id === profileSubscriberId) || null : null}
+        payments={payments}
+        tickets={tickets}
+        settings={settings}
+        currentUser={currentUser}
+        onClose={() => setProfileSubscriberId(null)}
+        onRenew={(sub) => { setSubscriberToRenew(sub); setIsRenewModalOpen(true); }}
+        onWhatsApp={(sub) => {
+          setSubscriberForWhatsApp(sub);
+          setWhatsAppDefaultTab(getRemainingDebt(sub) > 0 ? 'debt' : getDaysRemaining(sub.expiryDate) < 0 ? 'expired' : 'expiry');
+          setIsWhatsAppModalOpen(true);
+        }}
+        onDebt={(sub) => setDebtSubscriberId(sub.id)}
+        onEdit={(sub) => { setSubscriberToEdit(sub); setIsSubscriberModalOpen(true); }}
+        onTicket={(sub) => { setTicketToEdit(null); setTicketPrefillSubscriberId(sub.id); setIsTicketModalOpen(true); }}
+        onPrintReceipt={(sub) => { setSubscriberForReceipt(sub); setReceiptCustomAmount(undefined); setIsReceiptModalOpen(true); }}
       />
 
       {/* Main Content Area */}
@@ -1115,6 +1154,7 @@ export default function App() {
             currentUser={currentUser}
             towerFilterRequest={towerFilterRequest}
             onOpenDebt={(sub) => setDebtSubscriberId(sub.id)}
+            onOpenProfile={(sub) => setProfileSubscriberId(sub.id)}
             onTowerFilterApplied={() => setTowerFilterRequest(null)}
             onAssignTower={handleAssignTower}
             onRenew={(sub) => {
@@ -1201,6 +1241,8 @@ export default function App() {
           <RemindersView
             subscribers={subscribers}
             settings={settings}
+            payments={payments}
+            onOpenProfile={(sub) => setProfileSubscriberId(sub.id)}
             onOpenDebt={(sub) => setDebtSubscriberId(sub.id)}
             onRenew={(sub) => {
               setSubscriberToRenew(sub);
@@ -1388,6 +1430,7 @@ export default function App() {
         onClose={() => setDebtSubscriberId(null)}
         onAddPayment={(id, data) => handleAddPayment(id, { ...data, paymentType: 'debt_installment' })}
         onAdjustDebt={handleAdjustDebt}
+        onSetPlan={handleSetInstallmentPlan}
       />
 
       <SyncStatusBadge

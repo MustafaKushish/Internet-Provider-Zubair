@@ -1,10 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import { useEscapeKey } from './ui/useEscapeKey';
 import { appConfirm } from './ui/Dialogs';
-import { PaymentRecord, StaffUser, Subscriber, SystemSettings } from '../types/isp';
+import { InstallmentPlan, PaymentRecord, StaffUser, Subscriber, SystemSettings } from '../types/isp';
+import { createPlan, planProgress, suggestInstallment } from '../utils/installments';
+import { todayStr } from '../utils/dates';
 import { formatCurrency, getAmountDue, getRemainingDebt } from '../utils/storage';
 import { debtInMonths, formatMonthsAr, monthsLate } from '../utils/debt';
-import { X, Wallet, Lock, Minus, Plus, History, Trash2, Save, CreditCard, AlertTriangle } from 'lucide-react';
+import { X, Wallet, Lock, Minus, Plus, History, Trash2, Save, CreditCard, AlertTriangle, CalendarClock } from 'lucide-react';
 
 interface DebtModalProps {
   subscriber: Subscriber | null;
@@ -14,6 +16,8 @@ interface DebtModalProps {
   onClose: () => void;
   onAddPayment: (subscriberId: string, data: { amount: number; paymentMethod: PaymentRecord['paymentMethod']; notes: string }) => void;
   onAdjustDebt: (subscriberId: string, newDebt: number, reason: string) => void;
+  /** إنشاء خطة تقسيط أو إلغاؤها (null) — للمدير فقط */
+  onSetPlan?: (subscriberId: string, plan: InstallmentPlan | null) => void;
 }
 
 const METHODS: { value: PaymentRecord['paymentMethod']; label: string }[] = [
@@ -34,6 +38,7 @@ const DebtModalInner: React.FC<DebtModalProps & { subscriber: Subscriber }> = ({
   onClose,
   onAddPayment,
   onAdjustDebt,
+  onSetPlan,
 }) => {
   useEscapeKey(onClose);
   const isAdmin = currentUser.role === 'admin';
@@ -56,6 +61,13 @@ const DebtModalInner: React.FC<DebtModalProps & { subscriber: Subscriber }> = ({
   const [error, setError] = useState<string | null>(null);
   const targetDebt = customAmount.trim() !== '' ? Math.max(0, Number(customAmount) || 0) : Math.round(targetMonths * price);
 
+  // ---- خطة التقسيط ----
+  const progress = useMemo(() => planProgress(sub, payments), [sub, payments]);
+  const [planCount, setPlanCount] = useState(3);
+  const [planStart, setPlanStart] = useState(todayStr());
+  const [planNote, setPlanNote] = useState('');
+  const planAmount = suggestInstallment(debt, planCount);
+
   const subPayments = useMemo(
     () => payments.filter(p => p.subscriberId === sub.id).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6),
     [payments, sub.id],
@@ -66,7 +78,10 @@ const DebtModalInner: React.FC<DebtModalProps & { subscriber: Subscriber }> = ({
     const amount = Math.round(payAmount);
     if (!amount || amount <= 0) { setError('أدخل مبلغ التسديد.'); return; }
     if (amount > debt) { setError(`المبلغ أكبر من الدين (${money(debt)}).`); return; }
-    onAddPayment(sub.id, { amount, paymentMethod: method, notes: payNote.trim() || `تسديد دين (${formatMonthsAr(amount / (price || amount))})` });
+    const planNoteText = progress && progress.status !== 'done'
+      ? `قسط ${Math.min(progress.plan.count, progress.paidInstallments + 1)} من ${progress.plan.count}`
+      : `تسديد دين (${formatMonthsAr(amount / (price || amount))})`;
+    onAddPayment(sub.id, { amount, paymentMethod: method, notes: payNote.trim() || planNoteText });
     onClose();
   };
 
@@ -133,6 +148,82 @@ const DebtModalInner: React.FC<DebtModalProps & { subscriber: Subscriber }> = ({
               <span className="block text-slate-300">دين سابق مرحّل: {money(sub.carriedDebt || 0)}</span>
             </div>
           </div>
+
+          {/* خطة التقسيط */}
+          {(progress || (debt > 0 && onSetPlan)) && (
+            <section className="space-y-2.5 border border-indigo-900/70 bg-indigo-950/20 rounded-xl p-3.5">
+              <h3 className="font-bold text-white text-sm flex items-center gap-1.5">
+                <CalendarClock className="w-4 h-4 text-indigo-300" /> تقسيط الدين
+                {!isAdmin && !progress && <span className="text-[10px] font-normal text-slate-500">(ينشئه المدير)</span>}
+              </h3>
+              {progress ? (
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-slate-300">
+                      {progress.plan.count} أقساط × {money(progress.plan.amount)} • من {progress.plan.startDate}
+                    </span>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${progress.status === 'done' ? 'bg-emerald-950 border-emerald-800 text-emerald-300' : progress.status === 'late' ? 'bg-rose-950 border-rose-800 text-rose-300' : 'bg-indigo-950 border-indigo-800 text-indigo-300'}`}>
+                      {progress.status === 'done' ? 'مكتملة' : progress.status === 'late' ? `متأخر ${money(progress.arrears)}` : 'منتظم'}
+                    </span>
+                  </div>
+                  <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                    <div className="h-full bg-indigo-500" style={{ width: `${Math.min(100, (progress.paid / progress.plan.total) * 100)}%` }} />
+                  </div>
+                  <div className="flex flex-wrap justify-between gap-2 text-slate-400">
+                    <span>مسدد {money(progress.paid)} من {money(progress.plan.total)} ({progress.paidInstallments}/{progress.plan.count})</span>
+                    {progress.nextDate && <span>القسط القادم: <b className="text-white">{money(progress.nextAmount)}</b> بتاريخ <span dir="ltr">{progress.nextDate}</span></span>}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {progress.status !== 'done' && debt > 0 && (
+                      <button type="button" onClick={() => setPayAmount(Math.min(debt, progress.nextAmount))}
+                        className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold cursor-pointer">
+                        تسديد القسط ({money(Math.min(debt, progress.nextAmount))})
+                      </button>
+                    )}
+                    {isAdmin && onSetPlan && (
+                      <button type="button"
+                        onClick={async () => { if (await appConfirm(`إلغاء خطة تقسيط ${sub.name}؟ (الدين نفسه لا يتغير)`, { confirmLabel: 'إلغاء الخطة' })) onSetPlan(sub.id, null); }}
+                        className="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 cursor-pointer">
+                        {progress.status === 'done' ? 'إزالة الخطة' : 'إلغاء الخطة'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : isAdmin && onSetPlan ? (
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-slate-400">عدد الأقساط:</span>
+                    {[2, 3, 4, 6, 10, 12].map(n => (
+                      <button key={n} type="button" onClick={() => setPlanCount(n)} aria-pressed={planCount === n}
+                        className={`px-2.5 py-1 rounded-md font-bold cursor-pointer ${planCount === n ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-indigo-300 hover:bg-slate-700'}`}>
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <label className="block">
+                      <span className="block text-slate-400 mb-1">تاريخ أول قسط</span>
+                      <input id="plan-start" type="date" value={planStart} onChange={e => setPlanStart(e.target.value || todayStr())}
+                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-indigo-500" />
+                    </label>
+                    <div className="bg-slate-950/60 border border-slate-800 rounded-lg p-2.5">
+                      <span className="block text-slate-400">القسط الشهري</span>
+                      <span className="text-base font-bold text-indigo-300">{money(planAmount)}</span>
+                      <span className="block text-[10px] text-slate-500">{planCount} أشهر لدين {money(debt)}</span>
+                    </div>
+                  </div>
+                  <input id="plan-note" type="text" value={planNote} onChange={e => setPlanNote(e.target.value)} placeholder="ملاحظة الاتفاق (اختياري)"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500" />
+                  <button type="button" onClick={() => onSetPlan(sub.id, createPlan(debt, planCount, planStart, currentUser.name, planNote))}
+                    className="w-full py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold cursor-pointer">
+                    إنشاء خطة تقسيط ({planCount} × {money(planAmount)})
+                  </button>
+                </div>
+              ) : (
+                <p className="text-slate-400 flex items-center gap-1.5"><Lock className="w-3.5 h-3.5" /> لا توجد خطة تقسيط. المدير العام ينشئ الخطط.</p>
+              )}
+            </section>
+          )}
 
           {/* Pay */}
           {debt > 0 && (

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Subscriber, PaymentRecord, SystemSettings, ReportPeriod, Expense } from '../../types/isp';
 import { EXPENSE_CATEGORIES, sumAmounts } from '../../utils/expenses';
+import { LOST_AFTER_DAYS, lastMonthKeys, movementByTower, subscriberMovement } from '../../utils/growth';
 import { generatePeriodReport, formatCurrency, exportReportToExcel, getPaymentCost } from '../../utils/storage';
 import { toLocalDateStr, todayStr } from '../../utils/dates';
 import {
@@ -122,6 +123,12 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   );
   const periodExpensesTotal = sumAmounts(periodExpenses);
   const realNet = report.totalNetProfit - periodExpensesTotal;
+
+  // حركة المشتركين: جدد، مجددون، مسترجعون، مفقودون (آخر 6 أشهر)
+  const movement = useMemo(() => subscriberMovement(subscribers, payments, lastMonthKeys(6)), [subscribers, payments]);
+  const towerMovement = useMemo(() => movementByTower(subscribers, lastMonthKeys(3)), [subscribers]);
+  const MONTHS_SHORT = ['ك2', 'شباط', 'آذار', 'نيسان', 'أيار', 'حزيران', 'تموز', 'آب', 'أيلول', 'ت1', 'ت2', 'ك1'];
+  const movementChart = movement.map(m => ({ ...m, label: MONTHS_SHORT[Number(m.month.slice(5, 7)) - 1] }));
 
   const handlePrintReport = () => {
     window.print();
@@ -483,6 +490,68 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
               </BarChart>
             </ResponsiveContainer>
           </div>
+        </div>
+
+        {/* حركة المشتركين */}
+        <div className="bg-slate-950/70 print:bg-slate-50 border border-slate-800 print:border-slate-300 rounded-2xl p-5 shadow-lg space-y-4">
+          <div>
+            <h3 className="text-sm font-bold text-white print:text-slate-900 flex items-center gap-1.5">
+              <Users className="w-4 h-4 text-emerald-400" /> حركة المشتركين: الجدد والمفقودون (آخر 6 أشهر)
+            </h3>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              «مفقود» = انتهى اشتراكه في ذلك الشهر ولم يجدد خلال {LOST_AFTER_DAYS} يوماً • «مسترجع» = جدد بعد انقطاع أطول من {LOST_AFTER_DAYS} يوماً • المستوردون من إكسل لا يُحسبون جدداً
+            </p>
+          </div>
+          <div className="h-56 no-print" dir="ltr">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={movementChart} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                <XAxis dataKey="label" stroke="#64748b" fontSize={11} />
+                <YAxis stroke="#64748b" fontSize={11} allowDecimals={false} />
+                <Tooltip contentStyle={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 12, fontSize: 12 }} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Bar dataKey="newCount" name="جدد" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={28} />
+                <Bar dataKey="returnedCount" name="مسترجعون" fill="#06b6d4" radius={[4, 4, 0, 0]} maxBarSize={28} />
+                <Bar dataKey="lostCount" name="مفقودون" fill="#f43f5e" radius={[4, 4, 0, 0]} maxBarSize={28} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-right">
+              <thead className="bg-slate-800/60 print:bg-slate-100 text-slate-400 print:text-slate-700">
+                <tr>
+                  <th className="p-2">الشهر</th><th className="p-2">جدد</th><th className="p-2">جددوا</th><th className="p-2">مسترجعون</th>
+                  <th className="p-2">مفقودون</th><th className="p-2">بانتظار التجديد</th><th className="p-2">صافي النمو</th><th className="p-2">نسبة الاحتفاظ</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800 print:divide-slate-200 text-slate-200 print:text-slate-800">
+                {[...movement].reverse().map(m => (
+                  <tr key={m.month}>
+                    <td className="p-2 font-mono" dir="ltr">{m.month}</td>
+                    <td className="p-2 text-emerald-400 font-bold">{m.newCount}</td>
+                    <td className="p-2">{m.renewedCount}</td>
+                    <td className="p-2 text-cyan-300">{m.returnedCount}</td>
+                    <td className="p-2 text-rose-400 font-bold">{m.lostCount}</td>
+                    <td className="p-2 text-amber-300">{m.pendingCount || '—'}</td>
+                    <td className={`p-2 font-bold ${m.net > 0 ? 'text-emerald-400' : m.net < 0 ? 'text-rose-400' : 'text-slate-400'}`}>{m.net > 0 ? `+${m.net}` : m.net}</td>
+                    <td className="p-2">{m.retention === null ? '—' : `${m.retention}%`}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {towerMovement.length > 0 && (
+            <div>
+              <h4 className="text-xs font-bold text-slate-300 mb-1.5">حسب البرج (آخر 3 أشهر) — الأكثر خسارة أولاً</h4>
+              <div className="flex flex-wrap gap-1.5 text-[11px]">
+                {towerMovement.map(t => (
+                  <span key={t.tower} className={`px-2 py-1 rounded-lg border ${t.newCount - t.lostCount < 0 ? 'bg-rose-950/40 border-rose-900 text-rose-200' : 'bg-emerald-950/40 border-emerald-900 text-emerald-200'}`}>
+                    {t.tower}: +{t.newCount} / −{t.lostCount}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Breakdown Sections: Providers & Towers */}

@@ -37,6 +37,20 @@ export interface Subscriber {
   carriedDebt?: number;    // دين سابق مُرحَّل من الدورات السابقة
   currentCycleId?: string; // معرّف الدورة الحالية لربط الوصولات بها
   debtLog?: DebtAdjustment[]; // سجل تعديلات/إعفاءات الدين اليدوية (للمدير فقط)
+  installmentPlan?: InstallmentPlan; // خطة تقسيط الدين القديم (ينشئها المدير فقط)
+  source?: 'import';       // أُضيف من ملف إكسل (لا يُحسب كمشترك جديد في التقارير)
+}
+
+/** خطة تقسيط دين: أقساط شهرية متساوية تبدأ من تاريخ أول قسط */
+export interface InstallmentPlan {
+  id: string;
+  total: number;       // الدين المقسّط وقت إنشاء الخطة
+  count: number;       // عدد الأقساط
+  amount: number;      // قيمة القسط (الأخير قد يكون أقل)
+  startDate: string;   // تاريخ أول قسط YYYY-MM-DD
+  createdAt: string;
+  createdBy: string;
+  note?: string;
 }
 
 /** تعديل يدوي على دين مشترك (يقوم به المدير فقط) */
@@ -65,6 +79,7 @@ export interface PaymentRecord {
   provider?: string;       // المزود وقت الدفع (للتقارير حتى لو حُذف المشترك)
   towerName?: string;      // البرج وقت الدفع
   cycleId?: string;        // الدورة التي يتبع لها الوصل
+  lateDays?: number;       // عند التجديد: كم يوماً كان الاشتراك منتهياً (لحساب المسترجعين)
 }
 
 export interface SupportTicket {

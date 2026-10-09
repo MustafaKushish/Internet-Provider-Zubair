@@ -1,5 +1,7 @@
 import { Expense, PaymentRecord, Subscriber, SupportTicket, SystemSettings, TowerPoint, UpstreamProvider } from '../types/isp';
 import { EXPENSE_CATEGORIES, expensesByTower, expensesInMonth, netProfitInMonth, sumAmounts } from '../utils/expenses';
+import { LOST_AFTER_DAYS, lastMonthKeys, movementByTower, subscriberMovement } from '../utils/growth';
+import { planProgress } from '../utils/installments';
 import { getDaysRemaining, getPaymentCost, getRemainingDebt } from '../utils/storage';
 import { computeTowerStats, sortTowerStats, NO_TOWER_LABEL, normTower } from '../utils/towers';
 import { todayStr } from '../utils/dates';
@@ -201,6 +203,20 @@ export function buildBusinessSnapshot(input: {
     if (cats.length) lines.push(`المصاريف حسب النوع (آخر 3 أشهر): ${cats.map(([l, t]) => `${l} ${n(t)}`).join('، ')}`);
     const byTower = [...expensesByTower(expenses, exMonths[exMonths.length - 1]).entries()];
     if (byTower.length) lines.push(`مصاريف هذا الشهر حسب البرج: ${byTower.map(([t, v]) => `${t || 'عامة'} ${n(v)}`).join('، ')}`);
+  }
+
+  // ---------- حركة المشتركين ----------
+  lines.push('');
+  lines.push(`## حركة المشتركين (جدد / جددوا / مسترجعون / مفقودون = انتهى ولم يجدد خلال ${LOST_AFTER_DAYS} يوماً / صافي / الاحتفاظ)`);
+  subscriberMovement(subscribers, payments, lastMonthKeys(6)).forEach(m => {
+    lines.push(`- ${m.month}: ${m.newCount} / ${m.renewedCount} / ${m.returnedCount} / ${m.lostCount} / ${m.net >= 0 ? '+' : ''}${m.net} / ${m.retention === null ? '—' : `${m.retention}%`}`);
+  });
+  const tm = movementByTower(subscribers, lastMonthKeys(3));
+  if (tm.length) lines.push(`حسب البرج آخر 3 أشهر (جدد/مفقودون): ${tm.map(t => `${t.tower} +${t.newCount}/−${t.lostCount}`).join('، ')}`);
+  const activePlans = subscribers.map(s => planProgress(s, payments)).filter(p => p && p.status !== 'done');
+  if (activePlans.length) {
+    const late = activePlans.filter(p => p!.status === 'late');
+    lines.push(`خطط تقسيط الديون النشطة: ${activePlans.length} (متأخرة ${late.length} بمبلغ ${n(late.reduce((a, p) => a + p!.arrears, 0))})`);
   }
 
   // ---------- الدعم الفني ----------

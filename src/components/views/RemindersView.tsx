@@ -3,7 +3,8 @@ import { NO_TOWER_LABEL, normTower } from '../../utils/towers';
 import { todayStr } from '../../utils/dates';
 import { matchesSubscriber } from '../../utils/search';
 import { useEscapeKey } from '../ui/useEscapeKey';
-import { Subscriber, SystemSettings } from '../../types/isp';
+import { PaymentRecord, Subscriber, SystemSettings } from '../../types/isp';
+import { installmentMessage, planProgress } from '../../utils/installments';
 import { formatCurrency, getDaysRemaining, generateWhatsAppLink, getWhatsAppTemplates, getRemainingDebt } from '../../utils/storage';
 import { debtInMonths, formatMonthsAr, monthsLate } from '../../utils/debt';
 import {
@@ -39,6 +40,8 @@ interface RemindersViewProps {
   onRenew: (sub: Subscriber) => void;
   onOpenMessageModal: (sub: Subscriber, defaultTab: any) => void;
   onOpenDebt?: (sub: Subscriber) => void;
+  payments?: PaymentRecord[];
+  onOpenProfile?: (sub: Subscriber) => void;
 }
 
 export const RemindersView: React.FC<RemindersViewProps> = ({
@@ -47,6 +50,8 @@ export const RemindersView: React.FC<RemindersViewProps> = ({
   onRenew,
   onOpenMessageModal,
   onOpenDebt,
+  payments = [],
+  onOpenProfile,
 }) => {
   const [filterTab, setFilterTab] = useState<'all_alerts' | 'expiring' | 'expired' | 'debts'>('all_alerts');
   const [sentRecords, setSentRecords] = useState<Record<string, boolean>>(loadSent);
@@ -103,12 +108,16 @@ export const RemindersView: React.FC<RemindersViewProps> = ({
   const pendingQueue = activeList.filter(s => s.phone && !sentRecords[`${s.id}_${typeFor(s)}`]);
   const startQueue = () => { setQueue(pendingQueue); setQueueIndex(0); };
 
-  const handleInstantWhatsApp = (sub: Subscriber, type: 'expiry' | 'expired' | 'debt') => {
+  // نص الرسالة: لمن عنده خطة تقسيط نشطة تُرسل رسالة القسط بدل المطالبة بكل الدين
+  const messageFor = (sub: Subscriber, type: 'expiry' | 'expired' | 'debt'): string => {
+    const pr = type === 'debt' ? planProgress(sub, payments) : null;
+    if (pr && pr.status !== 'done') return installmentMessage(sub, pr, settings);
     const templates = getWhatsAppTemplates(sub, settings);
-    let msg = templates.expiryReminder;
-    if (type === 'expired') msg = templates.expiredNotice;
-    if (type === 'debt') msg = templates.debtReminder;
+    return type === 'expired' ? templates.expiredNotice : type === 'debt' ? templates.debtReminder : templates.expiryReminder;
+  };
 
+  const handleInstantWhatsApp = (sub: Subscriber, type: 'expiry' | 'expired' | 'debt') => {
+    const msg = messageFor(sub, type);
     const link = generateWhatsAppLink(sub.phone, msg);
     markSent(`${sub.id}_${type}`);
     window.open(link, '_blank');
@@ -241,7 +250,9 @@ export const RemindersView: React.FC<RemindersViewProps> = ({
                 {/* Header */}
                 <div className="flex items-start justify-between">
                   <div>
-                    <h3 className="font-bold text-white text-sm">{sub.name}</h3>
+                    <h3 className="font-bold text-white text-sm">
+                      <button type="button" onClick={() => onOpenProfile?.(sub)} className="hover:text-cyan-300 hover:underline cursor-pointer text-right">{sub.name}</button>
+                    </h3>
                     {sub.phone
                       ? <a href={`tel:${sub.phone}`} className="text-xs text-slate-400 hover:text-cyan-300 font-mono mt-0.5 flex items-center gap-1 justify-end" dir="ltr"><Phone className="w-3 h-3" />{sub.phone}</a>
                       : <p className="text-xs text-amber-400 mt-0.5">لا يوجد رقم هاتف</p>}
@@ -281,6 +292,17 @@ export const RemindersView: React.FC<RemindersViewProps> = ({
                     <span className="font-mono text-slate-300" dir="ltr">{sub.expiryDate}</span>
                   </div>
 
+                  {hasDebt && (() => {
+                    const pr = planProgress(sub, payments);
+                    return pr && pr.status !== 'done' ? (
+                      <div className="flex justify-between text-[11px] pt-1">
+                        <span className="text-indigo-300">خطة تقسيط {pr.paidInstallments}/{pr.plan.count}:</span>
+                        <span className={pr.status === 'late' ? 'text-rose-300 font-bold' : 'text-indigo-200'}>
+                          {pr.status === 'late' ? `متأخر ${formatCurrency(pr.arrears, settings.currency)}` : `القادم ${formatCurrency(pr.nextAmount, settings.currency)} • ${pr.nextDate}`}
+                        </span>
+                      </div>
+                    ) : null;
+                  })()}
                   {hasDebt && (
                     <div className="border-t border-slate-800 pt-1 space-y-0.5">
                       <div className="flex justify-between text-rose-400 font-bold">
@@ -363,6 +385,7 @@ export const RemindersView: React.FC<RemindersViewProps> = ({
           index={queueIndex}
           settings={settings}
           typeFor={typeFor}
+          messageFor={messageFor}
           onSend={(sub) => {
             handleInstantWhatsApp(sub, typeFor(sub));
             setQueueIndex(i => i + 1);
@@ -393,16 +416,16 @@ const ReminderQueue: React.FC<{
   index: number;
   settings: SystemSettings;
   typeFor: (s: Subscriber) => 'expiry' | 'expired' | 'debt';
+  messageFor: (s: Subscriber, type: 'expiry' | 'expired' | 'debt') => string;
   onSend: (s: Subscriber) => void;
   onSkip: () => void;
   onClose: () => void;
-}> = ({ queue, index, settings, typeFor, onSend, onSkip, onClose }) => {
+}> = ({ queue, index, settings, typeFor, messageFor, onSend, onSkip, onClose }) => {
   useEscapeKey(onClose);
   const sub = queue[index];
   const done = !sub;
   const type = sub ? typeFor(sub) : 'expiry';
-  const t = sub ? getWhatsAppTemplates(sub, settings) : null;
-  const message = t ? (type === 'expired' ? t.expiredNotice : type === 'debt' ? t.debtReminder : t.expiryReminder) : '';
+  const message = sub ? messageFor(sub, type) : '';
   const debt = sub ? getRemainingDebt(sub) : 0;
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-sm" onClick={onClose}>
