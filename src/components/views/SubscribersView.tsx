@@ -444,9 +444,9 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
       )}
 
       {/* الهاتف: بطاقات بدل الجدول العريض */}
-      <div className="md:hidden space-y-2.5">
+      <div className="lg:hidden grid grid-cols-1 md:grid-cols-2 gap-2.5 items-start" data-list="cards">
         {pageItems.length === 0 ? (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-center text-slate-400 text-sm space-y-3">
+          <div className="md:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6 text-center text-slate-400 text-sm space-y-3">
             <p>{subscribers.length === 0 ? 'لا يوجد مشتركون بعد.' : 'لا يوجد مشتركون مطابقون للبحث.'}</p>
             {subscribers.length === 0 && onOpenAddModal && (
               <button onClick={onOpenAddModal} className="px-4 py-2 bg-cyan-600 text-white text-xs font-bold rounded-xl cursor-pointer">+ إضافة أول مشترك</button>
@@ -510,7 +510,7 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
       </div>
 
       {/* Subscribers Table Card */}
-      <div className="hidden md:block bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
+      <div className="hidden lg:block bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-right text-xs">
             <thead className="bg-slate-800/90 text-slate-300 font-bold border-b border-slate-700">

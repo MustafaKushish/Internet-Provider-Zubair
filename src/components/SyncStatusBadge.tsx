@@ -25,7 +25,7 @@ export const SyncStatusBadge: React.FC<SyncStatusBadgeProps> = ({ previewMode, s
 
   if (previewMode) {
     return (
-      <div className="fixed bottom-[4.75rem] md:bottom-3 left-3 z-40 no-print max-w-[calc(100vw-1.5rem)]">
+      <div className="fixed bottom-[4.75rem] lg:bottom-3 left-3 z-40 no-print max-w-[calc(100vw-1.5rem)]">
         <div className="flex items-center gap-1.5 rounded-full border border-amber-800 bg-amber-950/95 px-3 py-1.5 text-[11px] font-semibold text-amber-300 shadow-lg">
           <CloudOff className="w-3.5 h-3.5" />
           <span className="truncate">وضع المعاينة • البيانات على هذا الجهاز فقط</span>
@@ -60,7 +60,7 @@ export const SyncStatusBadge: React.FC<SyncStatusBadgeProps> = ({ previewMode, s
   const quiet = phase === 'synced' || phase === 'idle';
 
   return (
-    <div className="fixed bottom-[4.75rem] md:bottom-3 left-3 z-40 flex flex-col items-start gap-2 no-print max-w-[calc(100vw-1.5rem)]">
+    <div className="fixed bottom-[4.75rem] lg:bottom-3 left-3 z-40 flex flex-col items-start gap-2 no-print max-w-[calc(100vw-1.5rem)]">
       {notice && (
         <div role="alert" className="flex items-start gap-2 rounded-xl border border-rose-800 bg-rose-950/95 px-3 py-2 text-xs text-rose-200 shadow-lg">
           <AlertTriangle className="w-4 h-4 flex-shrink-0 text-rose-400 mt-0.5" />

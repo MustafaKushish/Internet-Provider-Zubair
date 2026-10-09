@@ -63,8 +63,21 @@ const TABS: TabDef[] = [
   { id: 'settings', label: 'إعدادات المنظومة', short: 'الإعدادات', icon: Settings, roles: ['admin'] },
 ];
 
-// الأقسام الظاهرة مباشرة في شريط الهاتف السفلي (الباقي في «المزيد»)
-const MOBILE_PRIMARY = ['subscribers', 'reminders', 'dashboard', 'tickets', 'towers'];
+// الأقسام الظاهرة مباشرة في الشريط السفلي (الباقي في «المزيد»): 4 في الهاتف و 6 في التابلت
+const MOBILE_PRIMARY = ['subscribers', 'reminders', 'dashboard', 'tickets', 'cash', 'reports', 'towers'];
+
+function useIsTablet(): boolean {
+  const query = '(min-width: 768px)';
+  const [match, setMatch] = useState(() => typeof window !== 'undefined' && window.matchMedia?.(query).matches);
+  useEffect(() => {
+    const mq = window.matchMedia?.(query);
+    if (!mq) return;
+    const on = () => setMatch(mq.matches);
+    mq.addEventListener?.('change', on);
+    return () => mq.removeEventListener?.('change', on);
+  }, []);
+  return !!match;
+}
 
 interface HeaderProps {
   activeTab: string;
@@ -114,7 +127,11 @@ export const Header: React.FC<HeaderProps> = ({
   const [moreOpen, setMoreOpen] = useState(false);
 
   const visibleTabs = TABS.filter(t => t.roles.includes(currentUser.role));
-  const primaryTabs = visibleTabs.filter(t => MOBILE_PRIMARY.includes(t.id)).slice(0, 4);
+  const isTablet = useIsTablet();
+  const primaryTabs = visibleTabs
+    .filter(t => MOBILE_PRIMARY.includes(t.id))
+    .sort((a, b) => MOBILE_PRIMARY.indexOf(a.id) - MOBILE_PRIMARY.indexOf(b.id))
+    .slice(0, isTablet ? 6 : 4);
   const moreTabs = visibleTabs.filter(t => !primaryTabs.includes(t));
   const alertsCount = stats.expiringSoonCount + stats.expiredCount;
   const badgeFor = (id: string): React.ReactNode => {
@@ -162,9 +179,9 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <>
-    <header className="bg-slate-900 border-b border-slate-800 md:sticky md:top-0 z-30 shadow-xl backdrop-blur-md bg-opacity-95 no-print">
+    <header className="bg-slate-900 border-b border-slate-800 lg:sticky lg:top-0 z-30 shadow-xl backdrop-blur-md bg-opacity-95 no-print">
       {/* الهاتف: شريط علوي مضغوط */}
-      <div className="md:hidden px-3 pt-3 pb-2 space-y-2">
+      <div className="lg:hidden px-3 pt-3 pb-2 space-y-2">
         <div className="flex items-center gap-2">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-600 via-blue-600 to-indigo-600 flex items-center justify-center text-white flex-shrink-0">
             <Wifi className="w-5 h-5" />
@@ -226,7 +243,7 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Top Banner */}
-      <div className="hidden md:block max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+      <div className="hidden lg:block max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           {/* Logo & Brand */}
           <div className="flex items-center gap-3">
@@ -463,7 +480,7 @@ export const Header: React.FC<HeaderProps> = ({
     {/* الهاتف: شريط تنقل سفلي ثابت */}
     <nav
       aria-label="التنقل السريع"
-      className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 no-print"
+      className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 no-print"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <div className="grid" style={{ gridTemplateColumns: `repeat(${primaryTabs.length + (moreTabs.length ? 1 : 0)}, minmax(0, 1fr))` }}>
@@ -477,7 +494,7 @@ export const Header: React.FC<HeaderProps> = ({
               type="button"
               onClick={() => go(t.id)}
               aria-current={active ? 'page' : undefined}
-              className={`relative flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-semibold cursor-pointer ${active ? 'text-cyan-400' : 'text-slate-400'}`}
+              className={`relative flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] md:text-xs font-semibold cursor-pointer ${active ? 'text-cyan-400' : 'text-slate-400'}`}
             >
               {active && <span className="absolute top-0 inset-x-4 h-0.5 rounded-full bg-cyan-400" />}
               <span className="relative">
@@ -555,12 +572,12 @@ export const Header: React.FC<HeaderProps> = ({
 const MoreSheet: React.FC<{ onClose: () => void; children: React.ReactNode }> = ({ onClose, children }) => {
   useEscapeKey(onClose);
   return (
-    <div className="md:hidden fixed inset-0 z-50 flex items-end bg-slate-950/70 backdrop-blur-sm no-print" onClick={onClose}>
+    <div className="lg:hidden fixed inset-0 z-50 flex items-end bg-slate-950/70 backdrop-blur-sm no-print" onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"
         aria-label="المزيد من الأقسام"
-        className="w-full bg-slate-900 border-t border-slate-700 rounded-t-3xl p-4 shadow-2xl"
+        className="w-full md:max-w-xl md:mx-auto bg-slate-900 border-t border-x md:border border-slate-700 rounded-t-3xl p-4 shadow-2xl"
         style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
         onClick={e => e.stopPropagation()}
       >

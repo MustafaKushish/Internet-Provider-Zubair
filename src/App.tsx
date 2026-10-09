@@ -1415,7 +1415,7 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-slate-900 bg-slate-950 py-4 pb-24 md:pb-4 text-center text-xs text-slate-500 no-print">
+      <footer className="border-t border-slate-900 bg-slate-950 py-4 pb-24 lg:pb-4 text-center text-xs text-slate-500 no-print">
         <p>
           {settings.ispName} (العراق - البصرة - قضاء الزبير) © {new Date().getFullYear()}
           {settings.contactPhone && <> • هاتف وواتساب:{' '}<span className="font-mono text-cyan-400 font-semibold" dir="ltr">{settings.contactPhone}</span></>}

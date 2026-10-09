@@ -217,7 +217,7 @@ export const AdvisorView: React.FC<AdvisorViewProps> = (props) => {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-[11px]">
-          <label className="flex items-center gap-1.5 bg-slate-800 rounded-lg px-2 py-1 text-slate-300">
+          <label className="flex items-center gap-1.5 bg-slate-800 rounded-lg px-2 py-1 text-slate-300 w-full sm:w-auto min-w-0">
             <span>المحرك:</span>
             <select
               id="advisor-engine"
@@ -225,7 +225,7 @@ export const AdvisorView: React.FC<AdvisorViewProps> = (props) => {
               disabled={!isAdmin || busy}
               title={isAdmin ? 'اختيار محرك الذكاء الاصطناعي' : 'المدير فقط يغيّر المحرك'}
               onChange={e => props.onChangeProvider(e.target.value as AdvisorProvider)}
-              className="bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-white focus:outline-none focus:border-cyan-500 disabled:opacity-70"
+              className="flex-1 min-w-0 max-w-full bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-white focus:outline-none focus:border-cyan-500 disabled:opacity-70"
             >
               {ENGINE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
