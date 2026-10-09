@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { PaymentRecord, Subscriber, SupportTicket, SystemSettings, TowerPoint, UpstreamProvider } from '../../types/isp';
 import { buildBusinessSnapshot } from '../../ai/businessSnapshot';
-import { askAdvisor, AdvisorMessage } from '../../ai/advisorApi';
-import { PREVIEW_MODE } from '../../sync/api';
+import { askAdvisor, AdvisorMessage, AdvisorProvider, PROVIDER_LABELS } from '../../ai/advisorApi';
+import { PREVIEW_MODE, apiRequest } from '../../sync/api';
+import { StaffUser } from '../../types/isp';
 import { Sparkles, Send, Square, Trash2, Brain, ShieldCheck, Eye, X, AlertTriangle } from 'lucide-react';
 
 interface AdvisorViewProps {
@@ -12,7 +13,16 @@ interface AdvisorViewProps {
   providers: UpstreamProvider[];
   towers: TowerPoint[];
   settings: SystemSettings;
+  currentUser: StaffUser;
+  onChangeProvider: (provider: AdvisorProvider) => void;
 }
+
+const ENGINE_OPTIONS: { value: AdvisorProvider; label: string }[] = [
+  { value: 'auto', label: 'تلقائي مجاني (Gemini ثم Cloudflare AI)' },
+  { value: 'gemini', label: 'Google Gemini (مجاني ضمن حدود)' },
+  { value: 'workers', label: 'Cloudflare AI (مجاني ضمن حصة يومية)' },
+  { value: 'claude', label: 'Claude (مدفوع، أعلى جودة)' },
+];
 
 const HISTORY_KEY = 'sas_plus_advisor_chat_v1';
 
@@ -104,6 +114,14 @@ export const AdvisorView: React.FC<AdvisorViewProps> = (props) => {
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  const provider: AdvisorProvider = props.settings.advisorProvider || 'auto';
+  const isAdmin = props.currentUser.role === 'admin';
+  const [engineStatus, setEngineStatus] = useState<{ gemini: boolean; workers: boolean; claude: boolean } | null>(null);
+  useEffect(() => {
+    if (PREVIEW_MODE) return;
+    apiRequest<{ gemini: boolean; workers: boolean; claude: boolean }>('/api/ai/status').then(setEngineStatus).catch(() => undefined);
+  }, []);
+
   const snapshot = useMemo(() => buildBusinessSnapshot(props), [props.subscribers, props.payments, props.tickets, props.providers, props.towers, props.settings]);
 
   useEffect(() => {
@@ -136,8 +154,10 @@ export const AdvisorView: React.FC<AdvisorViewProps> = (props) => {
           setThinking('');
           setMessages([...history, { role: 'assistant', content: answer }]);
         },
-      }, controller.signal);
+      }, controller.signal, provider);
       if (res.remaining !== null) setRemaining(res.remaining);
+      const via = res.provider ? `${PROVIDER_LABELS[res.provider] || res.provider}${res.model ? ` • ${res.model}` : ''}` : undefined;
+      if (answer) setMessages([...history, { role: 'assistant', content: answer, via }]);
       if (res.stopReason === 'refusal' && !answer) {
         setError('لم يتمكن المستشار من الإجابة على هذا السؤال. أعد صياغته.');
       } else if (res.stopReason === 'max_tokens') {
@@ -171,7 +191,30 @@ export const AdvisorView: React.FC<AdvisorViewProps> = (props) => {
             <p className="text-xs text-slate-400 mt-0.5">خبير تسويق وتسعير وتطوير أبراج، يقرأ أرقام شبكتك ويفكر بعمق قبل الإجابة</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 text-[11px]">
+        <div className="flex flex-wrap items-center gap-2 text-[11px]">
+          <label className="flex items-center gap-1.5 bg-slate-800 rounded-lg px-2 py-1 text-slate-300">
+            <span>المحرك:</span>
+            <select
+              id="advisor-engine"
+              value={provider}
+              disabled={!isAdmin || busy}
+              title={isAdmin ? 'اختيار محرك الذكاء الاصطناعي' : 'المدير فقط يغيّر المحرك'}
+              onChange={e => props.onChangeProvider(e.target.value as AdvisorProvider)}
+              className="bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-white focus:outline-none focus:border-cyan-500 disabled:opacity-70"
+            >
+              {ENGINE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </label>
+          {engineStatus && (
+            <span className="flex items-center gap-2 text-slate-400" title="المحركات المضبوطة على الخادم">
+              {(['gemini', 'workers', 'claude'] as const).map(k => (
+                <span key={k} className="flex items-center gap-1">
+                  <span className={`w-1.5 h-1.5 rounded-full ${engineStatus[k] ? 'bg-emerald-400' : 'bg-slate-600'}`} />
+                  {PROVIDER_LABELS[k]}
+                </span>
+              ))}
+            </span>
+          )}
           <button type="button" onClick={() => setShowData(true)} className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center gap-1 cursor-pointer">
             <Eye className="w-3.5 h-3.5" /> البيانات المرسلة
           </button>
@@ -218,7 +261,12 @@ export const AdvisorView: React.FC<AdvisorViewProps> = (props) => {
               <div key={i} className="flex justify-end">
                 <div className="w-full max-w-[95%] bg-slate-950/70 border border-slate-800 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-slate-200 leading-relaxed">
                   {m.content
-                    ? <div dangerouslySetInnerHTML={{ __html: renderMarkdown(m.content) }} />
+                    ? (
+                      <>
+                        <div dangerouslySetInnerHTML={{ __html: renderMarkdown(m.content) }} />
+                        {m.via && <div className="mt-2 pt-1.5 border-t border-slate-800 text-[10px] text-slate-500">أجاب: {m.via}</div>}
+                      </>
+                    )
                     : (
                       <div className="flex items-start gap-2 text-slate-400 text-xs">
                         <Brain className="w-4 h-4 text-indigo-400 animate-pulse flex-shrink-0 mt-0.5" />

@@ -3,7 +3,16 @@ import { ApiError, getToken } from '../sync/api';
 export interface AdvisorMessage {
   role: 'user' | 'assistant';
   content: string;
+  via?: string; // المحرك الذي أجاب (للعرض فقط، لا يُرسل)
 }
+
+export type AdvisorProvider = 'auto' | 'gemini' | 'workers' | 'claude';
+
+export const PROVIDER_LABELS: Record<string, string> = {
+  gemini: 'Google Gemini',
+  workers: 'Cloudflare AI',
+  claude: 'Claude',
+};
 
 export interface AdvisorHandlers {
   onThinking: (summary: string) => void;
@@ -21,13 +30,14 @@ export async function askAdvisor(
   context: string,
   handlers: AdvisorHandlers,
   signal?: AbortSignal,
-): Promise<{ remaining: number | null; stopReason: string | null }> {
+  provider: AdvisorProvider = 'auto',
+): Promise<{ remaining: number | null; stopReason: string | null; provider: string | null; model: string | null }> {
   let res: Response;
   try {
     res = await fetch(`${API_BASE}/api/ai/chat`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${getToken() || ''}` },
-      body: JSON.stringify({ messages, context }),
+      body: JSON.stringify({ messages: messages.map(m => ({ role: m.role, content: m.content })), context, provider }),
       signal,
     });
   } catch (e) {
@@ -41,14 +51,40 @@ export async function askAdvisor(
   }
 
   const remainingHeader = res.headers.get('x-advisor-remaining');
+  const usedProvider = res.headers.get('x-advisor-provider');
+  const usedModel = res.headers.get('x-advisor-model');
   const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
   let buffer = '';
   let stopReason: string | null = null;
   let streamError: string | null = null;
 
+  // ثلاث صيغ بث: Claude (type)، Gemini (candidates)، Workers AI (response أو choices أو output_text)
   const handleEvent = (data: string) => {
+    if (data === '[DONE]') return;
     let ev: any;
     try { ev = JSON.parse(data); } catch { return; }
+    if (Array.isArray(ev.candidates)) {
+      const cand = ev.candidates[0] || {};
+      for (const part of cand.content?.parts || []) {
+        if (typeof part.text !== 'string') continue;
+        if (part.thought) handlers.onThinking(part.text); else handlers.onText(part.text);
+      }
+      if (cand.finishReason === 'MAX_TOKENS') stopReason = 'max_tokens';
+      else if (cand.finishReason && /SAFETY|PROHIBITED|BLOCKLIST|RECITATION/.test(cand.finishReason)) stopReason = 'refusal';
+      else if (cand.finishReason) stopReason = 'end_turn';
+      if (ev.promptFeedback?.blockReason) stopReason = 'refusal';
+      return;
+    }
+    if (typeof ev.response === 'string') { if (ev.response) handlers.onText(ev.response); return; }
+    if (Array.isArray(ev.choices)) {
+      const d = ev.choices[0]?.delta || {};
+      if (typeof d.reasoning_content === 'string' && d.reasoning_content) handlers.onThinking(d.reasoning_content);
+      if (typeof d.content === 'string' && d.content) handlers.onText(d.content);
+      if (ev.choices[0]?.finish_reason === 'length') stopReason = 'max_tokens';
+      return;
+    }
+    if (ev.type === 'response.output_text.delta' && typeof ev.delta === 'string') { handlers.onText(ev.delta); return; }
+    if (ev.type === 'response.reasoning_text.delta' && typeof ev.delta === 'string') { handlers.onThinking(ev.delta); return; }
     switch (ev.type) {
       case 'content_block_delta':
         if (ev.delta?.type === 'text_delta') handlers.onText(ev.delta.text);
@@ -68,7 +104,8 @@ export async function askAdvisor(
   for (;;) {
     const { value, done } = await reader.read();
     if (done) break;
-    buffer += value;
+    // Gemini يفصل الأحداث بـ \r\n\r\n؛ نوحّد نهايات الأسطر قبل التقسيم
+    buffer = (buffer + value).replace(/\r\n/g, '\n');
     let idx: number;
     // أحداث SSE تفصلها سطر فارغ؛ نقرأ أسطر data: فقط
     while ((idx = buffer.indexOf('\n\n')) !== -1) {
@@ -79,6 +116,6 @@ export async function askAdvisor(
     }
   }
   if (streamError) throw new ApiError(502, streamError);
-  return { remaining: remainingHeader ? Number(remainingHeader) : null, stopReason };
+  return { remaining: remainingHeader ? Number(remainingHeader) : null, stopReason, provider: usedProvider, model: usedModel };
 }
 

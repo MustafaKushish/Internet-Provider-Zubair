@@ -1,5 +1,5 @@
 {
-  // Cloudflare Worker: يخدم واجهة المنظومة (dist) وواجهة المزامنة /api
+  // إعداد التطوير المحلي: مثل wrangler.jsonc لكن بدون Workers AI (يحتاج تسجيل دخول Cloudflare)
   "name": "sas-plus-zubair",
   "main": "worker/index.ts",
   "compatibility_date": "2025-09-01",
@@ -15,7 +15,5 @@
       // database_id يُنشأ تلقائياً عند أول نشر (wrangler deploy)
     }
   ],
-  // Cloudflare Workers AI للمستشار الذكي (حصة يومية مجانية ضمن الحساب)
-  "ai": { "binding": "AI" },
   "observability": { "enabled": true }
 }

@@ -40,23 +40,38 @@ Der Windows-Installer ist eine Electron-Hülle (`desktop/`) um dieselbe Adresse.
 ## Der KI-Berater („المستشار الذكي“)
 
 Ein Reiter für Admin und Buchhalter: Er beantwortet Fragen zu Marketing, Preisen, Zuschlägen, Schulden und dazu,
-welche Türme sich lohnen. Dafür nutzt er **Claude Opus 5.5** mit gründlichem Nachdenken und die aktuellen Zahlen der App.
+welche Türme sich lohnen. Grundlage sind die aktuellen Zahlen der App.
 
 - **Datenschutz:** Gesendet wird nur eine Zahlenübersicht (Türme, Pakete, Preise, Gewinne, Schulden, Einnahmen pro Monat, Tickets).
   Keine Namen, Telefonnummern, Benutzernamen oder Passwörter. In der App zeigt der Knopf „البيانات المرسلة“ genau, was gesendet wird.
-- **Kosten:** Pro Frage etwa 0,05–0,20 US-$, abgerechnet bei Anthropic. Pro Person sind höchstens 40 Fragen am Tag erlaubt.
-- **Einrichtung (einmalig):**
-  1. Auf <https://console.anthropic.com> ein Konto anlegen, Guthaben aufladen und unter *API Keys* einen Schlüssel erstellen.
-  2. Im Cloudflare-Dashboard unter *Workers & Pages → sas-plus-zubair → Settings → Variables and Secrets* den Eintrag **Add**
-     wählen, Typ **Secret**, Name `ANTHROPIC_API_KEY` und den Schlüssel als Wert eintragen, dann **Deploy**.
-     Der Schlüssel bleibt nur auf dem Server und übersteht alle späteren Deploys.
+- **Pro Person höchstens 40 Fragen am Tag.** Fehlgeschlagene Fragen werden nicht gezählt.
+
+**KI-Motoren** (der Admin wählt oben im Berater unter „المحرك“):
+
+| Motor | Kosten | Einrichtung |
+|---|---|---|
+| **Automatisch** (Standard) | kostenlos | Erst Google Gemini, bei Fehler oder Limit automatisch Cloudflare AI. |
+| **Google Gemini** (Flash) | kostenlos im Rahmen der Google-Limits | Secret `GEMINI_API_KEY` (siehe unten). |
+| **Cloudflare AI** (Workers AI) | kostenlos bis 10.000 „Neurons“ pro Tag (Reset 00:00 UTC) | Nichts, ist über `wrangler.jsonc` (`"ai"`) schon verbunden. |
+| **Claude** (Opus 5.5) | ca. 0,05–0,20 US-$ pro Frage bei Anthropic, nur mit Guthaben | Secret `ANTHROPIC_API_KEY` (optional). |
+
+**Gemini-Schlüssel einrichten (einmalig):**
+
+1. Auf <https://aistudio.google.com> mit einem Google-Konto anmelden → **Get API key** → **Create API key** → Schlüssel kopieren.
+2. Im Cloudflare-Dashboard unter *Workers & Pages → sas-plus-zubair → Settings → Variables and Secrets* auf **Add**,
+   Typ **Secret**, Name `GEMINI_API_KEY`, Schlüssel als Wert, dann **Deploy**.
+   Der Schlüssel bleibt nur auf dem Server und übersteht alle späteren Deploys.
+
+Für Claude geht es genauso mit einem Schlüssel von <https://console.anthropic.com> und dem Namen `ANTHROPIC_API_KEY`.
+Optional lassen sich die Modelle über die Variablen `GEMINI_MODEL` und `WORKERS_AI_MODEL` ändern.
+Die grünen Punkte neben der Motor-Auswahl zeigen, welche Motoren auf dem Server eingerichtet sind.
 
 ## Einmalige Einrichtung bei Cloudflare
 
 1. Kostenloses Konto auf <https://dash.cloudflare.com> anlegen.
 2. **Account-ID** kopieren: Dashboard → rechts „Account ID“ (oder unter *Workers & Pages*).
 3. **API-Token** erstellen: *My Profile → API Tokens → Create Token → Vorlage „Edit Cloudflare Workers“*,
-   dann zusätzlich die Berechtigung **Account → D1 → Edit** hinzufügen.
+   dann zusätzlich die Berechtigungen **Account → D1 → Edit** und **Account → Workers AI → Edit** hinzufügen.
 4. Im GitHub-Repo unter *Settings → Secrets and variables → Actions* zwei Secrets anlegen:
    `CLOUDFLARE_API_TOKEN` und `CLOUDFLARE_ACCOUNT_ID`.
 5. Den Workflow **Deploy to Cloudflare** starten (*Actions* → Workflow → *Run workflow*). Danach läuft er bei jedem Push auf `main`

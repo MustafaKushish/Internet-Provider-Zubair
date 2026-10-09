@@ -1213,6 +1213,12 @@ export default function App() {
               providers={providers}
               towers={towerPoints}
               settings={settings}
+              currentUser={currentUser}
+              onChangeProvider={(p) => {
+                if (currentUser.role !== 'admin') return;
+                setSettings(prev => ({ ...prev, advisorProvider: p }));
+                notify('تم تغيير محرك المستشار الذكي.', 'success');
+              }}
             />
           </React.Suspense>
         )}

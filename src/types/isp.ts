@@ -117,6 +117,7 @@ export interface SystemSettings {
   currency: 'IQD' | 'USD';
   warningDaysBeforeExpiry: number;
   whatsappFooter: string;
+  advisorProvider?: 'auto' | 'gemini' | 'workers' | 'claude'; // محرك المستشار الذكي
 }
 
 export type ReportPeriod = 'this_month' | 'last_month' | 'this_quarter' | 'last_quarter' | 'this_year' | 'custom';

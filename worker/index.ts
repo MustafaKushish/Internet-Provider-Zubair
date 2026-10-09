@@ -7,12 +7,16 @@
  *   لكل منها رقم نسخة متصاعد، والأجهزة تسحب ما تغيّر منذ آخر رقم رأته
  */
 
-import { handleAdvisorChat } from './advisor';
+import { handleAdvisorChat, advisorStatus } from './advisor';
 
 export interface Env {
   DB: D1Database;
   ASSETS?: Fetcher;
-  ANTHROPIC_API_KEY?: string; // سرّ في Cloudflare للمستشار الذكي
+  ANTHROPIC_API_KEY?: string; // سرّ في Cloudflare للمستشار الذكي (اختياري، مدفوع)
+  GEMINI_API_KEY?: string;    // سرّ في Cloudflare (Google AI Studio، مجاني ضمن حدود)
+  GEMINI_MODEL?: string;
+  WORKERS_AI_MODEL?: string;
+  AI?: { run: (model: string, input: any) => Promise<any> }; // Cloudflare Workers AI
 }
 
 type Role = 'admin' | 'accountant' | 'technician';
@@ -659,6 +663,7 @@ async function handleApi(req: Request, env: Env, url: URL): Promise<Response> {
   if (path === '/api/sync' && method === 'GET') return handlePull(url, db);
   if (path === '/api/sync' && method === 'POST') return handlePush(req, db, user);
   if (path === '/api/ai/chat' && method === 'POST') return handleAdvisorChat(req, env, user);
+  if (path === '/api/ai/status' && method === 'GET') return json(advisorStatus(env));
 
   throw new HttpError(404, 'المسار غير موجود.');
 }
