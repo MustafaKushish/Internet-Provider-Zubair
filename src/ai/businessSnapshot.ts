@@ -1,12 +1,15 @@
 import { PaymentRecord, Subscriber, SupportTicket, SystemSettings, TowerPoint, UpstreamProvider } from '../types/isp';
 import { getDaysRemaining, getPaymentCost, getRemainingDebt } from '../utils/storage';
-import { computeTowerStats, sortTowerStats, NO_TOWER_LABEL } from '../utils/towers';
+import { computeTowerStats, sortTowerStats, NO_TOWER_LABEL, normTower } from '../utils/towers';
 import { todayStr } from '../utils/dates';
 
 /**
  * لقطة أرقام تجارية للمستشار الذكي.
  * لا تحتوي أي بيانات شخصية: لا أسماء، لا هواتف، لا أسماء مستخدمين، لا كلمات مرور، لا عناوين، لا IP.
  */
+
+/** الحد الأقصى لنص «معلومات عملي» المرسل للمستشار */
+export const ADVISOR_NOTES_MAX = 3000;
 
 const n = (x: number) => Math.round(x).toLocaleString('en-US');
 
@@ -53,6 +56,13 @@ export function buildBusinessSnapshot(input: {
   const cur = settings.currency === 'USD' ? 'دولار' : 'دينار عراقي';
 
   lines.push(`التاريخ: ${today} | العملة: ${cur} | منطقة العمل: الزبير - البصرة | تنبيه قبل الانتهاء: ${settings.warningDaysBeforeExpiry} أيام`);
+
+  const notes = (settings.advisorNotes || '').trim();
+  if (notes) {
+    lines.push('');
+    lines.push('## معلومات من صاحب الشبكة (كلف، منافسون، سعة الأبراج، أهداف)');
+    lines.push(notes.slice(0, ADVISOR_NOTES_MAX));
+  }
 
   // ---------- المشتركون ----------
   const active = subscribers.filter(s => s.status === 'active').length;
@@ -113,6 +123,46 @@ export function buildBusinessSnapshot(input: {
     const meta = t.tower ? [t.tower.location, t.tower.ipRange].filter(Boolean).join(' | ') : (t.name === NO_TOWER_LABEL ? '' : 'غير مسجل كبرج');
     lines.push(`- ${t.name}${meta ? ` [${meta}]` : ''}: مشتركون ${t.subscribers} (نشط ${t.active}، منتهٍ ${t.expired}) | إيراد متوقع ${n(t.monthlyRevenue)} | ربح متوقع ${n(t.monthlyProfit)} | مقبوض هذا الشهر ${n(t.collectedThisMonth)} | ديون ${n(t.debts)}`);
   });
+
+  // ---------- مؤشرات النمو لكل برج ----------
+  const totalProfit = towerStats.reduce((a, t) => a + Math.max(0, t.monthlyProfit), 0);
+  const ticketSince = new Date();
+  ticketSince.setDate(ticketSince.getDate() - 90);
+  const ticketSinceStr = ticketSince.toISOString().slice(0, 10);
+  const recentMonths = new Set(lastMonths(3));
+  const towerOf = (name?: string) => normTower(name) || NO_TOWER_LABEL;
+  lines.push('');
+  lines.push('## مؤشرات النمو لكل برج');
+  lines.push('(حصة الربح | متوسط سعر المشترك ARPU | هامش المشترك | نسبة التجديد = غير المنتهين ÷ الكل | مجمع الاسترجاع = منتهون خلال 90 يوماً وقيمتهم الشهرية | مفقودون أكثر من 90 يوماً | الديون ÷ الإيراد الشهري | بلاغات 90 يوماً لكل 10 مشتركين | جدد آخر 3 أشهر)');
+  let winBackCount = 0, winBackValue = 0;
+  towerStats.forEach(t => {
+    const subs = subscribers.filter(s => towerOf(s.towerName) === t.name);
+    if (!subs.length) {
+      lines.push(`- ${t.name}: لا مشتركين بعد (برج مسجل بدون استغلال)`);
+      return;
+    }
+    const arpu = subs.reduce((a, s) => a + (s.salePrice || 0), 0) / subs.length;
+    const margin = subs.reduce((a, s) => a + (s.salePrice || 0) - (s.costPrice || 0), 0) / subs.length;
+    const renewal = Math.round((t.active / subs.length) * 100);
+    const pool = subs.filter(s => { const d = -getDaysRemaining(s.expiryDate); return d > 0 && d <= 90 && s.status !== 'suspended'; });
+    const poolValue = pool.reduce((a, s) => a + (s.salePrice || 0) - (s.costPrice || 0), 0);
+    winBackCount += pool.length; winBackValue += poolValue;
+    const lost = subs.filter(s => -getDaysRemaining(s.expiryDate) > 90).length;
+    const debtRatio = t.monthlyRevenue ? Math.round((t.debts / t.monthlyRevenue) * 100) : 0;
+    const tk = tickets.filter(x => (x.createdAt || '') >= ticketSinceStr && towerOf(x.towerName) === t.name).length;
+    const fresh = subs.filter(s => recentMonths.has(monthKey(s.createdAt))).length;
+    const share = totalProfit ? Math.round((Math.max(0, t.monthlyProfit) / totalProfit) * 100) : 0;
+    lines.push(`- ${t.name}: حصة ${share}% | ARPU ${n(arpu)} | هامش ${n(margin)} | تجديد ${renewal}% | استرجاع ${pool.length} بقيمة ربح ${n(poolValue)} شهرياً | مفقود ${lost} | ديون/إيراد ${debtRatio}% | بلاغات ${(tk / subs.length * 10).toFixed(1)} | جدد ${fresh}`);
+  });
+
+  // ---------- مؤشرات الشبكة ----------
+  const expectedRevenue = towerStats.reduce((a, t) => a + t.monthlyRevenue, 0);
+  const collectedNow = towerStats.reduce((a, t) => a + t.collectedThisMonth, 0);
+  const allMargin = subscribers.length ? subscribers.reduce((a, s) => a + (s.salePrice || 0) - (s.costPrice || 0), 0) / subscribers.length : 0;
+  lines.push('');
+  lines.push('## مؤشرات الشبكة');
+  lines.push(`الإيراد الشهري المتوقع ${n(expectedRevenue)} | المقبوض هذا الشهر حتى اليوم ${n(collectedNow)} (${expectedRevenue ? Math.round((collectedNow / expectedRevenue) * 100) : 0}%) | متوسط هامش المشترك ${n(allMargin)}`);
+  lines.push(`مجمع الاسترجاع الكلي: ${winBackCount} مشترك منتهٍ خلال 90 يوماً = ربح ${n(winBackValue)} شهرياً إذا عادوا | الديون الكلية = ${expectedRevenue ? (totalDebt / expectedRevenue).toFixed(1) : 0} شهر من الإيراد`);
 
   // ---------- المقبوضات ----------
   const months = lastMonths(6);

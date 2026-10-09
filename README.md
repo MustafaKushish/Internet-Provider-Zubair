@@ -45,6 +45,12 @@ welche Türme sich lohnen. Grundlage sind die aktuellen Zahlen der App.
 - **Datenschutz:** Gesendet wird nur eine Zahlenübersicht (Türme, Pakete, Preise, Gewinne, Schulden, Einnahmen pro Monat, Tickets).
   Keine Namen, Telefonnummern, Benutzernamen oder Passwörter. In der App zeigt der Knopf „البيانات المرسلة“ genau, was gesendet wird.
 - **Pro Person höchstens 40 Fragen am Tag.** Fehlgeschlagene Fragen werden nicht gezählt.
+- **„معلومات عملي“** (nur der Admin bearbeitet): Kosten pro Turm, Kapazität, Preise der Konkurrenz, Ziele. Der Berater
+  rechnet bei jeder Frage damit. Keine Kundennamen oder Telefonnummern eintragen.
+- **„خطة رفع برج“**: Turm wählen → der Berater vergleicht ihn mit dem Netz und erstellt einen Monatsplan mit Ziel nach 3 Monaten
+  und fertigen WhatsApp-Texten.
+- Pro Turm bekommt der Berater u. a. ARPU, Marge pro Kunde, Verlängerungsquote, Rückgewinnungs-Potenzial
+  (in den letzten 90 Tagen abgelaufen), Schulden im Verhältnis zum Umsatz und Störungsmeldungen pro 10 Kunden.
 
 **KI-Motoren** (der Admin wählt oben im Berater unter „المحرك“):
 

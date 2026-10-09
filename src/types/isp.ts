@@ -118,6 +118,7 @@ export interface SystemSettings {
   warningDaysBeforeExpiry: number;
   whatsappFooter: string;
   advisorProvider?: 'auto' | 'gemini' | 'workers' | 'claude'; // محرك المستشار الذكي
+  advisorNotes?: string;   // «معلومات عملي» للمستشار: كلف، منافسون، سعة الأبراج، أهداف (بدون بيانات شخصية)
 }
 
 export type ReportPeriod = 'this_month' | 'last_month' | 'this_quarter' | 'last_quarter' | 'this_year' | 'custom';

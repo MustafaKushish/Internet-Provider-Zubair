@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { PaymentRecord, Subscriber, SupportTicket, SystemSettings, TowerPoint, UpstreamProvider } from '../../types/isp';
-import { buildBusinessSnapshot } from '../../ai/businessSnapshot';
+import { buildBusinessSnapshot, ADVISOR_NOTES_MAX } from '../../ai/businessSnapshot';
+import { NO_TOWER_LABEL, normTower } from '../../utils/towers';
 import { askAdvisor, AdvisorMessage, AdvisorProvider, PROVIDER_LABELS } from '../../ai/advisorApi';
 import { PREVIEW_MODE, apiRequest } from '../../sync/api';
 import { StaffUser } from '../../types/isp';
-import { Sparkles, Send, Square, Trash2, Brain, ShieldCheck, Eye, X, AlertTriangle } from 'lucide-react';
+import { Sparkles, Send, Square, Trash2, Brain, ShieldCheck, Eye, X, AlertTriangle, Rocket, NotebookPen } from 'lucide-react';
 
 interface AdvisorViewProps {
   subscribers: Subscriber[];
@@ -15,6 +16,7 @@ interface AdvisorViewProps {
   settings: SystemSettings;
   currentUser: StaffUser;
   onChangeProvider: (provider: AdvisorProvider) => void;
+  onSaveNotes: (notes: string) => void;
 }
 
 const ENGINE_OPTIONS: { value: AdvisorProvider; label: string }[] = [
@@ -27,13 +29,26 @@ const ENGINE_OPTIONS: { value: AdvisorProvider; label: string }[] = [
 const HISTORY_KEY = 'sas_plus_advisor_chat_v1';
 
 const SUGGESTIONS = [
-  'حلل وضع الشبكة الحالي: ما أهم 5 قرارات يجب أن أتخذها هذا الشهر؟',
-  'أي برج يستحق التوسعة أو سكتر إضافي، وأي برج خاسر؟ احسبها بالأرقام.',
-  'هل أسعار الباقات مناسبة؟ اقترح زيادة أو رسوم إضافية بدون خسارة مشتركين.',
-  'خطة تسويق عملية لجذب 30 مشتركاً جديداً في الزبير خلال شهر.',
-  'كيف أقلل الديون المتأخرة وأرفع نسبة التحصيل؟',
-  'اكتب رسالة واتساب احترافية لعرض ترويجي على المشتركين المنتهين.',
+  'حلل وضع الشبكة الحالي: ما أهم 5 قرارات ترفع صافي الربح هذا الشهر؟ رتبها حسب الأثر بالدينار.',
+  'قارن الأبراج: أي برج يستحق التوسعة أو سكتر إضافي، وأي برج خاسر يجب إصلاحه أو دمجه؟',
+  'لدي مشتركون منتهون حديثاً: خطة استرجاع خلال أسبوعين مع عرض ورسالة واتساب جاهزة.',
+  'هل أسعار الباقات مناسبة؟ اقترح زيادة أو رسوم أو دفع مقدم لـ3 أشهر بدون خسارة مشتركين، واحسب الأثر.',
+  'خطة تسويق عملية لجذب 30 مشتركاً جديداً في الزبير خلال شهر، بميزانية صغيرة.',
+  'كيف أحصّل الديون المتأخرة دون خسارة المشترك؟ خطة حسب عدد أشهر التأخير.',
+  'برنامج «جيب جارك» للإحالة: صممه لي بالأرقام وهل يربح؟',
+  'ما الذي يجب أن أكتبه في «معلومات عملي» حتى تصبح نصائحك أدق؟',
 ];
+
+/** طلب «خطة رفع البرج»: تحليل عميق لبرج واحد مقارنة ببقية الشبكة */
+function towerGrowthPrompt(tower: string): string {
+  return `أريد خطة كاملة لرفع برج «${tower}» إلى أقصى ربح ممكن.
+1. شخّص البرج بالأرقام مقارنة بمتوسط الشبكة وأفضل برج: الربح، ARPU، نسبة التجديد، مجمع الاسترجاع، الديون، البلاغات.
+2. ما أكبر 3 روافع لهذا البرج تحديداً؟ واحسب لكل واحدة الربح الشهري الإضافي المتوقع.
+3. خطة أسبوع بأسبوع لمدة شهر: استرجاع المنتهين، التحصيل، الترقية لباقة أعلى، التسويق في محيط البرج، وأي إصلاح فني مطلوب قبل التسويق.
+4. هدف واقعي بعد 3 أشهر: عدد المشتركين والربح الشهري.
+5. هل يستحق سكتراً إضافياً أو استثماراً؟ احسب فترة الاسترداد إن أمكن.
+6. رسالة واتساب جاهزة لمشتركي هذا البرج المنتهين، وأخرى للتسويق في الحي.`;
+}
 
 // ---------- عرض Markdown بسيط وآمن (النص يُهرَّب أولاً) ----------
 function escapeHtml(s: string) {
@@ -111,6 +126,15 @@ export const AdvisorView: React.FC<AdvisorViewProps> = (props) => {
   const [error, setError] = useState<string | null>(null);
   const [remaining, setRemaining] = useState<number | null>(null);
   const [showData, setShowData] = useState(false);
+  const [showNotes, setShowNotes] = useState(false);
+  const [notesDraft, setNotesDraft] = useState('');
+  const towerNames = useMemo(() => {
+    const names = new Set<string>();
+    props.towers.forEach(t => normTower(t.name) && names.add(normTower(t.name)));
+    props.subscribers.forEach(s => normTower(s.towerName) && names.add(normTower(s.towerName)));
+    return [...names].filter(n => n !== NO_TOWER_LABEL).sort((a, b) => a.localeCompare(b, 'ar'));
+  }, [props.towers, props.subscribers]);
+  const [growthTower, setGrowthTower] = useState('');
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -215,6 +239,9 @@ export const AdvisorView: React.FC<AdvisorViewProps> = (props) => {
               ))}
             </span>
           )}
+          <button type="button" onClick={() => { setNotesDraft(props.settings.advisorNotes || ''); setShowNotes(true); }} className={`px-2.5 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer ${props.settings.advisorNotes?.trim() ? 'bg-slate-800 hover:bg-slate-700 text-slate-300' : 'bg-amber-900/50 hover:bg-amber-900 text-amber-200 border border-amber-800'}`}>
+            <NotebookPen className="w-3.5 h-3.5" /> معلومات عملي
+          </button>
           <button type="button" onClick={() => setShowData(true)} className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center gap-1 cursor-pointer">
             <Eye className="w-3.5 h-3.5" /> البيانات المرسلة
           </button>
@@ -229,6 +256,31 @@ export const AdvisorView: React.FC<AdvisorViewProps> = (props) => {
       {PREVIEW_MODE && (
         <div className="bg-amber-950/40 border border-amber-800 rounded-2xl p-3 text-xs text-amber-200 flex gap-2">
           <AlertTriangle className="w-4 h-4 flex-shrink-0" /> المستشار يعمل فقط في النسخة المنشورة على الخادم، وليس في وضع المعاينة.
+        </div>
+      )}
+
+      {towerNames.length > 0 && (
+        <div className="bg-gradient-to-l from-indigo-950/60 to-slate-900 border border-indigo-900/60 rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center gap-2">
+          <div className="flex items-center gap-2 text-sm font-bold text-indigo-200 flex-shrink-0">
+            <Rocket className="w-4 h-4" /> خطة رفع برج
+          </div>
+          <select
+            id="advisor-growth-tower"
+            value={growthTower}
+            onChange={e => setGrowthTower(e.target.value)}
+            className="flex-1 min-w-0 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+          >
+            <option value="">اختر البرج…</option>
+            {towerNames.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <button
+            type="button"
+            disabled={!growthTower || busy || PREVIEW_MODE}
+            onClick={() => send(towerGrowthPrompt(growthTower))}
+            className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-xs font-bold cursor-pointer"
+          >
+            حلّل وارفع هذا البرج
+          </button>
         </div>
       )}
 
@@ -316,6 +368,43 @@ export const AdvisorView: React.FC<AdvisorViewProps> = (props) => {
           <p className="px-4 pb-2 text-[10px] text-slate-500">متبقٍ لك اليوم: {remaining} سؤالاً</p>
         )}
       </div>
+
+      {showNotes && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm" onClick={() => setShowNotes(false)}>
+          <div role="dialog" aria-modal="true" className="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800">
+              <h2 className="text-sm font-bold text-white">معلومات عملي (يقرأها المستشار مع كل سؤال)</h2>
+              <button type="button" onClick={() => setShowNotes(false)} className="text-slate-400 hover:text-white cursor-pointer" aria-label="إغلاق"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="p-5 space-y-3 overflow-auto">
+              <p className="text-xs text-slate-400 leading-relaxed">
+                كلما عرف المستشار أكثر عن عملك، صارت نصائحه أدق. اكتب مثلاً: كلفة كل برج شهرياً (إيجار، مولد، كهرباء، صيانة)،
+                سعة كل برج وعدد السكترات، أسعار المنافسين والفايبر في المنطقة، عدد العاملين ورواتبهم، ميزانية التسويق، وأهدافك
+                (مثلاً: 250 مشتركاً نهاية السنة). <span className="text-amber-300">لا تكتب أسماء أو هواتف مشتركين.</span>
+              </p>
+              <textarea
+                id="advisor-notes"
+                value={notesDraft}
+                onChange={e => setNotesDraft(e.target.value.slice(0, ADVISOR_NOTES_MAX))}
+                readOnly={!isAdmin}
+                rows={12}
+                placeholder={'برج الرينج: إيجار 50,000 + مولد 75,000 شهرياً، سكترين، السعة تقريباً 60 مشترك\nالفايبر وصل حي الشهداء بسعر 35,000\nالهدف: 250 مشترك و 3 ملايين ربح شهري نهاية السنة'}
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-sm text-white leading-relaxed focus:outline-none focus:border-cyan-500"
+              />
+              <div className="flex items-center justify-between text-[11px] text-slate-500">
+                <span>{notesDraft.length} / {ADVISOR_NOTES_MAX}</span>
+                {isAdmin
+                  ? (
+                    <button type="button" onClick={() => { props.onSaveNotes(notesDraft.trim()); setShowNotes(false); }} className="px-4 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold cursor-pointer">
+                      حفظ
+                    </button>
+                  )
+                  : <span>المدير فقط يعدّل هذه المعلومات</span>}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm" onClick={() => setShowData(false)}>

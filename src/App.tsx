@@ -1219,6 +1219,11 @@ export default function App() {
                 setSettings(prev => ({ ...prev, advisorProvider: p }));
                 notify('تم تغيير محرك المستشار الذكي.', 'success');
               }}
+              onSaveNotes={(notes) => {
+                if (currentUser.role !== 'admin') return;
+                setSettings(prev => ({ ...prev, advisorNotes: notes }));
+                notify('تم حفظ معلومات العمل للمستشار.', 'success');
+              }}
             />
           </React.Suspense>
         )}
