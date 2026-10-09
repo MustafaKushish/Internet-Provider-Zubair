@@ -61,6 +61,8 @@ welche Türme sich lohnen. Grundlage sind die aktuellen Zahlen der App.
 2. Im Cloudflare-Dashboard unter *Workers & Pages → sas-plus-zubair → Settings → Variables and Secrets* auf **Add**,
    Typ **Secret**, Name `GEMINI_API_KEY`, Schlüssel als Wert, dann **Deploy**.
    Der Schlüssel bleibt nur auf dem Server und übersteht alle späteren Deploys.
+   Auch die Namen `Gemini_Key` oder `GEMINI_KEY` werden erkannt. Schlüssel von Google AI Studio (`AIza…`)
+   und von Vertex AI Express (`AQ.…`) funktionieren beide.
 
 Für Claude geht es genauso mit einem Schlüssel von <https://console.anthropic.com> und dem Namen `ANTHROPIC_API_KEY`.
 Optional lassen sich die Modelle über die Variablen `GEMINI_MODEL` und `WORKERS_AI_MODEL` ändern.

@@ -89,6 +89,9 @@ export interface AdvisorEnv {
   AI?: { run: (model: string, input: any) => Promise<any> };
   ANTHROPIC_API_KEY?: string;
   GEMINI_API_KEY?: string;
+  Gemini_Key?: string;
+  GEMINI_KEY?: string;
+  Gemini_API_Key?: string;
   GEMINI_MODEL?: string;
   WORKERS_AI_MODEL?: string;
 }
@@ -119,32 +122,48 @@ function systemText(context: string) {
 }
 
 // ---------- Google Gemini ----------
+/** مفتاح Gemini بأي من الأسماء الشائعة في إعدادات Cloudflare */
+function geminiKey(env: AdvisorEnv): string | undefined {
+  return env.GEMINI_API_KEY || env.Gemini_Key || env.GEMINI_KEY || env.Gemini_API_Key;
+}
+
+// Google AI Studio (مفاتيح AIza…) و Vertex AI Express (مفاتيح AQ.…): نفس صيغة الطلب والرد
+const GEMINI_ENDPOINTS = {
+  studio: (model: string) => `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`,
+  vertex: (model: string) => `https://aiplatform.googleapis.com/v1/publishers/google/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`,
+};
+
 async function runGemini(env: AdvisorEnv, messages: ChatMessage[], context: string) {
-  if (!env.GEMINI_API_KEY) throw new ProviderFailure('gemini', 'مفتاح GEMINI_API_KEY غير مضبوط.', 503);
+  const key = geminiKey(env)?.trim();
+  if (!key) throw new ProviderFailure('gemini', 'مفتاح GEMINI_API_KEY غير مضبوط.', 503);
   const models = [env.GEMINI_MODEL, ...GEMINI_MODELS].filter((m, i, a): m is string => !!m && a.indexOf(m) === i);
+  const endpoints = key.startsWith('AQ.') ? (['vertex', 'studio'] as const) : (['studio', 'vertex'] as const);
+  const body = JSON.stringify({
+    systemInstruction: { parts: [{ text: systemText(context) }] },
+    contents: messages.map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })),
+    generationConfig: { maxOutputTokens: 8192 },
+  });
   let last = '';
-  for (const model of models) {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`,
-      {
+  let keyRejected = false;
+  endpoints: for (const endpoint of endpoints) {
+    for (const model of models) {
+      const res = await fetch(GEMINI_ENDPOINTS[endpoint](model), {
         method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: systemText(context) }] },
-          contents: messages.map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })),
-          generationConfig: { maxOutputTokens: 8192 },
-        }),
-      },
-    );
-    if (res.ok && res.body) return { body: res.body, model };
-    const detail = await res.text().catch(() => '');
-    last = `${res.status} ${detail.slice(0, 200)}`;
-    console.error('gemini failed', model, last);
-    if (res.status === 401 || res.status === 403 || /API_KEY_INVALID|API key not valid/i.test(detail)) {
-      throw new ProviderFailure('gemini', 'مفتاح Gemini غير صحيح أو غير مفعّل.', 503);
+        headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
+        body,
+      });
+      if (res.ok && res.body) return { body: res.body, model };
+      const detail = await res.text().catch(() => '');
+      last = `${res.status} ${detail.slice(0, 200)}`;
+      console.error('gemini failed', endpoint, model, last);
+      if (res.status === 401 || res.status === 403 || /API_KEY_INVALID|API key not valid|API_KEY_SERVICE_BLOCKED/i.test(detail)) {
+        keyRejected = true; // ربما المفتاح من الخدمة الأخرى (AI Studio / Vertex)
+        continue endpoints;
+      }
+      if (res.status !== 404 && res.status !== 400) break endpoints; // 429/5xx: ننتقل لمحرك آخر
     }
-    if (res.status !== 404 && res.status !== 400) break; // 429/5xx: لا فائدة من نموذج آخر لدى Google، ننتقل لمحرك آخر
   }
+  if (keyRejected) throw new ProviderFailure('gemini', 'مفتاح Gemini غير صحيح أو غير مفعّل.', 503);
   throw new ProviderFailure('gemini', `Gemini غير متاح الآن (${last.split(' ')[0]}).`);
 }
 
@@ -211,13 +230,13 @@ function providerChain(requested: AdvisorProvider, env: AdvisorEnv): (keyof type
     case 'claude': return ['claude'];
     case 'workers': return ['workers'];
     case 'gemini': return ['gemini', 'workers'];
-    default: return env.GEMINI_API_KEY ? ['gemini', 'workers'] : ['workers'];
+    default: return geminiKey(env) ? ['gemini', 'workers'] : ['workers'];
   }
 }
 
 /** أي المحركات مضبوطة (لعرض الحالة في الإعدادات) */
 export function advisorStatus(env: AdvisorEnv) {
-  return { gemini: !!env.GEMINI_API_KEY, workers: !!env.AI, claude: !!env.ANTHROPIC_API_KEY };
+  return { gemini: !!geminiKey(env), workers: !!env.AI, claude: !!env.ANTHROPIC_API_KEY };
 }
 
 export async function handleAdvisorChat(
