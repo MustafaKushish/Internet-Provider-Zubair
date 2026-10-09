@@ -1,6 +1,7 @@
 import React from 'react';
 import { PaymentRecord, Subscriber, SystemSettings, TowerPoint } from '../../types/isp';
 import { computeTowerStats, sortTowerStats, NO_TOWER_LABEL } from '../../utils/towers';
+import { debtInMonths, formatMonthsAr, monthsLate } from '../../utils/debt';
 import { formatCurrency, getDaysRemaining, getAmountDue, getRemainingDebt } from '../../utils/storage';
 import {
   DollarSign,
@@ -24,6 +25,7 @@ interface DashboardViewProps {
   towerPoints: TowerPoint[];
   settings: SystemSettings;
   onOpenTowers?: () => void;
+  onOpenDebt?: (sub: Subscriber) => void;
   onRenew: (sub: Subscriber) => void;
   onSendWhatsApp: (sub: Subscriber, defaultTab?: any) => void;
 }
@@ -34,6 +36,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   towerPoints,
   settings,
   onOpenTowers,
+  onOpenDebt,
   onRenew,
   onSendWhatsApp,
 }) => {
@@ -199,7 +202,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       <div className="mt-1">
                         {days <= 0 ? (
                           <span className="text-rose-400 font-bold bg-rose-950/60 px-2 py-0.5 rounded border border-rose-900">
-                            منتهي منذ {Math.abs(days)} يوم ({sub.expiryDate})
+                            متأخر {formatMonthsAr(monthsLate(sub.expiryDate))} ({sub.expiryDate})
                           </span>
                         ) : (
                           <span className="text-amber-300 font-bold bg-amber-950/60 px-2 py-0.5 rounded border border-amber-900">
@@ -262,10 +265,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       </div>
                       <div className="text-rose-400 font-bold mt-1">
                         المبلغ المطلوب: {formatCurrency(debt, settings.currency)}
+                        {sub.salePrice > 0 && <span className="font-normal text-rose-300/80"> (×{debtInMonths(sub)} {sub.planName})</span>}
                       </div>
                     </div>
 
                     <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {onOpenDebt && (
+                        <button
+                          onClick={() => onOpenDebt(sub)}
+                          className="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded-lg font-bold transition cursor-pointer text-xs"
+                        >
+                          إدارة الدين
+                        </button>
+                      )}
                       <button
                         onClick={() => onSendWhatsApp(sub, 'debt')}
                         className="bg-rose-600 hover:bg-rose-500 text-white px-3 py-1.5 rounded-lg font-bold flex items-center gap-1 transition cursor-pointer text-xs"

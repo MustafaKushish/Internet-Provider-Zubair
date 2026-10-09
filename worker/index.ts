@@ -479,6 +479,54 @@ async function fixSequenceNumbers(db: D1Database, accepted: { change: IncomingCh
   }
 }
 
+/**
+ * زيادة "المبلغ المدفوع" لغير المدير مقبولة فقط بقدر الوصولات التي سُجلت بعد آخر تحديث للمشترك
+ * (في قاعدة البيانات أو في نفس الطلب)، حتى لا يُمسح دين بدون وصل.
+ */
+async function paidIncreaseNotCovered(
+  db: D1Database,
+  cur: RecordRow,
+  next: any,
+  batchPayments: Map<string, number>,
+): Promise<string | null> {
+  let prev: any;
+  try { prev = JSON.parse(cur.data || '{}'); } catch { return null; }
+  if ((prev.currentCycleId || '') !== (next?.currentCycleId || '')) return null; // تجديد = دورة جديدة
+  const increase = (Number(next?.paidAmount) || 0) - (Number(prev.paidAmount) || 0);
+  if (increase <= 0) return null;
+  const row = await db
+    .prepare(`SELECT COALESCE(SUM(CAST(json_extract(data, '$.amount') AS INTEGER)), 0) AS total FROM records
+              WHERE collection = 'payments' AND deleted = 0 AND version > ?
+                AND json_extract(data, '$.subscriberId') = ?`)
+    .bind(cur.version, cur.id)
+    .first<{ total: number }>();
+  const covered = (row?.total || 0) + (batchPayments.get(cur.id) || 0);
+  return increase > covered ? 'تسديد الدين يتم فقط بتسجيل وصل دفع. تعديل الدين للمدير فقط.' : null;
+}
+
+/**
+ * تعديل الديون وحذفها للمدير فقط: غير المدير لا يستطيع خفض الدين المرحّل أو المبلغ المدفوع
+ * أو عدد أشهر الدورة، ولا تغيير سجل تعديلات الدين، ضمن نفس الدورة.
+ * المسموح له: الدفعات (زيادة المدفوع) والتجديد (دورة جديدة بمعرّف جديد).
+ */
+function reducesDebtWithoutPayment(oldJson: string | null, next: any): string | null {
+  // ملاحظة: زيادة "المدفوع" تُفحص منفصلة مقابل الوصولات (paidIncreaseNotCovered)
+  if (!oldJson || !next) return null;
+  let prev: any;
+  try { prev = JSON.parse(oldJson); } catch { return null; }
+  const num = (v: unknown) => Number(v) || 0;
+  if (JSON.stringify(prev.debtLog || []) !== JSON.stringify(next.debtLog || [])) {
+    return 'تعديل الديون وحذفها مخصص للمدير العام فقط.';
+  }
+  const sameCycle = (prev.currentCycleId || '') === (next.currentCycleId || '');
+  if (!sameCycle) return null;
+  if (num(next.carriedDebt) < num(prev.carriedDebt) || num(next.paidAmount) < num(prev.paidAmount)
+    || num(next.cycleMonths || 1) < num(prev.cycleMonths || 1)) {
+    return 'تعديل الديون وحذفها مخصص للمدير العام فقط.';
+  }
+  return null;
+}
+
 async function handlePush(req: Request, db: D1Database, user: UserRow) {
   const body = await readJson<{ changes?: IncomingChange[] }>(req);
   const changes = Array.isArray(body.changes) ? body.changes : [];
@@ -505,6 +553,7 @@ async function handlePush(req: Request, db: D1Database, user: UserRow) {
 
   const results: any[] = [];
   const accepted: { change: IncomingChange; isNew: boolean }[] = [];
+  const batchPayments = new Map<string, number>();
   for (const c of changes) {
     const cur = existing.get(`${c.collection}\u0000${c.id}`);
     const live = !!cur && !cur.deleted;
@@ -514,17 +563,28 @@ async function handlePush(req: Request, db: D1Database, user: UserRow) {
       continue;
     }
     const allowed = c.deleted ? rule.delete : live ? rule.update : rule.create;
-    if (!allowed.includes(user.role)) {
+    let debtViolation = live && !c.deleted && c.collection === 'subscribers' && user.role !== 'admin'
+      ? reducesDebtWithoutPayment(cur!.data, c.data)
+      : null;
+    if (!debtViolation && live && !c.deleted && c.collection === 'subscribers' && user.role !== 'admin') {
+      debtViolation = await paidIncreaseNotCovered(db, cur!, c.data, batchPayments);
+    }
+    if (!allowed.includes(user.role) || debtViolation) {
       results.push({
         collection: c.collection,
         id: c.id,
         status: 'rejected',
-        reason: 'لا تملك صلاحية هذه العملية.',
+        reason: debtViolation || 'لا تملك صلاحية هذه العملية.',
         current: cur ? outRecord(cur) : null,
       });
       continue;
     }
     accepted.push({ change: c, isNew: !live });
+    // وصولات جديدة في نفس الطلب تغطي زيادة "المدفوع" للمشترك
+    if (c.collection === 'payments' && !c.deleted && !live && c.data?.subscriberId) {
+      const sid = String(c.data.subscriberId);
+      batchPayments.set(sid, (batchPayments.get(sid) || 0) + (Number(c.data.amount) || 0));
+    }
   }
 
   await fixSequenceNumbers(db, accepted);

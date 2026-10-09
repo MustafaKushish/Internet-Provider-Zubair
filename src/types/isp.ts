@@ -36,6 +36,16 @@ export interface Subscriber {
   cycleMonths?: number;    // عدد أشهر الدورة الحالية (افتراضياً 1)
   carriedDebt?: number;    // دين سابق مُرحَّل من الدورات السابقة
   currentCycleId?: string; // معرّف الدورة الحالية لربط الوصولات بها
+  debtLog?: DebtAdjustment[]; // سجل تعديلات/إعفاءات الدين اليدوية (للمدير فقط)
+}
+
+/** تعديل يدوي على دين مشترك (يقوم به المدير فقط) */
+export interface DebtAdjustment {
+  at: string;          // تاريخ ووقت التعديل ISO
+  by: string;          // اسم المدير
+  from: number;        // الدين قبل التعديل
+  to: number;          // الدين بعد التعديل
+  reason: string;
 }
 
 export interface PaymentRecord {

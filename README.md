@@ -20,6 +20,8 @@ einer **Cloudflare-D1-Datenbank**.
   |---|---|---|---|
   | Mitglieder anlegen/ändern | ✓ | ✓ | ✓ |
   | Mitglieder löschen, Belege löschen | ✓ | – | – |
+  | Schulden kassieren (mit Beleg) | ✓ | ✓ | ✓ |
+  | Schulden ändern oder erlassen | ✓ | – | – |
   | Anbieter und Türme | ✓ | ✓ | – |
   | Einstellungen, Mitarbeiter | ✓ | – | – |
 

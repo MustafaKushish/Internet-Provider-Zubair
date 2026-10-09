@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Subscriber, SystemSettings } from '../../types/isp';
 import { formatCurrency, getDaysRemaining, generateWhatsAppLink, getWhatsAppTemplates, getRemainingDebt } from '../../utils/storage';
+import { debtInMonths, formatMonthsAr, monthsLate } from '../../utils/debt';
 import {
   MessageSquare,
   Send,
@@ -10,7 +11,8 @@ import {
   RefreshCw,
   CheckCircle2,
   Phone,
-  Check
+  Check,
+  Wallet
 } from 'lucide-react';
 
 interface RemindersViewProps {
@@ -18,6 +20,7 @@ interface RemindersViewProps {
   settings: SystemSettings;
   onRenew: (sub: Subscriber) => void;
   onOpenMessageModal: (sub: Subscriber, defaultTab: any) => void;
+  onOpenDebt?: (sub: Subscriber) => void;
 }
 
 export const RemindersView: React.FC<RemindersViewProps> = ({
@@ -25,6 +28,7 @@ export const RemindersView: React.FC<RemindersViewProps> = ({
   settings,
   onRenew,
   onOpenMessageModal,
+  onOpenDebt,
 }) => {
   const [filterTab, setFilterTab] = useState<'all_alerts' | 'expiring' | 'expired' | 'debts'>('all_alerts');
   const [sentRecords, setSentRecords] = useState<Record<string, boolean>>({});
@@ -169,7 +173,7 @@ export const RemindersView: React.FC<RemindersViewProps> = ({
                   <div>
                     {isExpired ? (
                       <span className="bg-rose-950/80 text-rose-300 border border-rose-800 text-[10px] font-bold px-2 py-0.5 rounded-full block text-center">
-                        منتهي منذ {Math.abs(days)} يوم
+                        متأخر {formatMonthsAr(monthsLate(sub.expiryDate))}
                       </span>
                     ) : isExpiringSoon ? (
                       <span className="bg-amber-950/80 text-amber-300 border border-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full block text-center">
@@ -199,9 +203,17 @@ export const RemindersView: React.FC<RemindersViewProps> = ({
                   </div>
 
                   {hasDebt && (
-                    <div className="flex justify-between text-rose-400 font-bold border-t border-slate-800 pt-1">
-                      <span>المتبقي بذمته (دين):</span>
-                      <span>{formatCurrency(remainingDebt, settings.currency)}</span>
+                    <div className="border-t border-slate-800 pt-1 space-y-0.5">
+                      <div className="flex justify-between text-rose-400 font-bold">
+                        <span>المتبقي بذمته (دين):</span>
+                        <span>{formatCurrency(remainingDebt, settings.currency)}</span>
+                      </div>
+                      {sub.salePrice > 0 && (
+                        <div className="flex justify-between text-rose-300/80 text-[11px]">
+                          <span>بالأشهر:</span>
+                          <span>×{debtInMonths(sub)} {sub.planName} ({formatCurrency(sub.salePrice, settings.currency)})</span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -240,6 +252,16 @@ export const RemindersView: React.FC<RemindersViewProps> = ({
                   >
                     <MessageSquare className="w-4 h-4" />
                   </button>
+
+                  {hasDebt && onOpenDebt && (
+                    <button
+                      onClick={() => onOpenDebt(sub)}
+                      title="إدارة الدين: تسديد، تعديل أو حذف"
+                      className="p-2 bg-rose-700 hover:bg-rose-600 text-white rounded-xl transition cursor-pointer text-xs"
+                    >
+                      <Wallet className="w-4 h-4" />
+                    </button>
+                  )}
 
                   <button
                     onClick={() => onRenew(sub)}

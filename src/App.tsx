@@ -28,6 +28,7 @@ import {
   loadActiveStaffUser,
   saveActiveStaffUser,
   exportSubscribersToExcel,
+  formatCurrency,
   calculateSubscriptionStatus,
   calculatePaymentStatus,
   generateWhatsAppLink,
@@ -85,6 +86,8 @@ import { TowersView } from './components/views/TowersView';
 // المستشار الذكي يُحمَّل عند فتح التبويب فقط
 const AdvisorView = React.lazy(() => import('./components/views/AdvisorView').then(m => ({ default: m.AdvisorView })));
 import { NO_TOWER_LABEL, normTower } from './utils/towers';
+import { withRemainingDebt } from './utils/debt';
+import { DebtModal } from './components/DebtModal';
 import { SettingsView } from './components/views/SettingsView';
 import { appConfirm, notify } from './components/ui/Dialogs';
 
@@ -543,9 +546,10 @@ export default function App() {
   };
 
   // Handlers: Add manual payment from Payment History
-  const handleAddPaymentFromHistory = (paymentData: Partial<PaymentRecord>) => {
-    if (!subscriberForHistory) return;
-    const sub = subscribers.find(s => s.id === subscriberForHistory.id) || subscriberForHistory;
+  // تسجيل دفعة لمشترك (قسط دين أو إضافة) من سجل الدفعات أو نافذة الديون
+  const handleAddPayment = (subscriberId: string, paymentData: Partial<PaymentRecord>) => {
+    const sub = subscribers.find(s => s.id === subscriberId);
+    if (!sub) return;
     const amount = Math.max(0, Number(paymentData.amount) || 0);
     if (amount <= 0) return;
 
@@ -577,8 +581,36 @@ export default function App() {
 
     setPayments(prev => [newRec, ...prev]);
     setSubscribers(prev => prev.map(s => s.id === sub.id ? updatedSub : s));
-    setSubscriberForHistory(updatedSub);
+    setSubscriberForHistory(prev => (prev && prev.id === sub.id ? updatedSub : prev));
+    notify(`تم تسجيل وصل ${newRec.receiptNumber} بمبلغ ${formatCurrency(amount, settings.currency)}. المتبقي: ${formatCurrency(getRemainingDebt(updatedSub), settings.currency)}`, 'success');
   };
+
+  const handleAddPaymentFromHistory = (paymentData: Partial<PaymentRecord>) => {
+    if (subscriberForHistory) handleAddPayment(subscriberForHistory.id, paymentData);
+  };
+
+  // تعديل أو حذف دين مشترك: للمدير فقط (والخادم يرفض أي تخفيض للدين من غير المدير)
+  const handleAdjustDebt = (subscriberId: string, newDebt: number, reason: string) => {
+    if (currentUser.role !== 'admin') {
+      notify('تعديل الديون وحذفها مخصص للمدير العام فقط.', 'error');
+      return;
+    }
+    const sub = subscribers.find(s => s.id === subscriberId);
+    if (!sub) return;
+    const from = getRemainingDebt(sub);
+    const updated = refreshSubscriberStatus({
+      ...sub,
+      ...withRemainingDebt(sub, newDebt),
+      debtLog: [...(sub.debtLog || []), { at: new Date().toISOString(), by: currentUser.name, from, to: Math.max(0, Math.round(newDebt)), reason }],
+    }, settings.warningDaysBeforeExpiry);
+    setSubscribers(prev => prev.map(s => s.id === subscriberId ? updated : s));
+    notify(newDebt <= 0
+      ? `تم حذف دين ${sub.name} (${formatCurrency(from, settings.currency)}).`
+      : `دين ${sub.name} أصبح ${formatCurrency(getRemainingDebt(updated), settings.currency)}.`, 'success');
+  };
+
+  const [debtSubscriberId, setDebtSubscriberId] = useState<string | null>(null);
+  const debtSubscriber = debtSubscriberId ? subscribers.find(s => s.id === debtSubscriberId) || null : null;
 
   // هل الوصل تابع للدورة الحالية للمشترك؟
   const paymentBelongsToCurrentCycle = (pay: PaymentRecord, sub: Subscriber): boolean => {
@@ -1001,6 +1033,7 @@ export default function App() {
             towers={towers}
             currentUser={currentUser}
             towerFilterRequest={towerFilterRequest}
+            onOpenDebt={(sub) => setDebtSubscriberId(sub.id)}
             onTowerFilterApplied={() => setTowerFilterRequest(null)}
             onAssignTower={handleAssignTower}
             onRenew={(sub) => {
@@ -1055,6 +1088,7 @@ export default function App() {
             towerPoints={towerPoints}
             settings={settings}
             onOpenTowers={() => setActiveTab('towers')}
+            onOpenDebt={(sub) => setDebtSubscriberId(sub.id)}
             onRenew={(sub) => {
               setSubscriberToRenew(sub);
               setIsRenewModalOpen(true);
@@ -1083,6 +1117,7 @@ export default function App() {
           <RemindersView
             subscribers={subscribers}
             settings={settings}
+            onOpenDebt={(sub) => setDebtSubscriberId(sub.id)}
             onRenew={(sub) => {
               setSubscriberToRenew(sub);
               setIsRenewModalOpen(true);
@@ -1221,6 +1256,16 @@ export default function App() {
           <span className="font-mono text-cyan-400 font-semibold" dir="ltr">+964 771 979 7455</span>
         </p>
       </footer>
+
+      <DebtModal
+        subscriber={debtSubscriber}
+        payments={payments}
+        settings={settings}
+        currentUser={currentUser}
+        onClose={() => setDebtSubscriberId(null)}
+        onAddPayment={(id, data) => handleAddPayment(id, { ...data, paymentType: 'debt_installment' })}
+        onAdjustDebt={handleAdjustDebt}
+      />
 
       <SyncStatusBadge
         previewMode={PREVIEW_MODE}

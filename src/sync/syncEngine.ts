@@ -295,7 +295,9 @@ export class SyncEngine {
   }
 
   private async push() {
-    const changes = COLLECTIONS.flatMap(c => this.diff(c));
+    // الوصولات تُرفع قبل المشتركين: الخادم يقبل زيادة "المدفوع" فقط إذا وُجدت وصولات تغطيها
+    const order: CollectionName[] = ['payments', ...COLLECTIONS.filter(c => c !== 'payments')];
+    const changes = order.flatMap(c => this.diff(c));
     if (!changes.length) return;
     this.setStatus({ pending: changes.length });
     const rejected: string[] = [];

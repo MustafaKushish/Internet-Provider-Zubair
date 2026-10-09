@@ -138,10 +138,9 @@ export const SubscriberModal: React.FC<SubscriberModalProps> = ({
     }
   };
 
-  const addDaysToExpiry = (days: number) => {
-    const base = parseLocalDate(startDate || todayStr());
-    base.setDate(base.getDate() + days);
-    setExpiryDate(toLocalDateStr(base));
+  // الاشتراك يُحسب بالأشهر التقويمية لا بالأيام
+  const addMonthsToExpiry = (months: number) => {
+    setExpiryDate(addMonthsToDateStr(startDate || todayStr(), months));
   };
 
   const netProfit = salePrice - costPrice;
@@ -464,17 +463,17 @@ export const SubscriberModal: React.FC<SubscriberModalProps> = ({
                   <div className="flex gap-1 text-[10px]">
                     <button
                       type="button"
-                      onClick={() => addDaysToExpiry(30)}
+                      onClick={() => addMonthsToExpiry(1)}
                       className="text-cyan-400 hover:text-cyan-300 bg-cyan-950/50 px-1.5 py-0.5 rounded cursor-pointer"
                     >
-                      +30 يوم
+                      +شهر
                     </button>
                     <button
                       type="button"
-                      onClick={() => addDaysToExpiry(60)}
+                      onClick={() => addMonthsToExpiry(2)}
                       className="text-cyan-400 hover:text-cyan-300 bg-cyan-950/50 px-1.5 py-0.5 rounded cursor-pointer"
                     >
-                      +60 يوم
+                      +شهرين
                     </button>
                   </div>
                 </div>

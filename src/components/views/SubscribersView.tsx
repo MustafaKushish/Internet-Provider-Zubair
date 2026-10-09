@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { copyText } from '../ui/Dialogs';
 import { NO_TOWER_LABEL, normTower } from '../../utils/towers';
+import { debtInMonths, formatMonthsAr, monthsLate } from '../../utils/debt';
 import { Subscriber, SystemSettings, StaffUser } from '../../types/isp';
 import { formatCurrency, getDaysRemaining, getRemainingDebt, getAmountDue } from '../../utils/storage';
 import {
@@ -39,6 +40,8 @@ interface SubscribersViewProps {
   onAssignTower?: (subscriberIds: string[], towerName: string) => void;
   /** يُستدعى بعد تطبيق طلب الفلترة حتى لا يُطبَّق مرة أخرى عند العودة للتبويب */
   onTowerFilterApplied?: () => void;
+  /** فتح نافذة إدارة الدين */
+  onOpenDebt?: (sub: Subscriber) => void;
   onRenew: (sub: Subscriber) => void;
   onSendWhatsApp: (sub: Subscriber, defaultTab?: any) => void;
   onPrintReceipt: (sub: Subscriber) => void;
@@ -61,6 +64,7 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
   towerFilterRequest,
   onAssignTower,
   onTowerFilterApplied,
+  onOpenDebt,
   onRenew,
   onSendWhatsApp,
   onPrintReceipt,
@@ -551,9 +555,11 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
                                 <span className="inline-flex items-center gap-1 bg-amber-950/60 text-amber-300 px-2 py-0.5 rounded-full border border-amber-800/60 font-semibold text-[11px]">
                                   <span>قيد الدفع (جزئي)</span>
                                 </span>
-                                <div className="text-[11px] text-rose-400 font-bold mt-1">
+                                <button type="button" onClick={() => onOpenDebt?.(sub)} title="إدارة الدين"
+                                  className="block text-right text-[11px] text-rose-400 font-bold mt-1 hover:underline cursor-pointer">
                                   متبقي: {formatCurrency(remainingDebt, settings.currency)}
-                                </div>
+                                  {sub.salePrice > 0 && <span className="block font-normal text-rose-300/80">×{debtInMonths(sub)} {sub.planName}</span>}
+                                </button>
                               </div>
                             ) : (
                               <div>
@@ -561,9 +567,11 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
                                   <XCircle className="w-3 h-3" />
                                   <span>متأخر (Overdue)</span>
                                 </span>
-                                <div className="text-[11px] text-rose-400 font-bold mt-1">
-                                  مستحق: {formatCurrency(getAmountDue(sub), settings.currency)}
-                                </div>
+                                <button type="button" onClick={() => onOpenDebt?.(sub)} title="إدارة الدين"
+                                  className="block text-right text-[11px] text-rose-400 font-bold mt-1 hover:underline cursor-pointer">
+                                  الدين: {formatCurrency(remainingDebt, settings.currency)}
+                                  {sub.salePrice > 0 && <span className="block font-normal text-rose-300/80">×{debtInMonths(sub)} {sub.planName}</span>}
+                                </button>
                               </div>
                             )}
                           </td>
@@ -584,7 +592,7 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
                             </span>
                           ) : (
                             <span className="bg-rose-950/70 text-rose-300 px-2 py-0.5 rounded font-bold text-[11px] border border-rose-800 inline-block">
-                              متأخر {Math.abs(days)} يوم
+                              متأخر {formatMonthsAr(monthsLate(sub.expiryDate))}
                             </span>
                           )}
                         </div>
