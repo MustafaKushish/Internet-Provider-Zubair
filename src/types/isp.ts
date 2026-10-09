@@ -39,6 +39,11 @@ export interface Subscriber {
   debtLog?: DebtAdjustment[]; // سجل تعديلات/إعفاءات الدين اليدوية (للمدير فقط)
   installmentPlan?: InstallmentPlan; // خطة تقسيط الدين القديم (ينشئها المدير فقط)
   source?: 'import';       // أُضيف من ملف إكسل (لا يُحسب كمشترك جديد في التقارير)
+  archived?: boolean;      // مشترك غادر: خارج القوائم والإحصائيات والتذكيرات (المدير فقط)
+  archivedAt?: string;
+  archivedBy?: string;
+  archiveReason?: string;
+  pendingPrice?: { salePrice: number; costPrice: number; from: string; by: string }; // سعر جديد يُطبَّق عند التجديد القادم
 }
 
 /** خطة تقسيط دين: أقساط شهرية متساوية تبدأ من تاريخ أول قسط */

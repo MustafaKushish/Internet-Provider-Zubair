@@ -26,6 +26,8 @@ einer **Cloudflare-D1-Datenbank**.
   | Einstellungen, Mitarbeiter | ✓ | – | – |
   | Ausgaben erfassen/ändern | ✓ | ✓ | – |
   | Ausgaben löschen | ✓ | – | – |
+  | Kunden archivieren, Ratenpläne, Protokoll | ✓ | – | – |
+  | Paketpreise ändern | ✓ | ✓ | – |
 
 ## Als App installieren
 
@@ -59,6 +61,20 @@ Der Windows-Installer ist eine Electron-Hülle (`desktop/`) um dieselbe Adresse.
 - **Kundenbewegung** (Finanzbericht und KI-Berater): pro Monat neue, verlängerte, zurückgewonnene und verlorene Kunden,
   Nettowachstum und Bindungsquote, dazu pro Turm. „Verloren“ = abgelaufen und 30 Tage nicht verlängert.
   Aus Excel importierte Kunden zählen nicht als neu.
+
+## Archiv, Datenprüfung, Protokoll und Preisänderung
+
+- **Archiv (nur Admin, vom Server erzwungen):** Kunden, die gegangen sind, verschwinden aus Listen, Kopfzahlen, Erinnerungen,
+  Türmen und KI-Berater, bleiben aber mit allen Belegen und Schulden erhalten (Filter „مؤرشف“, Schnellsuche, Profil).
+  Archivieren über das Profil, die Auswahl in der Liste oder „Datenprüfung“. **Eine Verlängerung holt den Kunden automatisch zurück.**
+- **Datenprüfung („جودة البيانات“ in der Übersicht):** lange abgelaufene Kunden (3/6/12 Monate, mit „alle archivieren“),
+  doppelte Benutzernamen oder Telefonnummern, fehlende Telefonnummer oder fehlender Turm, Platzhalter-Benutzernamen aus dem Import,
+  Verkaufspreis unter Einkaufspreis – jeweils mit Profil- und Bearbeiten-Knopf.
+- **Protokoll („سجل العمليات“, nur Admin, unter „المستخدمون والمشرفون“):** jede Anlage, Änderung und Löschung mit Mitarbeiter,
+  Zeit und geänderten Feldern (alte → neue Werte). Wird ein Jahr auf dem Server aufbewahrt. Passwörter werden nie mitgeschrieben.
+- **Preisänderung pro Paket („تغيير السعر“ bei den Anbietern):** Der neue Preis gilt für jeden Kunden des Pakets ab seiner
+  **nächsten Verlängerung** (laufende Periode und Schulden bleiben unverändert), zeigt den Mehrumsatz und liefert einen
+  fertigen WhatsApp-Ankündigungstext.
 
 ## Kasse und Ausgaben („الصندوق والمصاريف“, Admin und Buchhalter)
 

@@ -77,6 +77,8 @@ import { ForcePasswordChange } from './components/ForcePasswordChange';
 import { SyncStatusBadge } from './components/SyncStatusBadge';
 import { QuickSearch } from './components/QuickSearch';
 import { SubscriberProfile } from './components/SubscriberProfile';
+import { DataHealthPanel } from './components/DataHealthPanel';
+import { AuditLogView } from './components/views/AuditLogView';
 import { backupReminderDue, daysSinceBackup, downloadFullBackup, snoozeBackupReminder } from './utils/backup';
 import { authApi, usersApi, getToken, setToken, ApiError, PREVIEW_MODE } from './sync/api';
 import { useCloudSync } from './sync/useCloudSync';
@@ -405,7 +407,11 @@ export default function App() {
   }, [subscriberForReceipt, receiptCustomAmount, payments]);
 
   // Overall statistics
+  // المؤرشفون (غادروا) خارج الإحصائيات والتذكيرات والأبراج، ويبقون في البحث والتقارير
+  const activeSubscribers = React.useMemo(() => subscribers.filter(s => !s.archived), [subscribers]);
+
   const stats = React.useMemo(() => {
+    const subscribers = activeSubscribers;
     const totalSubscribers = subscribers.length;
     const activeCount = subscribers.filter(s => s.status === 'active').length;
     const expiringSoonCount = subscribers.filter(s => s.status === 'expiring_soon').length;
@@ -427,7 +433,23 @@ export default function App() {
       totalDebts,
       openTicketsCount,
     };
-  }, [subscribers, tickets]);
+  }, [activeSubscribers, tickets]);
+
+  // أرشفة مشتركين غادروا أو إعادتهم (للمدير فقط، والخادم يفرض ذلك)
+  const handleArchive = (ids: string[], archive: boolean, reason?: string) => {
+    if (currentUser.role !== 'admin') {
+      notify('أرشفة المشتركين مخصصة للمدير العام فقط.', 'error');
+      return;
+    }
+    const set = new Set(ids);
+    const now = new Date().toISOString();
+    setSubscribers(prev => prev.map(s => {
+      if (!set.has(s.id)) return s;
+      const { archived: _a, archivedAt: _b, archivedBy: _c, archiveReason: _d, ...rest } = s;
+      return archive ? { ...rest, archived: true, archivedAt: now, archivedBy: currentUser.name, archiveReason: reason || undefined } : rest;
+    }));
+    notify(archive ? `تمت أرشفة ${ids.length} مشترك. تجدهم في فلتر «مؤرشف».` : `تمت إعادة ${ids.length} مشترك من الأرشيف.`, 'success');
+  };
 
   // Handlers: Subscribers
   const handleSaveSubscriber = (subData: Partial<Subscriber>) => {
@@ -539,8 +561,14 @@ export default function App() {
     const previousDebt = getRemainingDebt(sub);
     const cycleId = uid('cycle');
 
+    // السعر الجديد المجدول يبدأ من هذه الدورة، والتجديد يعيد المشترك من الأرشيف
+    const { pendingPrice, archived: _a, archivedAt: _b, archivedBy: _c, archiveReason: _d, ...base } = sub;
+    const newSale = pendingPrice?.salePrice ?? sub.salePrice;
+    const newCost = pendingPrice?.costPrice ?? sub.costPrice;
     const updatedSub: Subscriber = refreshSubscriberStatus({
-      ...sub,
+      ...base,
+      salePrice: newSale,
+      costPrice: newCost,
       startDate: baseDate,
       expiryDate: newExpiry,
       paidAmount: amountPaid,
@@ -565,7 +593,7 @@ export default function App() {
       notes: renewalData.notes,
       collectedBy: currentUser.name || settings.agentName,
       remainingBalanceAfter: getRemainingDebt(updatedSub),
-      costAmount: sub.costPrice * months,
+      costAmount: newCost * months,
       provider: sub.upstreamProvider,
       towerName: sub.towerName,
       cycleId,
@@ -865,6 +893,29 @@ export default function App() {
     });
   };
 
+  // سعر جديد لباقة: يبدأ لكل مشتركيها عند تجديدهم القادم، ويصبح السعر الافتراضي للباقة
+  const handleSchedulePrice = (providerName: string, planName: string, price: { salePrice: number; costPrice: number } | null) => {
+    if (currentUser.role === 'technician') return;
+    const matches = (s: Subscriber) => !s.archived && s.upstreamProvider === providerName && (s.planName === planName || s.planName.includes(planName));
+    const changes = (s: Subscriber) => price ? !(s.salePrice === price.salePrice && s.costPrice === price.costPrice) : !!s.pendingPrice;
+    const count = subscribers.filter(s => matches(s) && changes(s)).length;
+    setSubscribers(prev => prev.map(s => {
+      if (!matches(s)) return s;
+      const { pendingPrice: _old, ...rest } = s;
+      if (!price || s.salePrice === price.salePrice && s.costPrice === price.costPrice) return _old ? rest : s;
+      return { ...rest, pendingPrice: { ...price, from: todayStr(), by: currentUser.name } };
+    }));
+    if (price) {
+      setProviders(prev => prev.map(p => p.name !== providerName ? p : {
+        ...p,
+        plans: p.plans.map(pl => pl.name === planName ? { ...pl, defaultSalePrice: price.salePrice, defaultCost: price.costPrice } : pl),
+      }));
+    }
+    notify(price
+      ? `السعر الجديد ${formatCurrency(price.salePrice, settings.currency)} لباقة ${planName} يبدأ عند التجديد القادم (${count} مشترك).`
+      : `تم إلغاء السعر المجدول لباقة ${planName} (${count} مشترك).`, 'success');
+  };
+
   // Handlers: Towers (الأبراج ونقاط البث)
   const handleSaveTower = (tower: TowerPoint, oldName?: string) => {
     const name = normTower(tower.name);
@@ -1116,6 +1167,7 @@ export default function App() {
         onEdit={(sub) => { setSubscriberToEdit(sub); setIsSubscriberModalOpen(true); }}
         onTicket={(sub) => { setTicketToEdit(null); setTicketPrefillSubscriberId(sub.id); setIsTicketModalOpen(true); }}
         onPrintReceipt={(sub) => { setSubscriberForReceipt(sub); setReceiptCustomAmount(undefined); setIsReceiptModalOpen(true); }}
+        onArchive={currentUser.role === 'admin' ? handleArchive : undefined}
       />
 
       {/* Main Content Area */}
@@ -1155,6 +1207,7 @@ export default function App() {
             towerFilterRequest={towerFilterRequest}
             onOpenDebt={(sub) => setDebtSubscriberId(sub.id)}
             onOpenProfile={(sub) => setProfileSubscriberId(sub.id)}
+            onArchive={currentUser.role === 'admin' ? handleArchive : undefined}
             onTowerFilterApplied={() => setTowerFilterRequest(null)}
             onAssignTower={handleAssignTower}
             onRenew={(sub) => {
@@ -1203,8 +1256,9 @@ export default function App() {
         )}
 
         {safeActiveTab === 'dashboard' && (
+          <div className="space-y-6">
           <DashboardView
-            subscribers={subscribers}
+            subscribers={activeSubscribers}
             payments={payments}
             expenses={expenses}
             onOpenCash={() => setActiveTab('cash')}
@@ -1222,12 +1276,22 @@ export default function App() {
               setIsWhatsAppModalOpen(true);
             }}
           />
+          <DataHealthPanel
+            subscribers={subscribers}
+            settings={settings}
+            currentUser={currentUser}
+            onOpenProfile={(sub) => setProfileSubscriberId(sub.id)}
+            onEdit={(sub) => { setSubscriberToEdit(sub); setIsSubscriberModalOpen(true); }}
+            onArchive={currentUser.role === 'admin' ? handleArchive : undefined}
+          />
+          </div>
         )}
 
         {safeActiveTab === 'reports' && (
           <React.Suspense fallback={<div className="py-20 text-center text-xs text-slate-400">جارٍ تحميل التقارير…</div>}>
           <ReportsView
-            subscribers={subscribers}
+            subscribers={activeSubscribers}
+            allSubscribers={subscribers}
             payments={payments}
             settings={settings}
             currentUser={currentUser}
@@ -1239,7 +1303,7 @@ export default function App() {
 
         {safeActiveTab === 'reminders' && (
           <RemindersView
-            subscribers={subscribers}
+            subscribers={activeSubscribers}
             settings={settings}
             payments={payments}
             onOpenProfile={(sub) => setProfileSubscriberId(sub.id)}
@@ -1277,11 +1341,12 @@ export default function App() {
         {safeActiveTab === 'providers' && (
           <ProvidersView
             providers={providers}
-            subscribers={subscribers}
+            subscribers={activeSubscribers}
             settings={settings}
             towers={towerPoints}
             onSaveProviders={setProviders}
             onSaveTowers={setTowerPoints}
+            onSchedulePrice={currentUser.role === 'technician' ? undefined : handleSchedulePrice}
             onOpenEditTowerModal={(tow) => {
               setTowerToEdit(tow);
               setIsTowerModalOpen(true);
@@ -1332,7 +1397,7 @@ export default function App() {
 
         {safeActiveTab === 'towers' && (
           <TowersView
-            subscribers={subscribers}
+            subscribers={activeSubscribers}
             payments={payments}
             expenses={canEditTowers ? expenses : []}
             towers={towerPoints}
@@ -1359,7 +1424,7 @@ export default function App() {
         {safeActiveTab === 'advisor' && (
           <React.Suspense fallback={<div className="py-20 text-center text-xs text-slate-400">جارٍ تحميل المستشار…</div>}>
             <AdvisorView
-              subscribers={subscribers}
+              subscribers={activeSubscribers}
               payments={payments}
               tickets={tickets}
               providers={providers}
@@ -1392,6 +1457,7 @@ export default function App() {
             onResetForceOpenAddModal={() => setForceOpenAddUserModal(false)}
           />
         )}
+        {safeActiveTab === 'users' && currentUser.role === 'admin' && <AuditLogView />}
 
         {safeActiveTab === 'settings' && (
           <SettingsView

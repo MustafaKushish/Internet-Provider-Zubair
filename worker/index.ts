@@ -89,6 +89,18 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
   `INSERT OR IGNORE INTO meta (key, value) VALUES ('version', '0')`,
   `INSERT OR IGNORE INTO meta (key, value) VALUES ('epoch', lower(hex(randomblob(8))))`,
+  `CREATE TABLE IF NOT EXISTS audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    at INTEGER NOT NULL,
+    user_id TEXT,
+    user_name TEXT,
+    collection TEXT NOT NULL,
+    record_id TEXT NOT NULL,
+    action TEXT NOT NULL,
+    summary TEXT,
+    fields TEXT
+  )`,
+  `CREATE INDEX IF NOT EXISTS audit_log_at ON audit_log(at)`,
   `CREATE TABLE IF NOT EXISTS ai_usage (
     user_id TEXT NOT NULL,
     day TEXT NOT NULL,
@@ -535,12 +547,67 @@ function reducesDebtWithoutPayment(oldJson: string | null, next: any): string | 
     return 'إنشاء خطط تقسيط الديون وإلغاؤها مخصص للمدير العام فقط.';
   }
   const sameCycle = (prev.currentCycleId || '') === (next.currentCycleId || '');
+  // الأرشفة (مشترك غادر) للمدير فقط؛ التجديد (دورة جديدة) يعيد المشترك من الأرشيف تلقائياً
+  if (!!prev.archived !== !!next.archived && !(sameCycle === false && !next.archived)) {
+    return 'أرشفة المشتركين مخصصة للمدير العام فقط.';
+  }
   if (!sameCycle) return null;
   if (num(next.carriedDebt) < num(prev.carriedDebt) || num(next.paidAmount) < num(prev.paidAmount)
     || num(next.cycleMonths || 1) < num(prev.cycleMonths || 1)) {
     return 'تعديل الديون وحذفها مخصص للمدير العام فقط.';
   }
   return null;
+}
+
+// ---------- سجل العمليات (من غيّر ماذا ومتى) ----------
+const AUDIT_KEEP_DAYS = 365;
+// حقول تُسجل قيمتها القديمة والجديدة؛ غيرها يُسجل اسمه فقط (وكلمات المرور لا تُسجل قيمتها أبداً)
+const AUDIT_VALUE_FIELDS = new Set([
+  'name', 'phone', 'username', 'planName', 'upstreamProvider', 'towerName', 'salePrice', 'costPrice', 'paidAmount',
+  'carriedDebt', 'cycleMonths', 'startDate', 'expiryDate', 'archived', 'amount', 'date', 'paymentMethod', 'category',
+  'status', 'priority', 'technicianName', 'ipAddress', 'macAddress',
+]);
+const AUDIT_SKIP_FIELDS = new Set(['paymentStatus', 'updatedAt']);
+
+function auditSummary(collection: Collection, d: any): string {
+  if (!d) return '';
+  const num = (v: unknown) => (Number(v) || 0).toLocaleString('en-US');
+  switch (collection) {
+    case 'subscribers': return String(d.name || '');
+    case 'payments': return `${d.receiptNumber || ''} • ${d.subscriberName || ''} • ${num(d.amount)}`;
+    case 'tickets': return `${d.ticketNumber || ''} • ${d.subscriberName || ''}`;
+    case 'expenses': return `${d.category || ''} • ${num(d.amount)}${d.towerName ? ` • ${d.towerName}` : ''}`;
+    case 'settings': return 'إعدادات المنظومة';
+    default: return String(d.name || '');
+  }
+}
+
+function auditFields(prev: any, next: any): string {
+  if (!prev || !next) return '';
+  const keys = new Set([...Object.keys(prev), ...Object.keys(next)]);
+  const out: string[] = [];
+  const short = (v: unknown) => {
+    const t = typeof v === 'object' ? JSON.stringify(v) : String(v ?? '');
+    return t.length > 40 ? `${t.slice(0, 40)}…` : t;
+  };
+  for (const k of keys) {
+    if (AUDIT_SKIP_FIELDS.has(k)) continue;
+    if (JSON.stringify(prev[k] ?? null) === JSON.stringify(next[k] ?? null)) continue;
+    out.push(AUDIT_VALUE_FIELDS.has(k) ? `${k}: ${short(prev[k])} → ${short(next[k])}` : k);
+    if (out.length >= 12) break;
+  }
+  return out.join(' | ').slice(0, 800);
+}
+
+async function handleAudit(url: URL, db: D1Database) {
+  const before = Math.max(0, Number(url.searchParams.get('before') || 0) || 0);
+  const limit = Math.min(200, Math.max(10, Number(url.searchParams.get('limit') || 100) || 100));
+  const { results } = await db
+    .prepare(`SELECT id, at, user_name, collection, record_id, action, summary, fields FROM audit_log
+              WHERE (? = 0 OR id < ?) ORDER BY id DESC LIMIT ?`)
+    .bind(before, before, limit)
+    .all();
+  return json({ entries: results, hasMore: results.length === limit });
 }
 
 async function handlePush(req: Request, db: D1Database, user: UserRow) {
@@ -623,6 +690,29 @@ async function handlePush(req: Request, db: D1Database, user: UserRow) {
             change.deleted ? 1 : 0, n - 1 - k, now, user.id),
       );
     });
+    // سجل العمليات: استعلام واحد لكل الطلب (حد الخطة المجانية 50 استعلاماً)
+    const entries = accepted.map(({ change, isNew }) => {
+      const cur = existing.get(`${change.collection}\u0000${change.id}`);
+      let prev: any = null;
+      try { prev = cur?.data ? JSON.parse(cur.data) : null; } catch { prev = null; }
+      return {
+        c: change.collection,
+        id: change.id,
+        a: change.deleted ? 'delete' : isNew ? 'create' : 'update',
+        s: auditSummary(change.collection, change.deleted ? prev : change.data).slice(0, 300),
+        f: change.deleted || isNew ? '' : auditFields(prev, change.data),
+      };
+    });
+    stmts.push(
+      db.prepare(`INSERT INTO audit_log (at, user_id, user_name, collection, record_id, action, summary, fields)
+                  SELECT ?, ?, ?, json_extract(value, '$.c'), json_extract(value, '$.id'), json_extract(value, '$.a'),
+                         json_extract(value, '$.s'), json_extract(value, '$.f')
+                  FROM json_each(?)`)
+        .bind(now, user.id, user.name, JSON.stringify(entries)),
+    );
+    if (Math.random() < 0.02) {
+      stmts.push(db.prepare('DELETE FROM audit_log WHERE at < ?').bind(now - AUDIT_KEEP_DAYS * 86_400_000));
+    }
     // دفعة واحدة = معاملة واحدة، فلا تتداخل أرقام النسخ بين طلبين متزامنين
     const out = await db.batch<{ version: number }>(stmts);
     accepted.forEach(({ change }, k) => {
@@ -672,6 +762,7 @@ async function handleApi(req: Request, env: Env, url: URL): Promise<Response> {
   if (userMatch && method === 'PUT') { requireAdmin(user); return handleUpdateUser(req, db, user, decodeURIComponent(userMatch[1])); }
   if (userMatch && method === 'DELETE') { requireAdmin(user); return handleDeleteUser(db, user, decodeURIComponent(userMatch[1])); }
 
+  if (path === '/api/audit' && method === 'GET') { requireAdmin(user); return handleAudit(url, db); }
   if (path === '/api/sync' && method === 'GET') return handlePull(url, db, user.role);
   if (path === '/api/sync' && method === 'POST') return handlePush(req, db, user);
   if (path === '/api/ai/chat' && method === 'POST') return handleAdvisorChat(req, env, user);

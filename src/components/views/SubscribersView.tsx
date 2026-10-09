@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { copyText } from '../ui/Dialogs';
+import { appConfirm, copyText } from '../ui/Dialogs';
 import { NO_TOWER_LABEL, normTower } from '../../utils/towers';
 import { matchesSubscriber } from '../../utils/search';
 import { debtInMonths, formatMonthsAr, monthsLate } from '../../utils/debt';
@@ -27,7 +27,8 @@ import {
   Send,
   TowerControl,
   Server,
-  MoreHorizontal
+  MoreHorizontal,
+  Archive
 } from 'lucide-react';
 
 type SortKey = 'name' | 'expiry' | 'debt' | 'newest';
@@ -49,6 +50,8 @@ interface SubscribersViewProps {
   onOpenDebt?: (sub: Subscriber) => void;
   /** فتح ملف المشترك الكامل */
   onOpenProfile?: (sub: Subscriber) => void;
+  /** أرشفة مشتركين غادروا أو إعادتهم (للمدير فقط) */
+  onArchive?: (ids: string[], archive: boolean, reason?: string) => void;
   onRenew: (sub: Subscriber) => void;
   onSendWhatsApp: (sub: Subscriber, defaultTab?: any) => void;
   onPrintReceipt: (sub: Subscriber) => void;
@@ -73,6 +76,7 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
   onTowerFilterApplied,
   onOpenDebt,
   onOpenProfile,
+  onArchive,
   onRenew,
   onSendWhatsApp,
   onPrintReceipt,
@@ -86,7 +90,10 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
   onOpenManageProviders,
 }) => {
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'expiring_soon' | 'expired'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'expiring_soon' | 'expired' | 'archived'>('all');
+  // المؤرشفون (غادروا) يظهرون فقط في فلتر «مؤرشف»
+  const archivedCount = useMemo(() => subscribers.filter(s => s.archived).length, [subscribers]);
+  const liveSubs = useMemo(() => subscribers.filter(s => !s.archived), [subscribers]);
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'paid' | 'pending' | 'overdue'>('all');
   const [providerFilter, setProviderFilter] = useState('all');
   const [towerFilter, setTowerFilter] = useState('all');
@@ -126,8 +133,9 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
       // Search
       const matchesSearch = matchesSubscriber(sub, search);
 
-      // Status
-      const matchesStatus = statusFilter === 'all' || sub.status === statusFilter;
+      // Status (المؤرشفون فقط في فلترهم)
+      if (statusFilter === 'archived' ? !sub.archived : sub.archived) return false;
+      const matchesStatus = statusFilter === 'all' || statusFilter === 'archived' || sub.status === statusFilter;
 
       // Payment
       const matchesPayment = paymentFilter === 'all' || sub.paymentStatus === paymentFilter;
@@ -159,7 +167,7 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
   const safePage = Math.min(page, pageCount - 1);
   const pageItems = sortedSubscribers.slice(safePage * pageSize, safePage * pageSize + pageSize);
 
-  const overdueCount = subscribers.filter(s => s.paymentStatus === 'overdue' || s.status === 'expired').length;
+  const overdueCount = liveSubs.filter(s => s.paymentStatus === 'overdue' || s.status === 'expired').length;
 
   // أزرار العمليات حسب الصلاحية؛ في الهاتف أزرار أكبر مع نص للعمليات الأساسية
   const renderActions = (sub: Subscriber, days: number, remainingDebt: number, mobile: boolean) => {
@@ -252,7 +260,7 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
                   : 'bg-slate-800 text-slate-400 hover:text-white'
               }`}
             >
-              الكل ({subscribers.length})
+              الكل ({liveSubs.length})
             </button>
             <button
               onClick={() => setStatusFilter('active')}
@@ -263,7 +271,7 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
               }`}
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>نشط ({subscribers.filter(s => s.status === 'active').length})</span>
+              <span>نشط ({liveSubs.filter(s => s.status === 'active').length})</span>
             </button>
             <button
               onClick={() => setStatusFilter('expiring_soon')}
@@ -274,7 +282,7 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
               }`}
             >
               <Clock className="w-3.5 h-3.5" />
-              <span>ينتهي قريباً ({subscribers.filter(s => s.status === 'expiring_soon').length})</span>
+              <span>ينتهي قريباً ({liveSubs.filter(s => s.status === 'expiring_soon').length})</span>
             </button>
             <button
               onClick={() => setStatusFilter('expired')}
@@ -285,8 +293,19 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
               }`}
             >
               <XCircle className="w-3.5 h-3.5" />
-              <span>منتهي ({subscribers.filter(s => s.status === 'expired').length})</span>
+              <span>منتهي ({liveSubs.filter(s => s.status === 'expired').length})</span>
             </button>
+            {archivedCount > 0 && (
+              <button
+                onClick={() => setStatusFilter('archived')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1 whitespace-nowrap ${
+                  statusFilter === 'archived' ? 'bg-slate-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'
+                }`}
+              >
+                <Archive className="w-3.5 h-3.5" />
+                <span>مؤرشف ({archivedCount})</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -437,6 +456,25 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
               {normTower(bulkTower) ? 'نقل' : `نقل إلى «${NO_TOWER_LABEL}»`}
             </button>
           </div>
+          {onArchive && (
+            <button
+              type="button"
+              onClick={async () => {
+                const ids = [...selected];
+                const restoring = statusFilter === 'archived';
+                const ok = await appConfirm(
+                  restoring ? `إعادة ${ids.length} مشترك من الأرشيف إلى القوائم؟` : `أرشفة ${ids.length} مشترك (غادروا)؟\nيختفون من القوائم والإحصائيات والتذكيرات، وتبقى بياناتهم ووصولاتهم. التجديد يعيد المشترك تلقائياً.`,
+                  { title: restoring ? 'إلغاء الأرشفة' : 'أرشفة المشتركين', confirmLabel: restoring ? 'إعادة' : 'أرشفة' },
+                );
+                if (!ok) return;
+                onArchive(ids, !restoring, restoring ? undefined : 'غادر الشبكة');
+                setSelected(new Set());
+              }}
+              className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-bold flex items-center gap-1 cursor-pointer"
+            >
+              <Archive className="w-3.5 h-3.5" /> {statusFilter === 'archived' ? 'إعادة من الأرشيف' : 'أرشفة (غادروا)'}
+            </button>
+          )}
           <button type="button" onClick={() => setSelected(new Set())} className="text-cyan-300 hover:text-white underline cursor-pointer mr-auto">
             إلغاء التحديد
           </button>
@@ -480,7 +518,7 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
                         <span className="flex items-center gap-1"><TowerControl className="w-3 h-3" />{normTower(sub.towerName) || NO_TOWER_LABEL}</span>
                       </div>
                     </div>
-                    <ExpiryChip days={days} expiryDate={sub.expiryDate} />
+                    {sub.archived ? <span className="flex-shrink-0 text-[10px] font-bold text-slate-300 bg-slate-800 border border-slate-600 px-2 py-0.5 rounded-full">مؤرشف</span> : <ExpiryChip days={days} expiryDate={sub.expiryDate} />}
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
                     <span className="text-slate-300">{sub.planName}</span>
@@ -614,6 +652,7 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
                       {/* Name & Phone & Tower */}
                       <td className="py-3 px-4">
                         <button type="button" onClick={() => onOpenProfile?.(sub)} title="فتح ملف المشترك" className="font-bold text-white text-sm hover:text-cyan-300 hover:underline cursor-pointer text-right">{sub.name}</button>
+                        {sub.archived && <span className="mr-1.5 text-[10px] font-bold text-slate-300 bg-slate-800 border border-slate-600 px-1.5 py-0.5 rounded">مؤرشف</span>}
                         <div className="flex items-center gap-1.5 text-slate-400 mt-0.5" dir="ltr">
                           {sub.phone ? <a href={`tel:${sub.phone}`} className="font-mono text-[11px] text-left hover:text-cyan-300">{sub.phone}</a> : <span className="text-[11px] text-amber-400/80">بدون رقم</span>}
                         </div>

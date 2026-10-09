@@ -10,7 +10,7 @@ import { copyText } from './ui/Dialogs';
 import { useEscapeKey } from './ui/useEscapeKey';
 import {
   X, Phone, MessageSquare, RefreshCw, Wallet, Edit, Wrench, Printer, TowerControl, Copy, Eye, EyeOff,
-  Receipt, Scale, UserPlus, CalendarClock, MapPin, StickyNote,
+  Receipt, Scale, UserPlus, CalendarClock, MapPin, StickyNote, Archive,
 } from 'lucide-react';
 
 interface SubscriberProfileProps {
@@ -26,6 +26,7 @@ interface SubscriberProfileProps {
   onEdit: (sub: Subscriber) => void;
   onTicket: (sub: Subscriber) => void;
   onPrintReceipt: (sub: Subscriber) => void;
+  onArchive?: (ids: string[], archive: boolean, reason?: string) => void;
 }
 
 const TICKET_STATUS: Record<string, string> = { open: 'مفتوح', in_progress: 'قيد المتابعة', resolved: 'تم الحل', closed: 'مغلق' };
@@ -38,7 +39,7 @@ export const SubscriberProfile: React.FC<SubscriberProfileProps> = props =>
   props.subscriber ? <ProfileInner {...props} sub={props.subscriber} /> : null;
 
 const ProfileInner: React.FC<SubscriberProfileProps & { sub: Subscriber }> = ({
-  sub, payments, tickets, settings, currentUser, onClose, onRenew, onWhatsApp, onDebt, onEdit, onTicket, onPrintReceipt,
+  sub, payments, tickets, settings, currentUser, onClose, onRenew, onWhatsApp, onDebt, onEdit, onTicket, onPrintReceipt, onArchive,
 }) => {
   useEscapeKey(onClose);
   const [showPass, setShowPass] = useState(false);
@@ -126,6 +127,8 @@ const ProfileInner: React.FC<SubscriberProfileProps & { sub: Subscriber }> = ({
                 <span className="flex items-center gap-1"><TowerControl className="w-3 h-3" />{normTower(sub.towerName) || NO_TOWER_LABEL}</span>
               </div>
               <div className="mt-1.5 flex flex-wrap gap-1.5 text-[10px] font-bold">
+                {sub.archived && <span className="px-2 py-0.5 rounded-full bg-slate-700 border border-slate-500 text-white">مؤرشف (غادر){sub.archivedAt ? ` • ${sub.archivedAt.slice(0, 10)}` : ''}</span>}
+                {sub.pendingPrice && <span className="px-2 py-0.5 rounded-full bg-amber-950 border border-amber-800 text-amber-300">سعر جديد {fmt(sub.pendingPrice.salePrice)} من التجديد القادم</span>}
                 {days > 3 ? (
                   <span className="px-2 py-0.5 rounded-full bg-emerald-950 border border-emerald-800 text-emerald-300">نشط • متبقي {days} يوم</span>
                 ) : days >= 0 ? (
@@ -151,6 +154,12 @@ const ProfileInner: React.FC<SubscriberProfileProps & { sub: Subscriber }> = ({
             {office && <button type="button" onClick={act(onPrintReceipt)} className={`${btn} bg-slate-800 border border-slate-700 text-slate-200`}><Printer className="w-4 h-4" />وصل</button>}
             <button type="button" onClick={act(onTicket)} className={`${btn} bg-slate-800 border border-slate-700 text-amber-300`}><Wrench className="w-4 h-4" />بلاغ عطل</button>
             <button type="button" onClick={act(onEdit)} className={`${btn} bg-slate-800 border border-slate-700 text-slate-200`}><Edit className="w-4 h-4" />تعديل</button>
+            {onArchive && (
+              <button type="button" onClick={() => onArchive([sub.id], !sub.archived, sub.archived ? undefined : 'غادر الشبكة')}
+                className={`${btn} bg-slate-800 border border-slate-600 text-slate-300`}>
+                <Archive className="w-4 h-4" />{sub.archived ? 'إعادة من الأرشيف' : 'أرشفة (غادر)'}
+              </button>
+            )}
           </div>
 
           {/* أرقام */}

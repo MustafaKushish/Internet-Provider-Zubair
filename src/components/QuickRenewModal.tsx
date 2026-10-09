@@ -33,8 +33,10 @@ const QuickRenewModalInner: React.FC<QuickRenewModalProps & { subscriber: Subscr
 
   // دين الدورة الحالية غير المسدد يُرحَّل إلى الدورة الجديدة
   const previousDebt = getRemainingDebt(subscriber);
+  // سعر جديد مجدول للباقة يبدأ مع هذا التجديد
+  const price = subscriber.pendingPrice?.salePrice ?? subscriber.salePrice;
   const [months, setMonths] = useState<number>(1);
-  const [amountPaid, setAmountPaid] = useState<number>(subscriber.salePrice + previousDebt);
+  const [amountPaid, setAmountPaid] = useState<number>(price + previousDebt);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'zain_cash' | 'qi_card' | 'transfer'>('cash');
   const [sendReceipt, setSendReceipt] = useState<boolean>(true);
   const [notes, setNotes] = useState<string>('تجديد اشتراك دورة جديدة');
@@ -49,10 +51,10 @@ const QuickRenewModalInner: React.FC<QuickRenewModalProps & { subscriber: Subscr
 
   const handleMonthsChange = (m: number) => {
     setMonths(m);
-    setAmountPaid(subscriber.salePrice * m + previousDebt);
+    setAmountPaid(price * m + previousDebt);
   };
 
-  const expectedTotal = subscriber.salePrice * months + previousDebt;
+  const expectedTotal = price * months + previousDebt;
   const remainingDebt = Math.max(0, expectedTotal - amountPaid);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -112,7 +114,8 @@ const QuickRenewModalInner: React.FC<QuickRenewModalProps & { subscriber: Subscr
             </div>
             <div className="text-left" dir="ltr">
               <span className="text-slate-400 block text-right">سعر الباقة الشهري:</span>
-              <span className="text-cyan-400 font-bold">{subscriber.salePrice.toLocaleString()} د.ع</span>
+              <span className="text-cyan-400 font-bold">{price.toLocaleString()} د.ع</span>
+              {subscriber.pendingPrice && <span className="block text-[10px] text-amber-300">سعر جديد (كان {subscriber.salePrice.toLocaleString()})</span>}
             </div>
           </div>
 
@@ -134,7 +137,7 @@ const QuickRenewModalInner: React.FC<QuickRenewModalProps & { subscriber: Subscr
                   }`}
                 >
                   <span>{m === 1 ? 'شهر واحد' : m === 2 ? 'شهران' : '3 أشهر'}</span>
-                  <span className="text-[10px] opacity-80">{(subscriber.salePrice * m).toLocaleString()} د.ع</span>
+                  <span className="text-[10px] opacity-80">{(price * m).toLocaleString()} د.ع</span>
                 </button>
               ))}
             </div>

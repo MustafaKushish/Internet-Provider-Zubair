@@ -34,6 +34,8 @@ interface ProvidersViewProps {
   onNavigateToSubscribersWithProvider?: (providerName: string) => void;
   onNavigateToSubscribersWithTower?: (towerName: string) => void;
   onOpenTowersTab?: () => void;
+  /** سعر جديد لباقة يبدأ لكل مشتركيها عند تجديدهم القادم (null = إلغاء السعر المجدول) */
+  onSchedulePrice?: (providerName: string, planName: string, price: { salePrice: number; costPrice: number } | null) => void;
 }
 
 export const ProvidersView: React.FC<ProvidersViewProps> = ({
@@ -50,7 +52,9 @@ export const ProvidersView: React.FC<ProvidersViewProps> = ({
   onNavigateToSubscribersWithProvider,
   onNavigateToSubscribersWithTower,
   onOpenTowersTab,
+  onSchedulePrice,
 }) => {
+  const [priceDialog, setPriceDialog] = useState<{ prov: UpstreamProvider; plan: ProviderPlan; sale: number; cost: number } | null>(null);
   const [activeSection, setActiveSection] = useState<'providers' | 'towers'>('providers');
   const [search, setSearch] = useState('');
 
@@ -406,6 +410,15 @@ export const ProvidersView: React.FC<ProvidersViewProps> = ({
                                 >
                                   <Edit2 className="w-3.5 h-3.5" />
                                 </button>
+                                {onSchedulePrice && (
+                                  <button
+                                    onClick={() => setPriceDialog({ prov, plan: pl, sale: pl.defaultSalePrice, cost: pl.defaultCost })}
+                                    className="text-amber-300 hover:text-amber-200 px-1.5 py-1 rounded hover:bg-slate-800 cursor-pointer flex items-center gap-1 text-[11px] font-bold whitespace-nowrap"
+                                    title="تغيير سعر الباقة لكل مشتركيها من التجديد القادم"
+                                  >
+                                    <DollarSign className="w-3.5 h-3.5" /> تغيير السعر
+                                  </button>
+                                )}
                                 <button
                                   onClick={() => handleDeletePlan(prov.id, pl.id)}
                                   className="text-slate-500 hover:text-rose-400 p-1 rounded hover:bg-slate-800 cursor-pointer"
@@ -426,6 +439,64 @@ export const ProvidersView: React.FC<ProvidersViewProps> = ({
           })}
         </div>
       )}
+
+      {priceDialog && onSchedulePrice && (() => {
+        const { prov, plan, sale, cost } = priceDialog;
+        const subs = subscribers.filter(s => s.upstreamProvider === prov.name && (s.planName === plan.name || s.planName.includes(plan.name)));
+        const scheduled = subs.filter(s => s.pendingPrice).length;
+        const diff = subs.reduce((a, s) => a + (sale - s.salePrice), 0);
+        const money = (n: number) => formatCurrency(Math.round(n), settings.currency);
+        const announce = `عزيزي المشترك 🌹\nنود إعلامكم بأن سعر باقة (${plan.name}) لدى ${settings.ispName} سيصبح ${money(sale)} شهرياً ابتداءً من التجديد القادم.\nنشكر ثقتكم ونعمل دائماً على تحسين الخدمة 🙏\n${settings.contactPhone || ''}`.trim();
+        return (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-sm" onClick={() => setPriceDialog(null)}>
+            <div role="dialog" aria-modal="true" aria-label="تغيير سعر الباقة" onClick={e => e.stopPropagation()}
+              className="w-full sm:max-w-md bg-slate-900 border border-slate-700 rounded-t-3xl sm:rounded-2xl p-5 space-y-3 text-xs shadow-2xl"
+              style={{ paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom))' }}>
+              <h3 className="text-sm font-bold text-white">تغيير سعر {plan.name} <span className="text-slate-400 font-normal">• {prov.name}</span></h3>
+              <p className="text-slate-400 leading-relaxed">السعر الجديد يُطبَّق على كل مشترك عند <b className="text-white">تجديده القادم</b>، فلا يتغير ما دفعه أو ما عليه في دورته الحالية. ويصبح أيضاً السعر الافتراضي للمشتركين الجدد.</p>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="space-y-1">
+                  <span className="text-slate-400">سعر البيع الجديد</span>
+                  <input id="new-sale-price" type="number" inputMode="numeric" min={0} step={250} value={sale || ''} onChange={e => setPriceDialog({ ...priceDialog, sale: Number(e.target.value) })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white font-bold" />
+                </label>
+                <label className="space-y-1">
+                  <span className="text-slate-400">كلفة الجملة</span>
+                  <input id="new-cost-price" type="number" inputMode="numeric" min={0} step={250} value={cost || ''} onChange={e => setPriceDialog({ ...priceDialog, cost: Number(e.target.value) })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white" />
+                </label>
+              </div>
+              <div className="rounded-xl bg-slate-950/60 border border-slate-800 p-3 space-y-1">
+                <div className="flex justify-between"><span className="text-slate-400">مشتركو الباقة</span><b className="text-white">{subs.length}</b></div>
+                <div className="flex justify-between"><span className="text-slate-400">الربح لكل خط بعد التغيير</span><b className={sale - cost > 0 ? 'text-emerald-400' : 'text-rose-400'}>{money(sale - cost)}</b></div>
+                <div className="flex justify-between"><span className="text-slate-400">فرق الإيراد الشهري عند تجديد الجميع</span><b className={diff >= 0 ? 'text-emerald-400' : 'text-rose-400'}>{diff >= 0 ? '+' : ''}{money(diff)}</b></div>
+                {scheduled > 0 && <div className="text-amber-300">لدى {scheduled} مشترك سعر مجدول سابقاً سيُستبدل.</div>}
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <button type="button" disabled={!sale || sale <= 0}
+                  onClick={() => { onSchedulePrice(prov.name, plan.name, { salePrice: Math.round(sale), costPrice: Math.round(cost) }); setPriceDialog(null); }}
+                  className="flex-1 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold disabled:opacity-40 cursor-pointer">
+                  اعتماد السعر من التجديد القادم
+                </button>
+                {scheduled > 0 && (
+                  <button type="button" onClick={() => { onSchedulePrice(prov.name, plan.name, null); setPriceDialog(null); }}
+                    className="px-3 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 cursor-pointer">
+                    إلغاء السعر المجدول
+                  </button>
+                )}
+              </div>
+              <div className="border-t border-slate-800 pt-3 space-y-2">
+                <div className="text-slate-400">رسالة إعلان للمشتركين (لقائمة البث في واتساب):</div>
+                <pre className="whitespace-pre-wrap font-sans bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-slate-300">{announce}</pre>
+                <button type="button" onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(announce)}`, '_blank')}
+                  className="w-full py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold cursor-pointer">
+                  مشاركة الإعلان عبر واتساب
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Quick Add Plan Modal */}
       {newPlanModal && (

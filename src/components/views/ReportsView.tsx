@@ -41,6 +41,8 @@ interface ReportsViewProps {
   currentUser?: StaffUser;
   onDeletePayment?: (paymentId: string) => void;
   expenses?: Expense[];
+  /** كل المشتركين مع المؤرشفين (لحركة المشتركين) */
+  allSubscribers?: Subscriber[];
 }
 
 export const ReportsView: React.FC<ReportsViewProps> = ({
@@ -50,6 +52,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   currentUser,
   onDeletePayment,
   expenses = [],
+  allSubscribers,
 }) => {
   const [period, setPeriod] = useState<ReportPeriod>('this_month');
   const [customStart, setCustomStart] = useState(() => {
@@ -125,8 +128,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   const realNet = report.totalNetProfit - periodExpensesTotal;
 
   // حركة المشتركين: جدد، مجددون، مسترجعون، مفقودون (آخر 6 أشهر)
-  const movement = useMemo(() => subscriberMovement(subscribers, payments, lastMonthKeys(6)), [subscribers, payments]);
-  const towerMovement = useMemo(() => movementByTower(subscribers, lastMonthKeys(3)), [subscribers]);
+  const movement = useMemo(() => subscriberMovement(allSubscribers || subscribers, payments, lastMonthKeys(6)), [allSubscribers, subscribers, payments]);
+  const towerMovement = useMemo(() => movementByTower(allSubscribers || subscribers, lastMonthKeys(3)), [allSubscribers, subscribers]);
   const MONTHS_SHORT = ['ك2', 'شباط', 'آذار', 'نيسان', 'أيار', 'حزيران', 'تموز', 'آب', 'أيلول', 'ت1', 'ت2', 'ك1'];
   const movementChart = movement.map(m => ({ ...m, label: MONTHS_SHORT[Number(m.month.slice(5, 7)) - 1] }));
 

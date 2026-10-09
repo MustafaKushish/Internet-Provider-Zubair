@@ -20,7 +20,7 @@ export function normalizeSearch(text: string): string {
 }
 
 /** أرقام الهاتف بدون رمز الدولة والصفر الأول: 07801234567 و +964 780 123 4567 متطابقان */
-function phoneDigits(text: string): string {
+export function phoneDigits(text: string): string {
   return normalizeSearch(text).replace(/\D/g, '').replace(/^00964|^964/, '').replace(/^0+/, '');
 }
 

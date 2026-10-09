@@ -104,7 +104,7 @@ const QuickSearchInner: React.FC<QuickSearchProps> = ({
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <div className="font-bold text-white text-sm truncate">{sub.name}</div>
+                        <div className="font-bold text-white text-sm truncate">{sub.name}{sub.archived && <span className="mr-1.5 text-[10px] text-slate-300 bg-slate-700 px-1.5 py-0.5 rounded">مؤرشف</span>}</div>
                         <div className="text-[11px] text-slate-400 flex flex-wrap gap-x-2 mt-0.5">
                           {sub.phone && <span className="font-mono" dir="ltr">{sub.phone}</span>}
                           <span className="font-mono text-indigo-300" dir="ltr">{sub.username}</span>
