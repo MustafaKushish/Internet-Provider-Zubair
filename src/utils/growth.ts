@@ -29,7 +29,7 @@ export function lastMonthKeys(count: number, today: string = todayStr()): string
 }
 
 /** معرّفات المشتركين المضافين باستيراد جماعي (حقل source أو يوم إضافة مزدحم) */
-function importedIds(subscribers: Subscriber[]): Set<string> {
+export function importedIds(subscribers: Subscriber[]): Set<string> {
   const perDay = new Map<string, number>();
   subscribers.forEach(s => {
     const d = (s.createdAt || '').slice(0, 10);

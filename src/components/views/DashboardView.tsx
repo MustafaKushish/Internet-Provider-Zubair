@@ -1,5 +1,6 @@
 import React from 'react';
-import { Expense, PaymentRecord, Subscriber, SystemSettings, TowerPoint } from '../../types/isp';
+const DashboardInsights = React.lazy(() => import('./DashboardInsights'));
+import { Expense, PaymentRecord, StaffUser, Subscriber, SupportTicket, SystemSettings, TowerPoint } from '../../types/isp';
 import { netProfitInMonth } from '../../utils/expenses';
 import { planProgress } from '../../utils/installments';
 import { computeTowerStats, sortTowerStats, NO_TOWER_LABEL } from '../../utils/towers';
@@ -33,6 +34,9 @@ interface DashboardViewProps {
   onSendWhatsApp: (sub: Subscriber, defaultTab?: any) => void;
   expenses?: Expense[];
   onOpenCash?: () => void;
+  tickets?: SupportTicket[];
+  currentUser?: StaffUser;
+  onSetTarget?: (target: number) => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -46,6 +50,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onSendWhatsApp,
   expenses = [],
   onOpenCash,
+  tickets = [],
+  currentUser,
+  onSetTarget,
 }) => {
   // Financial metrics
   // المبيعات المتوقعة = المستحق الفعلي لكل مشترك في دورته الحالية
@@ -178,6 +185,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
           )}
         </div>
+      )}
+
+      {subscribers.length > 0 && currentUser && (
+        <React.Suspense fallback={<div className="py-10 text-center text-xs text-slate-500">جارٍ تحميل التحليلات…</div>}>
+          <DashboardInsights
+            subscribers={subscribers}
+            payments={payments}
+            expenses={expenses}
+            tickets={tickets}
+            settings={settings}
+            currentUser={currentUser}
+            onSetTarget={onSetTarget}
+          />
+        </React.Suspense>
       )}
 
       {/* Clean Slate Alert when no subscribers yet */}

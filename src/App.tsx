@@ -1262,6 +1262,9 @@ export default function App() {
             payments={payments}
             expenses={expenses}
             onOpenCash={() => setActiveTab('cash')}
+            tickets={tickets}
+            currentUser={currentUser}
+            onSetTarget={currentUser.role === 'admin' ? (t) => { setSettings(prev => ({ ...prev, monthlyTarget: t || undefined })); notify(t ? `هدف الشهر: ${formatCurrency(t, settings.currency)}` : 'الهدف تلقائي حسب المشتركين.', 'success'); } : undefined}
             towerPoints={towerPoints}
             settings={settings}
             onOpenTowers={() => setActiveTab('towers')}

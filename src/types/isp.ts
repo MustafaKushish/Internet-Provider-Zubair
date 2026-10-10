@@ -154,6 +154,7 @@ export interface SystemSettings {
   warningDaysBeforeExpiry: number;
   whatsappFooter: string;
   advisorProvider?: 'auto' | 'gemini' | 'workers' | 'claude'; // محرك المستشار الذكي
+  monthlyTarget?: number;  // هدف التحصيل الشهري (لوحة المؤشرات)
   advisorNotes?: string;   // «معلومات عملي» للمستشار: كلف، منافسون، سعة الأبراج، أهداف (بدون بيانات شخصية)
 }
 

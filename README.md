@@ -62,6 +62,17 @@ Der Windows-Installer ist eine Electron-Hülle (`desktop/`) um dieselbe Adresse.
   Nettowachstum und Bindungsquote, dazu pro Turm. „Verloren“ = abgelaufen und 30 Tage nicht verlängert.
   Aus Excel importierte Kunden zählen nicht als neu.
 
+## Übersicht (لوحة المؤشرات)
+
+- **Heute:** Einnahmen nach Zahlungsart, Verlängerungen, wer heute/morgen abläuft, Netto des Monats, Ratenpläne.
+- **Dieser Monat bis heute** mit Vergleich zum gleichen Zeitraum des Vormonats (↑/↓ in % ): Einnahmen, echter Nettogewinn,
+  Verlängerungen, neue Kunden, Durchschnittszahlung pro Kunde, Belege.
+- **Monatsziel:** Fortschrittsbalken mit Markierung „wo du heute sein müsstest“, Hochrechnung zum Monatsende und nötiger
+  Tagesbetrag. Das Ziel setzt der Admin („تحديد الهدف“), sonst gilt ein Monatsbeitrag aller nicht gesperrten Kunden.
+- **Diagramme:** 12-Monats-Verlauf (Einnahmen und Nettogewinn), erwartete Verlängerungen der nächsten 30 Tage pro Tag und
+  Woche, Kundenstatus, Pakete nach Umsatz und Gewinn, Zahlungsarten, Kassieren pro Mitarbeiter, Support (offene Tickets,
+  durchschnittliche Lösungszeit, pro Turm). Trend und Prognose auch als Tabelle.
+
 ## Archiv, Datenprüfung, Protokoll und Preisänderung
 
 - **Archiv (nur Admin, vom Server erzwungen):** Kunden, die gegangen sind, verschwinden aus Listen, Kopfzahlen, Erinnerungen,
