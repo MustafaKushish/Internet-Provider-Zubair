@@ -83,8 +83,8 @@ const QuickRenewModalInner: React.FC<QuickRenewModalProps & { subscriber: Subscr
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm">
-      <div className="bg-slate-900 border border-cyan-500/30 rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div className="app-overlay fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm">
+      <div className="bg-slate-900 border border-cyan-500/30 rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden">
         {/* Modal Header */}
         <div className="px-6 py-4 bg-gradient-to-r from-cyan-900/40 via-slate-800 to-slate-900 border-b border-cyan-500/20 flex items-center justify-between">
           <div className="flex items-center gap-3">

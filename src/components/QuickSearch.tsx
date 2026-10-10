@@ -58,7 +58,7 @@ const QuickSearchInner: React.FC<QuickSearchProps> = ({
   const btn = 'h-8 px-2.5 rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer transition';
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-start justify-center p-3 sm:p-4 pt-[8vh] bg-slate-950/80 backdrop-blur-sm no-print" onClick={onClose}>
+    <div className="app-overlay fixed inset-0 z-[60] flex items-start justify-center p-3 sm:p-4 pt-[8vh] bg-slate-950/80 backdrop-blur-sm no-print" onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"

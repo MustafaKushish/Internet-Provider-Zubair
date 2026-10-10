@@ -42,7 +42,12 @@ export const ForcePasswordChange: React.FC<ForcePasswordChangeProps> = ({
 
   return (
     <div dir="rtl" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950 font-sans overflow-y-auto">
-      <div className="relative max-w-md w-full bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-5">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
+        <div className="app-grid-bg" />
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl float-slow"></div>
+        <div className="absolute bottom-1/4 left-1/3 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl float-slow-delayed"></div>
+      </div>
+      <div className="animate-rise relative max-w-md w-full bg-slate-900/80 backdrop-blur-xl border border-slate-700/60 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-black/50 space-y-5">
         <div className="text-center space-y-2">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-600 to-orange-600 mx-auto flex items-center justify-center shadow-lg ring-4 ring-slate-800">
             <KeyRound className="w-7 h-7 text-white" />

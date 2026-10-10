@@ -490,7 +490,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </p>
 
         {notifMessage && (
-          <div className="bg-cyan-950/60 border border-cyan-800 p-2.5 rounded-xl text-xs text-cyan-300 flex items-center gap-2 animate-in fade-in">
+          <div className="bg-cyan-950/60 border border-cyan-800 p-2.5 rounded-xl text-xs text-cyan-300 flex items-center gap-2 animate-pop">
             <Check className="w-4 h-4 flex-shrink-0" />
             <span>{notifMessage}</span>
           </div>

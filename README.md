@@ -49,6 +49,9 @@ Der Windows-Installer ist eine Electron-Hülle (`desktop/`) um dieselbe Adresse.
 - **Kundenliste:** 25 pro Seite (umstellbar), sortierbar nach Name, Ablauf, Schulden oder neueste.
 - **Erinnerungen:** nach Dringlichkeit sortiert, Suche und Turmfilter; „heute gesendet“ bleibt bis Mitternacht markiert.
 - **Übersicht:** „ملخص اليوم“ zeigt heutige Einnahmen nach Zahlungsart, Verlängerungen und wer heute oder morgen abläuft.
+- **Animationen:** Fenster gleiten beim Öffnen sanft hinein und blenden beim Schließen aus (am Handy als Blatt von unten).
+  Beim Bereichswechsel kommt der neue Bereich von der Seite seines Tabs, die Karten erscheinen nacheinander, und der
+  Markierungsbalken gleitet zum neuen Tab. Ist am Gerät „Bewegung reduzieren“ eingeschaltet, laufen keine Animationen.
 
 ## Kundenprofil, Ratenpläne und Kundenbewegung
 

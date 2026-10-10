@@ -110,7 +110,7 @@ const DebtModalInner: React.FC<DebtModalProps & { subscriber: Subscriber }> = ({
   const quick = [1, 2, 3, 4, 6];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto" onClick={onClose}>
+    <div className="app-overlay fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto" onClick={onClose}>
       <div role="dialog" aria-modal="true" aria-labelledby="debt-title" className="bg-slate-900 border border-slate-700 rounded-2xl max-w-xl w-full shadow-2xl my-6" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="px-5 py-4 bg-slate-800/80 border-b border-slate-700 flex items-center justify-between rounded-t-2xl">

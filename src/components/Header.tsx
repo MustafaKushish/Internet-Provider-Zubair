@@ -29,6 +29,8 @@ import {
   Search,
   X as CloseIcon,
 } from 'lucide-react';
+import { LazyMotion, MotionConfig } from 'motion/react';
+import * as m from 'motion/react-m';
 import { getNotificationPermission, requestNotificationPermission } from '../utils/notifications';
 import { StaffUser } from '../types/isp';
 import { canPromptInstall, isStandalone, onInstallAvailabilityChange, requestInstall } from '../pwa';
@@ -62,6 +64,14 @@ const TABS: TabDef[] = [
   { id: 'users', label: 'المستخدمون والمشرفون', short: 'المستخدمون', icon: ShieldCheck, roles: ['admin'], accent: 'indigo' },
   { id: 'settings', label: 'إعدادات المنظومة', short: 'الإعدادات', icon: Settings, roles: ['admin'] },
 ];
+
+/** ترتيب الأقسام في شريط التنقل (يحدد اتجاه حركة دخول القسم) */
+export const TAB_ORDER = TABS.map(t => t.id);
+
+const loadMotionFeatures = () => import('./ui/motionFeatures').then(r => r.default);
+
+// مؤشر التبويب النشط ينزلق بين التبويبات بحركة نابضية
+const PILL_SPRING = { type: 'spring', stiffness: 420, damping: 34, mass: 0.8 } as const;
 
 // الأقسام الظاهرة مباشرة في الشريط السفلي (الباقي في «المزيد»): 4 في الهاتف و 6 في التابلت
 const MOBILE_PRIMARY = ['subscribers', 'reminders', 'dashboard', 'tickets', 'cash', 'reports', 'towers'];
@@ -135,8 +145,8 @@ export const Header: React.FC<HeaderProps> = ({
   const moreTabs = visibleTabs.filter(t => !primaryTabs.includes(t));
   const alertsCount = stats.expiringSoonCount + stats.expiredCount;
   const badgeFor = (id: string): React.ReactNode => {
-    if (id === 'subscribers') return <span className="text-xs px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-300 font-normal">{stats.totalSubscribers}</span>;
-    if (id === 'tickets' && stats.openTicketsCount > 0) return <span className="text-xs px-1.5 py-0.2 rounded-full bg-rose-500/30 text-rose-300 border border-rose-500/40">{stats.openTicketsCount}</span>;
+    if (id === 'subscribers') return <span className="relative text-xs px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-300 font-normal">{stats.totalSubscribers}</span>;
+    if (id === 'tickets' && stats.openTicketsCount > 0) return <span className="relative text-xs px-1.5 py-0.2 rounded-full bg-rose-500/30 text-rose-300 border border-rose-500/40">{stats.openTicketsCount}</span>;
     if (id === 'reminders' && alertsCount > 0) return <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping absolute top-2 right-2"></span>;
     return null;
   };
@@ -178,16 +188,18 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <>
-    <header className="bg-slate-900 border-b border-slate-800 lg:sticky lg:top-0 z-30 shadow-xl backdrop-blur-md bg-opacity-95 no-print">
+    <LazyMotion features={loadMotionFeatures} strict>
+    <MotionConfig reducedMotion="user">
+    <header className="relative bg-slate-900/80 lg:sticky lg:top-0 z-30 shadow-2xl shadow-black/30 backdrop-blur-xl no-print">
+      <div className="gradient-line absolute bottom-0 inset-x-0" aria-hidden="true" />
       {/* الهاتف: شريط علوي مضغوط */}
       <div className="lg:hidden px-3 pt-3 pb-2 space-y-2">
         <div className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-600 via-blue-600 to-indigo-600 flex items-center justify-center text-white flex-shrink-0">
+          <div className="logo-glow w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-600 via-blue-600 to-indigo-600 flex items-center justify-center text-white flex-shrink-0">
             <Wifi className="w-5 h-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <h1 className="text-sm font-bold text-white truncate">{ispName}</h1>
+            <h1 className="text-sm font-bold gradient-text truncate">{ispName}</h1>
             <p className="text-[10px] text-slate-400 truncate">{currentUser.name} • {currentUser.role === 'admin' ? 'المدير' : currentUser.role === 'accountant' ? 'محاسب' : 'فني'}</p>
           </div>
           <button
@@ -247,12 +259,12 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           {/* Logo & Brand */}
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-cyan-600 via-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-cyan-500/20 text-white ring-2 ring-cyan-400/30">
-              <Wifi className="w-6 h-6 animate-pulse" />
+            <div className="logo-glow w-11 h-11 rounded-xl bg-gradient-to-tr from-cyan-600 via-blue-600 to-indigo-600 flex items-center justify-center text-white ring-2 ring-cyan-400/30">
+              <Wifi className="w-6 h-6" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold text-white tracking-tight">{ispName}</h1>
+                <h1 className="text-xl font-bold gradient-text tracking-tight">{ispName}</h1>
                 <span className="bg-gradient-to-r from-cyan-500/20 to-blue-500/20 text-cyan-300 text-xs px-2.5 py-0.5 rounded-full border border-cyan-500/30 font-semibold">
                   البصرة - الزبير
                 </span>
@@ -440,7 +452,10 @@ export const Header: React.FC<HeaderProps> = ({
           {visibleTabs.map(t => {
             const Icon = t.icon;
             const active = activeTab === t.id;
-            const activeCls = t.accent === 'indigo' ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40' : 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30';
+            const activeCls = t.accent === 'indigo' ? 'text-indigo-200' : 'text-cyan-300';
+            const pillCls = t.accent === 'indigo'
+              ? 'bg-indigo-500/20 border-indigo-500/40 shadow-[0_0_24px_-6px_rgb(99_102_241/0.6)]'
+              : 'bg-cyan-500/15 border-cyan-500/35 shadow-[0_0_24px_-6px_rgb(34_211_238/0.55)]';
             const idleCls = t.id === 'advisor' ? 'text-indigo-300/80 hover:text-indigo-200 hover:bg-slate-800/60' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60';
             return (
               <button
@@ -449,38 +464,46 @@ export const Header: React.FC<HeaderProps> = ({
                 aria-current={active ? 'page' : undefined}
                 className={`px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 whitespace-nowrap transition cursor-pointer relative ${active ? activeCls : idleCls}`}
               >
-                <Icon className={`w-4 h-4 ${t.id === 'users' ? 'text-indigo-400' : ''}`} />
-                <span>{t.label}</span>
+                {active && (
+                  <m.span
+                    layoutId="desktop-nav-pill"
+                    transition={PILL_SPRING}
+                    className={`absolute inset-0 rounded-lg border ${pillCls}`}
+                    aria-hidden="true"
+                  />
+                )}
+                <Icon className={`relative w-4 h-4 transition-transform duration-300 ${active ? 'scale-110' : ''} ${t.id === 'users' ? 'text-indigo-400' : ''}`} />
+                <span className="relative">{t.label}</span>
                 {badgeFor(t.id)}
               </button>
             );
           })}
         </nav>
       </div>
-      {iosHelpOpen && (
-        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm" onClick={() => setIosHelpOpen(false)}>
-          <div role="dialog" aria-modal="true" className="bg-slate-900 border border-slate-700 rounded-2xl max-w-sm w-full p-5 space-y-3 shadow-2xl text-sm" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between">
-              <h2 className="font-bold text-white">تثبيت التطبيق على آيفون / آيباد</h2>
-              <button type="button" onClick={() => setIosHelpOpen(false)} className="text-slate-400 hover:text-white cursor-pointer" aria-label="إغلاق">
-                <CloseIcon className="w-4 h-4" />
-              </button>
-            </div>
-            <ol className="space-y-2.5 text-slate-300 text-xs leading-relaxed list-decimal pr-4">
-              <li>افتح المنظومة في متصفح <strong className="text-white">Safari</strong>.</li>
-              <li>اضغط زر المشاركة <Share className="w-3.5 h-3.5 inline text-cyan-400" /> أسفل الشاشة.</li>
-              <li>اختر <strong className="text-white">«إضافة إلى الشاشة الرئيسية»</strong> ثم <strong className="text-white">«إضافة»</strong>.</li>
-              <li>افتح التطبيق من أيقونة <strong className="text-white">أولاد كشيش</strong> على الشاشة الرئيسية.</li>
-            </ol>
-          </div>
-        </div>
-      )}
     </header>
+    {iosHelpOpen && (
+      <div className="app-overlay fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm" onClick={() => setIosHelpOpen(false)}>
+        <div role="dialog" aria-modal="true" className="bg-slate-900 border border-slate-700 rounded-2xl max-w-sm w-full p-5 space-y-3 shadow-2xl text-sm" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center justify-between">
+            <h2 className="font-bold text-white">تثبيت التطبيق على آيفون / آيباد</h2>
+            <button type="button" onClick={() => setIosHelpOpen(false)} className="text-slate-400 hover:text-white cursor-pointer" aria-label="إغلاق">
+              <CloseIcon className="w-4 h-4" />
+            </button>
+          </div>
+          <ol className="space-y-2.5 text-slate-300 text-xs leading-relaxed list-decimal pr-4">
+            <li>افتح المنظومة في متصفح <strong className="text-white">Safari</strong>.</li>
+            <li>اضغط زر المشاركة <Share className="w-3.5 h-3.5 inline text-cyan-400" /> أسفل الشاشة.</li>
+            <li>اختر <strong className="text-white">«إضافة إلى الشاشة الرئيسية»</strong> ثم <strong className="text-white">«إضافة»</strong>.</li>
+            <li>افتح التطبيق من أيقونة <strong className="text-white">أولاد كشيش</strong> على الشاشة الرئيسية.</li>
+          </ol>
+        </div>
+      </div>
+    )}
 
     {/* الهاتف: شريط تنقل سفلي ثابت */}
     <nav
       aria-label="التنقل السريع"
-      className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 no-print"
+      className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-slate-900/85 backdrop-blur-xl border-t border-slate-800/80 shadow-[0_-10px_30px_-12px_rgb(0_0_0/0.6)] no-print"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <div className="grid" style={{ gridTemplateColumns: `repeat(${primaryTabs.length + (moreTabs.length ? 1 : 0)}, minmax(0, 1fr))` }}>
@@ -494,10 +517,17 @@ export const Header: React.FC<HeaderProps> = ({
               type="button"
               onClick={() => go(t.id)}
               aria-current={active ? 'page' : undefined}
-              className={`relative flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] md:text-xs font-semibold cursor-pointer ${active ? 'text-cyan-400' : 'text-slate-400'}`}
+              className={`relative flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] md:text-xs font-semibold cursor-pointer transition-colors ${active ? 'text-cyan-300' : 'text-slate-400'}`}
             >
-              {active && <span className="absolute top-0 inset-x-4 h-0.5 rounded-full bg-cyan-400" />}
-              <span className="relative">
+              {active && (
+                <m.span
+                  layoutId="mobile-nav-indicator"
+                  transition={PILL_SPRING}
+                  className="absolute inset-x-2 inset-y-1 rounded-2xl bg-gradient-to-b from-cyan-500/20 to-cyan-500/0 border-t-2 border-cyan-400 shadow-[0_-6px_18px_-6px_rgb(34_211_238/0.7)]"
+                  aria-hidden="true"
+                />
+              )}
+              <span className={`relative transition-transform duration-300 ease-[cubic-bezier(0.34,1.4,0.64,1)] ${active ? '-translate-y-0.5 scale-110' : ''}`}>
                 <Icon className="w-5 h-5" />
                 {count > 0 && (
                   <span className="absolute -top-1.5 -left-2.5 min-w-[16px] h-4 px-1 rounded-full bg-rose-600 text-white text-[9px] leading-4 text-center">
@@ -505,7 +535,7 @@ export const Header: React.FC<HeaderProps> = ({
                   </span>
                 )}
               </span>
-              <span>{t.short}</span>
+              <span className="relative">{t.short}</span>
             </button>
           );
         })}
@@ -526,7 +556,7 @@ export const Header: React.FC<HeaderProps> = ({
     {moreOpen && (
       <MoreSheet onClose={() => setMoreOpen(false)}>
         <div className="grid grid-cols-3 gap-2">
-          {moreTabs.map(t => {
+          {moreTabs.map((t, i) => {
             const Icon = t.icon;
             const active = activeTab === t.id;
             return (
@@ -534,7 +564,8 @@ export const Header: React.FC<HeaderProps> = ({
                 key={t.id}
                 type="button"
                 onClick={() => go(t.id)}
-                className={`flex flex-col items-center gap-1.5 rounded-2xl border p-3 text-[11px] font-semibold cursor-pointer ${active ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300' : 'bg-slate-800/60 border-slate-700 text-slate-200'}`}
+                style={{ animationDelay: `${0.08 + i * 0.035}s` }}
+                className={`animate-rise flex flex-col items-center gap-1.5 rounded-2xl border p-3 text-[11px] font-semibold cursor-pointer ${active ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300' : 'bg-slate-800/60 border-slate-700 text-slate-200'}`}
               >
                 <Icon className="w-5 h-5" />
                 <span className="text-center leading-tight">{t.short}</span>
@@ -564,7 +595,8 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </MoreSheet>
     )}
-    </>
+    </MotionConfig>
+    </LazyMotion>
   );
 };
 
@@ -572,7 +604,7 @@ export const Header: React.FC<HeaderProps> = ({
 const MoreSheet: React.FC<{ onClose: () => void; children: React.ReactNode }> = ({ onClose, children }) => {
   useEscapeKey(onClose);
   return (
-    <div className="lg:hidden fixed inset-0 z-50 flex items-end bg-slate-950/70 backdrop-blur-sm no-print" onClick={onClose}>
+    <div className="lg:hidden app-overlay fixed inset-0 z-50 flex items-end bg-slate-950/70 backdrop-blur-sm no-print" onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"

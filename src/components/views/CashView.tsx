@@ -400,7 +400,7 @@ const ExpenseForm: React.FC<{
   const set = (patch: Partial<Expense>) => setDraft({ ...draft, ...patch });
   const input = 'w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500';
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-sm" onClick={() => setDraft(null)}>
+    <div className="app-overlay fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-sm" onClick={() => setDraft(null)}>
       <form role="dialog" aria-modal="true" aria-label="تسجيل مصروف"
         onSubmit={e => { e.preventDefault(); onSave(); }}
         onClick={e => e.stopPropagation()}

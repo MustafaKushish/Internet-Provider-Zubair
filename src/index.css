@@ -42,14 +42,15 @@ button, a {
   height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: #020617;
 }
 ::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 4px;
+  background: linear-gradient(180deg, #334155, #1e293b);
+  border-radius: 999px;
+  border: 2px solid #020617;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: linear-gradient(180deg, #0e7490, #4338ca);
 }
 
 /* شريط أفقي قابل للسحب بدون شريط تمرير ظاهر (الهاتف) */
@@ -60,14 +61,263 @@ button, a {
   display: none;
 }
 
+/* ============================================================
+ * الحركة والمظهر
+ * - النوافذ (.app-overlay): ظهور ناعم للخلفية + قفزة خفيفة للنافذة،
+ *   وفي الهاتف تنزلق النوافذ السفلية من الأسفل. حركة الإغلاق في overlayExit.ts
+ * - الأقسام (.view-enter): دخول القسم من جهة التبويب الجديد مع تتابع البطاقات
+ * - كل الحركات تتوقف عند تفعيل «تقليل الحركة» في الجهاز
+ * ============================================================ */
+:root {
+  color-scheme: dark;
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+@keyframes overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes overlay-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes modal-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.94); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes modal-out {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateY(8px) scale(0.96); }
+}
+@keyframes sheet-in {
+  from { transform: translateY(100%); }
+  to { transform: none; }
+}
+@keyframes sheet-out {
+  from { transform: none; }
+  to { transform: translateY(100%); }
+}
+@keyframes drop-in {
+  from { opacity: 0; transform: translateY(-18px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes view-in {
+  from { opacity: 0; transform: translateX(var(--view-from, 0px)) translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-16px) scale(0.92); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes toast-out {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateY(-10px) scale(0.95); }
+}
+@keyframes toast-progress {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+@keyframes aurora-drift {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(3%, -4%, 0) scale(1.08); }
+  100% { transform: translate3d(-2%, 3%, 0) scale(1); }
+}
+@keyframes float-slow {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -14px, 0); }
+}
+@keyframes glow-ring {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(34 211 238 / 0.35), 0 10px 25px -8px rgb(34 211 238 / 0.45); }
+  50% { box-shadow: 0 0 0 6px rgb(34 211 238 / 0), 0 10px 30px -6px rgb(99 102 241 / 0.55); }
+}
+@keyframes gradient-pan {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+@keyframes spin-slow {
+  to { transform: rotate(360deg); }
+}
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to { background-position: 200% 0; }
+}
+
+/* ---------- النوافذ ---------- */
+.app-overlay {
+  animation: overlay-in 0.22s ease-out both;
+  background-image: radial-gradient(ellipse at 50% 0%, rgb(34 211 238 / 0.07), transparent 60%);
+}
+.app-overlay > :first-child {
+  animation: modal-in 0.34s var(--ease-out-expo) both;
+  box-shadow:
+    0 30px 70px -20px rgb(0 0 0 / 0.75),
+    0 0 0 1px rgb(148 163 184 / 0.06),
+    0 0 50px -18px rgb(34 211 238 / 0.25);
+}
+.app-overlay.items-start > :first-child {
+  animation-name: drop-in;
+}
+/* النوافذ السفلية في الهاتف تنزلق من الأسفل */
+@media (max-width: 639px) {
+  .app-overlay.items-end > :first-child {
+    animation: sheet-in 0.38s var(--ease-out-expo) both;
+  }
+}
+@media (min-width: 640px) and (max-width: 1023px) {
+  .app-overlay.lg\:hidden.items-end > :first-child {
+    animation: sheet-in 0.38s var(--ease-out-expo) both;
+  }
+}
+
+/* نسخة النافذة بعد إغلاقها: تتلاشى فقط ولا تستقبل أي ضغطة */
+.app-overlay.app-overlay-ghost {
+  pointer-events: none;
+  animation: overlay-out 0.24s ease-in both;
+}
+.app-overlay.app-overlay-ghost > :first-child {
+  animation: modal-out 0.2s ease-in both;
+}
+@media (max-width: 639px) {
+  .app-overlay.app-overlay-ghost.items-end > :first-child {
+    animation: sheet-out 0.24s ease-in both;
+  }
+}
+
+/* ---------- تبديل الأقسام ---------- */
+/* fill-mode: backwards حتى لا يبقى transform بعد الحركة (يكسر النوافذ الثابتة داخل القسم) */
+.view-enter {
+  animation: view-in 0.42s var(--ease-out-expo) backwards;
+}
+.view-enter > * > * {
+  animation: rise-in 0.5s var(--ease-out-expo) backwards;
+}
+.view-enter > * > :nth-child(2) { animation-delay: 0.04s; }
+.view-enter > * > :nth-child(3) { animation-delay: 0.08s; }
+.view-enter > * > :nth-child(4) { animation-delay: 0.12s; }
+.view-enter > * > :nth-child(5) { animation-delay: 0.16s; }
+.view-enter > * > :nth-child(6) { animation-delay: 0.2s; }
+.view-enter > * > :nth-child(n + 7) { animation-delay: 0.24s; }
+
+.animate-rise { animation: rise-in 0.55s var(--ease-out-expo) backwards; }
+.animate-pop { animation: pop-in 0.25s var(--ease-out-expo) backwards; }
+.toast-enter { animation: toast-in 0.4s var(--ease-spring) both; }
+.toast-leave { animation: toast-out 0.22s ease-in both; }
+.toast-progress {
+  transform-origin: right;
+  animation: toast-progress linear both;
+}
+
+/* ---------- الخلفية والزخارف ---------- */
+.app-aurora {
+  position: fixed;
+  inset: -10%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(40% 35% at 85% 10%, rgb(34 211 238 / 0.09), transparent 70%),
+    radial-gradient(35% 30% at 10% 30%, rgb(99 102 241 / 0.09), transparent 70%),
+    radial-gradient(45% 40% at 50% 100%, rgb(14 165 233 / 0.06), transparent 70%);
+  animation: aurora-drift 26s ease-in-out infinite alternate;
+}
+.app-grid-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgb(148 163 184 / 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(148 163 184 / 0.035) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse at 50% 0%, black 20%, transparent 75%);
+}
+.float-slow { animation: float-slow 9s ease-in-out infinite; }
+.float-slow-delayed { animation: float-slow 11s ease-in-out -4s infinite; }
+.logo-glow { animation: glow-ring 3.2s ease-in-out infinite; }
+.gradient-text {
+  background: linear-gradient(90deg, #fff, #67e8f9, #a5b4fc, #fff);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: gradient-pan 8s linear infinite;
+}
+.gradient-line {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgb(34 211 238 / 0.6), rgb(99 102 241 / 0.6), transparent);
+  background-size: 200% 100%;
+  animation: gradient-pan 6s linear infinite;
+}
+.spin-slow { animation: spin-slow 1.1s linear infinite; }
+.skeleton {
+  background: linear-gradient(90deg, rgb(30 41 59 / 0.6) 25%, rgb(51 65 85 / 0.6) 37%, rgb(30 41 59 / 0.6) 63%);
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease infinite;
+}
+
+/* ---------- لمسات عامة ---------- */
+/* ضغطة محسوسة على الأزرار (Tailwind 4 يستخدم translate/scale المنفصلة فلا تعارض) */
+:where(button:not(:disabled)) {
+  transition: color 0.15s, background-color 0.15s, border-color 0.15s, box-shadow 0.2s, opacity 0.15s, transform 0.15s var(--ease-spring);
+}
+:where(button:not(:disabled)):active {
+  transform: scale(0.96);
+}
+:where(button, a, [role='button'], summary):focus-visible {
+  outline: 2px solid rgb(34 211 238 / 0.75);
+  outline-offset: 2px;
+  border-radius: 0.6rem;
+}
+:where(input, select, textarea) {
+  transition: border-color 0.15s, box-shadow 0.2s, background-color 0.15s;
+}
+:where(input:not([type='checkbox']):not([type='radio']):not([type='range']), select, textarea):focus {
+  box-shadow: 0 0 0 3px rgb(34 211 238 / 0.15);
+}
+/* بطاقات المحتوى: توهج خفيف عند المرور بالفأرة */
+@media (hover: hover) {
+  main :is(div, section).rounded-2xl.border {
+    transition: border-color 0.25s, box-shadow 0.3s, translate 0.3s;
+  }
+  main :is(div, section).rounded-2xl.border:hover {
+    box-shadow: 0 0 0 1px rgb(34 211 238 / 0.08), 0 18px 40px -22px rgb(34 211 238 / 0.35);
+  }
+}
+tbody tr {
+  transition: background-color 0.15s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0s !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 /* Print Styles for Receipts */
 @media print {
   body {
     background: white !important;
     color: black !important;
   }
-  .no-print {
+  .no-print,
+  .app-aurora,
+  .app-grid-bg,
+  .app-overlay-ghost {
     display: none !important;
+  }
+  *, *::before, *::after {
+    animation: none !important;
   }
   .print-only {
     display: block !important;

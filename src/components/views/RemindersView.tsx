@@ -428,7 +428,7 @@ const ReminderQueue: React.FC<{
   const message = sub ? messageFor(sub, type) : '';
   const debt = sub ? getRemainingDebt(sub) : 0;
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-sm" onClick={onClose}>
+    <div className="app-overlay fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-sm" onClick={onClose}>
       <div role="dialog" aria-modal="true" aria-label="الإرسال المتتالي" onClick={e => e.stopPropagation()}
         className="w-full sm:max-w-lg bg-slate-900 border border-slate-700 rounded-t-3xl sm:rounded-2xl p-5 space-y-3 shadow-2xl"
         style={{ paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom))' }}>

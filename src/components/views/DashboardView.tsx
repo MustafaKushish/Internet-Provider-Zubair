@@ -7,6 +7,7 @@ import { computeTowerStats, sortTowerStats, NO_TOWER_LABEL } from '../../utils/t
 import { debtInMonths, formatMonthsAr, monthsLate } from '../../utils/debt';
 import { formatCurrency, getDaysRemaining, getAmountDue, getRemainingDebt, getPaymentCost } from '../../utils/storage';
 import { todayStr } from '../../utils/dates';
+import { CountUp } from '../ui/CountUp';
 import {
   DollarSign,
   TrendingUp,
@@ -149,7 +150,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs">
             <div className="bg-emerald-950/40 border border-emerald-800/50 rounded-xl p-3">
               <div className="text-emerald-300">المقبوض اليوم</div>
-              <div className="text-lg font-bold text-emerald-400 mt-0.5">{formatCurrency(collectedToday, settings.currency)}</div>
+              <div className="text-lg font-bold text-emerald-400 mt-0.5"><CountUp value={collectedToday} format={v => formatCurrency(v, settings.currency)} /></div>
               <div className="text-[11px] text-slate-400">{todaysPayments.length} وصل • ربح {formatCurrency(profitToday, settings.currency)}</div>
             </div>
             <div className="bg-cyan-950/40 border border-cyan-800/50 rounded-xl p-3">
@@ -217,7 +218,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* 4 Primary Financial KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Net Profit Card */}
-        <div className="bg-gradient-to-br from-emerald-950/60 to-slate-900 border border-emerald-500/30 rounded-2xl p-5 shadow-xl">
+        <div className="bg-gradient-to-br from-emerald-950/60 to-slate-900 border border-emerald-500/30 rounded-2xl p-5 shadow-xl hover:-translate-y-1">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">صافي أرباح المنظومة شهرياً</span>
             <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
@@ -225,7 +226,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
           </div>
           <div className="text-2xl font-black text-emerald-300">
-            {formatCurrency(totalNetProfit, settings.currency)}
+            <CountUp value={totalNetProfit} format={v => formatCurrency(v, settings.currency)} />
           </div>
           <div className="mt-2 text-xs text-slate-400 flex items-center justify-between border-t border-emerald-900/40 pt-2">
             <span>هامش الربح: <strong className="text-emerald-400">{profitMargin}%</strong></span>
@@ -234,7 +235,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* Total Wholesale Cost */}
-        <div className="bg-gradient-to-br from-amber-950/40 to-slate-900 border border-amber-500/30 rounded-2xl p-5 shadow-xl">
+        <div className="bg-gradient-to-br from-amber-950/40 to-slate-900 border border-amber-500/30 rounded-2xl p-5 shadow-xl hover:-translate-y-1">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">كلفة المزودين (سعر الجملة)</span>
             <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
@@ -242,7 +243,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
           </div>
           <div className="text-2xl font-black text-amber-300">
-            {formatCurrency(totalWholesaleCost, settings.currency)}
+            <CountUp value={totalWholesaleCost} format={v => formatCurrency(v, settings.currency)} />
           </div>
           <div className="mt-2 text-xs text-slate-400 flex items-center justify-between border-t border-amber-900/40 pt-2">
             <span>المبلغ الذي تدفعه للشركات</span>
@@ -251,7 +252,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* Total Debts in Market */}
-        <div className="bg-gradient-to-br from-rose-950/40 to-slate-900 border border-rose-500/30 rounded-2xl p-5 shadow-xl">
+        <div className="bg-gradient-to-br from-rose-950/40 to-slate-900 border border-rose-500/30 rounded-2xl p-5 shadow-xl hover:-translate-y-1">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-bold text-rose-400 uppercase tracking-wider">إجمالي الديون في السوق</span>
             <div className="w-9 h-9 rounded-xl bg-rose-500/20 text-rose-400 flex items-center justify-center">
@@ -259,7 +260,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
           </div>
           <div className="text-2xl font-black text-rose-300">
-            {formatCurrency(totalDebts, settings.currency)}
+            <CountUp value={totalDebts} format={v => formatCurrency(v, settings.currency)} />
           </div>
           <div className="mt-2 text-xs text-slate-400 flex items-center justify-between border-t border-rose-900/40 pt-2">
             <span>نسبة التحصيل: <strong className="text-slate-200">{collectionRate}%</strong></span>
@@ -268,7 +269,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* Total Expected Gross Revenue */}
-        <div className="bg-gradient-to-br from-cyan-950/40 to-slate-900 border border-cyan-500/30 rounded-2xl p-5 shadow-xl">
+        <div className="bg-gradient-to-br from-cyan-950/40 to-slate-900 border border-cyan-500/30 rounded-2xl p-5 shadow-xl hover:-translate-y-1">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider">إجمالي مبيعات المشتركين</span>
             <div className="w-9 h-9 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
@@ -276,7 +277,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
           </div>
           <div className="text-2xl font-black text-cyan-300">
-            {formatCurrency(totalSales, settings.currency)}
+            <CountUp value={totalSales} format={v => formatCurrency(v, settings.currency)} />
           </div>
           <div className="mt-2 text-xs text-slate-400 flex items-center justify-between border-t border-cyan-900/40 pt-2">
             <span>المحصل فعلياً:</span>

@@ -448,7 +448,7 @@ export const ProvidersView: React.FC<ProvidersViewProps> = ({
         const money = (n: number) => formatCurrency(Math.round(n), settings.currency);
         const announce = `عزيزي المشترك 🌹\nنود إعلامكم بأن سعر باقة (${plan.name}) لدى ${settings.ispName} سيصبح ${money(sale)} شهرياً ابتداءً من التجديد القادم.\nنشكر ثقتكم ونعمل دائماً على تحسين الخدمة 🙏\n${settings.contactPhone || ''}`.trim();
         return (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-sm" onClick={() => setPriceDialog(null)}>
+          <div className="app-overlay fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-sm" onClick={() => setPriceDialog(null)}>
             <div role="dialog" aria-modal="true" aria-label="تغيير سعر الباقة" onClick={e => e.stopPropagation()}
               className="w-full sm:max-w-md bg-slate-900 border border-slate-700 rounded-t-3xl sm:rounded-2xl p-5 space-y-3 text-xs shadow-2xl"
               style={{ paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom))' }}>
@@ -500,7 +500,7 @@ export const ProvidersView: React.FC<ProvidersViewProps> = ({
 
       {/* Quick Add Plan Modal */}
       {newPlanModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+        <div className="app-overlay fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
           <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <h3 className="font-bold text-white text-base">إضافة باقة جديدة للمزود</h3>
             <div className="space-y-3">

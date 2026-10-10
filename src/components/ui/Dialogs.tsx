@@ -24,6 +24,8 @@ interface Toast {
   id: number;
   message: string;
   tone: Tone;
+  ms?: number;
+  leaving?: boolean;
 }
 
 let seq = 0;
@@ -59,6 +61,13 @@ const TOAST_STYLE: Record<Tone, string> = {
   warning: 'border-amber-800 bg-amber-950/95 text-amber-100',
 };
 
+const TOAST_BAR: Record<Tone, string> = {
+  info: 'bg-cyan-400/60',
+  success: 'bg-emerald-400/60',
+  error: 'bg-rose-400/60',
+  warning: 'bg-amber-400/60',
+};
+
 const TOAST_ICON: Record<Tone, React.ReactNode> = {
   info: <Info className="w-4 h-4 text-cyan-400 flex-shrink-0 mt-0.5" />,
   success: <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />,
@@ -71,12 +80,18 @@ export const DialogHost: React.FC = () => {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const confirmBtn = useRef<HTMLButtonElement>(null);
 
+  // الإشعار يتلاشى أولاً ثم يُحذف
+  const dismissToast = (id: number) => {
+    setToasts(list => list.map(x => (x.id === id ? { ...x, leaving: true } : x)));
+    setTimeout(() => setToasts(list => list.filter(x => x.id !== id)), 220);
+  };
+
   useEffect(() => {
     pushConfirm = r => setQueue(q => [...q, r]);
     pushToast = t => {
-      setToasts(list => [...list.slice(-3), t]);
       const ms = Math.min(9000, 3500 + t.message.length * 40);
-      setTimeout(() => setToasts(list => list.filter(x => x.id !== t.id)), ms);
+      setToasts(list => [...list.slice(-3), { ...t, ms }]);
+      setTimeout(() => dismissToast(t.id), ms);
     };
     return () => {
       pushConfirm = null;
@@ -107,7 +122,7 @@ export const DialogHost: React.FC = () => {
     <>
       {current && (
         <div
-          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm"
+          className="app-overlay fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm"
           onClick={() => answer(false)}
         >
           <div
@@ -150,12 +165,21 @@ export const DialogHost: React.FC = () => {
       {toasts.length > 0 && (
         <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[80] flex flex-col gap-2 w-[min(28rem,calc(100vw-2rem))] no-print" aria-live="polite">
           {toasts.map(t => (
-            <div key={t.id} role="status" className={`flex items-start gap-2 rounded-xl border px-3 py-2.5 text-xs shadow-xl ${TOAST_STYLE[t.tone]}`}>
+            <div
+              key={t.id}
+              role="status"
+              className={`relative overflow-hidden flex items-start gap-2 rounded-xl border px-3 py-2.5 text-xs shadow-2xl shadow-black/40 backdrop-blur-md ${TOAST_STYLE[t.tone]} ${t.leaving ? 'toast-leave' : 'toast-enter'}`}
+            >
               {TOAST_ICON[t.tone]}
               <span className="min-w-0 flex-1 whitespace-pre-line leading-relaxed">{t.message}</span>
+              <span
+                aria-hidden="true"
+                className={`toast-progress absolute bottom-0 inset-x-0 h-0.5 ${TOAST_BAR[t.tone]}`}
+                style={{ animationDuration: `${t.ms ?? 4000}ms` }}
+              />
               <button
                 type="button"
-                onClick={() => setToasts(list => list.filter(x => x.id !== t.id))}
+                onClick={() => dismissToast(t.id)}
                 className="opacity-70 hover:opacity-100 cursor-pointer"
                 aria-label="إغلاق"
               >

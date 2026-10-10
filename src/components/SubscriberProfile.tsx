@@ -106,7 +106,7 @@ const ProfileInner: React.FC<SubscriberProfileProps & { sub: Subscriber }> = ({
   const btn = 'h-9 px-3 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-sm" onClick={onClose}>
+    <div className="app-overlay fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-sm" onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"

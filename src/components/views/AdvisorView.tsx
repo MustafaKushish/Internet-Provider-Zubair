@@ -371,7 +371,7 @@ export const AdvisorView: React.FC<AdvisorViewProps> = (props) => {
       </div>
 
       {showNotes && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm" onClick={() => setShowNotes(false)}>
+        <div className="app-overlay fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm" onClick={() => setShowNotes(false)}>
           <div role="dialog" aria-modal="true" className="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800">
               <h2 className="text-sm font-bold text-white">معلومات عملي (يقرأها المستشار مع كل سؤال)</h2>
@@ -408,7 +408,7 @@ export const AdvisorView: React.FC<AdvisorViewProps> = (props) => {
       )}
 
       {showData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm" onClick={() => setShowData(false)}>
+        <div className="app-overlay fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm" onClick={() => setShowData(false)}>
           <div role="dialog" aria-modal="true" className="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800">
               <h2 className="text-sm font-bold text-white">ما يراه المستشار (بدون بيانات شخصية)</h2>

@@ -85,21 +85,24 @@ export const LockScreen: React.FC<LockScreenProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950 font-sans selection:bg-cyan-500 selection:text-white overflow-y-auto">
       {/* Background Decorative Glow */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-1/4 left-1/3 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl"></div>
+      <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
+        <div className="app-grid-bg" />
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-cyan-500/15 rounded-full blur-3xl float-slow"></div>
+        <div className="absolute bottom-1/4 left-1/3 w-80 h-80 bg-indigo-500/15 rounded-full blur-3xl float-slow-delayed"></div>
+        <div className="absolute top-10 right-10 w-56 h-56 bg-sky-500/10 rounded-full blur-3xl float-slow-delayed"></div>
       </div>
 
-      <div className="relative max-w-md w-full bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
+      <div className="animate-rise relative max-w-md w-full bg-slate-900/80 backdrop-blur-xl border border-slate-700/60 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-black/50 space-y-6">
+        <div className="gradient-line absolute top-0 inset-x-8" aria-hidden="true" />
         {/* Brand & Security Header */}
         <div className="text-center space-y-2">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-cyan-600 via-blue-600 to-indigo-600 mx-auto flex items-center justify-center shadow-lg shadow-cyan-500/20 ring-4 ring-slate-800">
+          <div className="logo-glow w-16 h-16 rounded-2xl bg-gradient-to-tr from-cyan-600 via-blue-600 to-indigo-600 mx-auto flex items-center justify-center ring-4 ring-slate-800">
             <Lock className="w-8 h-8 text-white" />
           </div>
 
           <div>
             <div className="flex items-center justify-center gap-2">
-              <h1 className="text-xl font-bold text-white tracking-tight">{ispName}</h1>
+              <h1 className="text-xl font-bold gradient-text tracking-tight">{ispName}</h1>
               <span className="bg-cyan-500/10 text-cyan-400 text-xs px-2 py-0.5 rounded-full border border-cyan-500/20 font-semibold">
                 الزبير
               </span>

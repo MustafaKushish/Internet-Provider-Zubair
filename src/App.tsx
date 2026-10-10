@@ -61,7 +61,8 @@ import {
 } from './data/initialData';
 
 // Components & Modals
-import { Header } from './components/Header';
+import { Header, TAB_ORDER } from './components/Header';
+import { ViewLoader } from './components/ui/ViewLoader';
 import { SubscriberModal } from './components/SubscriberModal';
 import { QuickRenewModal } from './components/QuickRenewModal';
 import { WhatsAppReminderModal } from './components/WhatsAppReminderModal';
@@ -133,9 +134,13 @@ export default function App() {
   const [expenses, setExpenses] = useState<Expense[]>(loadExpenses);
 
   const [activeTab, setActiveTabRaw] = useState<string>('subscribers');
+  // اتجاه حركة دخول القسم: من جهة التبويب الجديد في شريط التنقل (من اليمين لليسار)
+  const [viewDir, setViewDir] = useState<1 | -1>(1);
   // لا يمكن فتح تبويب غير مسموح لدور المستخدم الحالي
   const setActiveTab = (tab: string) => {
-    setActiveTabRaw(canAccessTab(currentUser.role, tab) ? tab : 'subscribers');
+    const next = canAccessTab(currentUser.role, tab) ? tab : 'subscribers';
+    setViewDir(TAB_ORDER.indexOf(next) >= TAB_ORDER.indexOf(activeTab) ? 1 : -1);
+    setActiveTabRaw(next);
   };
   const safeActiveTab = canAccessTab(currentUser.role, activeTab) ? activeTab : 'subscribers';
 
@@ -1108,7 +1113,11 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-cyan-500 selection:text-white">
+    <div className="relative isolate min-h-screen text-slate-100 flex flex-col font-sans selection:bg-cyan-500 selection:text-white">
+      {/* خلفية متحركة هادئة */}
+      <div className="app-aurora no-print" aria-hidden="true" />
+      <div className="app-grid-bg no-print" aria-hidden="true" />
+
       {/* Top Header */}
       <Header
         activeTab={safeActiveTab}
@@ -1174,7 +1183,7 @@ export default function App() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
         {/* تذكير أسبوعي للمدير بأخذ نسخة احتياطية (إضافة إلى نسخ الخادم التلقائية) */}
         {currentUser.role === 'admin' && backupDue && subscribers.length > 0 && !PREVIEW_MODE && (
-          <div className="mb-4 bg-amber-950/50 border border-amber-800 rounded-2xl px-4 py-3 flex flex-wrap items-center justify-between gap-2 text-xs no-print">
+          <div className="animate-rise mb-4 bg-amber-950/50 border border-amber-800 rounded-2xl px-4 py-3 flex flex-wrap items-center justify-between gap-2 text-xs no-print">
             <span className="text-amber-200">
               {daysSinceBackup() === null ? 'لم تُحفظ نسخة احتياطية على هذا الجهاز بعد.' : `آخر نسخة احتياطية قبل ${daysSinceBackup()} يوماً.`}
               {' '}البيانات محفوظة على الخادم، ونسخة أسبوعية على جهازك تزيد الأمان.
@@ -1197,6 +1206,11 @@ export default function App() {
             </span>
           </div>
         )}
+        <div
+          key={safeActiveTab}
+          className="view-enter"
+          style={{ '--view-from': `${viewDir * -24}px` } as React.CSSProperties}
+        >
         {safeActiveTab === 'subscribers' && (
           <SubscribersView
             subscribers={subscribers}
@@ -1291,7 +1305,7 @@ export default function App() {
         )}
 
         {safeActiveTab === 'reports' && (
-          <React.Suspense fallback={<div className="py-20 text-center text-xs text-slate-400">جارٍ تحميل التقارير…</div>}>
+          <React.Suspense fallback={<ViewLoader label="جارٍ تحميل التقارير…" />}>
           <ReportsView
             subscribers={activeSubscribers}
             allSubscribers={subscribers}
@@ -1374,7 +1388,7 @@ export default function App() {
         )}
 
         {safeActiveTab === 'cash' && (
-          <React.Suspense fallback={<div className="py-16 text-center text-sm text-slate-400">جارٍ التحميل…</div>}>
+          <React.Suspense fallback={<ViewLoader />}>
             <CashView
               payments={payments}
               expenses={expenses}
@@ -1425,7 +1439,7 @@ export default function App() {
         )}
 
         {safeActiveTab === 'advisor' && (
-          <React.Suspense fallback={<div className="py-20 text-center text-xs text-slate-400">جارٍ تحميل المستشار…</div>}>
+          <React.Suspense fallback={<ViewLoader label="جارٍ تحميل المستشار…" />}>
             <AdvisorView
               subscribers={activeSubscribers}
               payments={payments}
@@ -1481,10 +1495,11 @@ export default function App() {
             expenses={expenses}
           />
         )}
+        </div>
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-slate-900 bg-slate-950 py-4 pb-24 lg:pb-4 text-center text-xs text-slate-500 no-print">
+      <footer className="relative border-t border-slate-800/60 bg-slate-950/70 backdrop-blur-sm py-4 pb-24 lg:pb-4 text-center text-xs text-slate-500 no-print">
         <p>
           {settings.ispName} (العراق - البصرة - قضاء الزبير) © {new Date().getFullYear()}
           {settings.contactPhone && <> • هاتف وواتساب:{' '}<span className="font-mono text-cyan-400 font-semibold" dir="ltr">{settings.contactPhone}</span></>}

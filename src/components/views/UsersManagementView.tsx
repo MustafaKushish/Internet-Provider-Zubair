@@ -385,7 +385,7 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
 
       {/* Create / Edit User Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+        <div className="app-overlay fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
           <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <h3 className="font-bold text-white text-base">
               {editingUser ? 'تعديل بيانات المستخدم' : 'إنشاء حساب موظف / مشرف جديد'}

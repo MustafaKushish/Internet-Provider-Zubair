@@ -102,7 +102,7 @@ ${settings.ispName} - ${settings.contactPhone}`;
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
+    <div className="app-overlay fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
       <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-3xl w-full shadow-2xl overflow-hidden my-6">
         {/* Header */}
         <div className="px-6 py-4 bg-slate-800/80 border-b border-slate-700/80 flex items-center justify-between">
@@ -186,7 +186,7 @@ ${settings.ispName} - ${settings.contactPhone}`;
 
         {/* Add Payment Inline Form */}
         {showAddForm && (
-          <form onSubmit={handleRecordPayment} className="m-6 p-4 bg-slate-950 border border-cyan-500/40 rounded-xl space-y-3 animate-in fade-in duration-150">
+          <form onSubmit={handleRecordPayment} className="m-6 p-4 bg-slate-950 border border-cyan-500/40 rounded-xl space-y-3 animate-pop">
             <h4 className="text-xs font-bold text-cyan-400 flex items-center gap-1">
               <DollarSign className="w-3.5 h-3.5" />
               <span>تسجيل دفعة نقدية / تسديد قسط للمشترك</span>

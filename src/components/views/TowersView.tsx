@@ -328,7 +328,7 @@ export const TowersView: React.FC<TowersViewProps> = ({
 
       {/* Delete / move dialog */}
       {dialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm" onClick={() => setDialog(null)}>
+        <div className="app-overlay fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm" onClick={() => setDialog(null)}>
           <div role="dialog" aria-modal="true" className="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full shadow-2xl p-5 space-y-4" onClick={e => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-start gap-3">
