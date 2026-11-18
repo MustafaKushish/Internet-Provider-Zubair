@@ -65,6 +65,8 @@ import { Header, TAB_ORDER } from './components/Header';
 import { canAccessTab } from '../shared/access';
 import { ViewLoader } from './components/ui/ViewLoader';
 import { pushTabHistory, setTabBackHandler } from './components/ui/backStack';
+import { useUndo } from './hooks/useUndo';
+import { UndoBar } from './components/UndoBar';
 import { SimpleHomeView } from './components/views/SimpleHomeView';
 import { SubscriberModal } from './components/SubscriberModal';
 import { QuickRenewModal } from './components/QuickRenewModal';
@@ -419,9 +421,18 @@ export default function App() {
   };
 
   // نقل مشتركين محددين إلى برج (أو بدون برج عند الاسم الفارغ)
+  // التراجع عن العمليات: للمدير فقط (begin يُستدعى في أول كل عملية تغيّر البيانات)
+  const { begin: beginUndo, undo: handleUndo, last: lastUndo, count: undoCount } = useUndo({
+    enabled: currentUser.role === 'admin' && !isLocked,
+    state: { subscribers, payments, tickets, providers, towers: towerPoints, expenses },
+    setters: { subscribers: setSubscribers, payments: setPayments, tickets: setTickets, providers: setProviders, towers: setTowerPoints, expenses: setExpenses },
+    by: currentUser.name,
+  });
+
   const handleAssignTower = (subscriberIds: string[], towerName: string) => {
     const ids = new Set(subscriberIds);
     const n = normTower(towerName);
+    beginUndo(`نقل ${ids.size} مشترك إلى ${n || NO_TOWER_LABEL}`);
     setSubscribers(prev => prev.map(s => ids.has(s.id) ? { ...s, towerName: n } : s));
     ensureTowerRegistered(n);
     notify(`تم نقل ${ids.size} مشترك إلى ${n || NO_TOWER_LABEL}.`, 'success');
@@ -478,6 +489,7 @@ export default function App() {
       notify('أرشفة المشتركين مخصصة للمدير العام فقط.', 'error');
       return;
     }
+    beginUndo(archive ? `أرشفة ${ids.length} مشترك` : `إعادة ${ids.length} مشترك من الأرشيف`);
     const set = new Set(ids);
     const now = new Date().toISOString();
     setSubscribers(prev => prev.map(s => {
@@ -490,6 +502,7 @@ export default function App() {
 
   // Handlers: Subscribers
   const handleSaveSubscriber = (subData: Partial<Subscriber>) => {
+    beginUndo(subData.id ? `تعديل المشترك ${subData.name || ''}` : `إضافة مشترك ${subData.name || ''}`);
     const warn = settings.warningDaysBeforeExpiry;
     if (subData.towerName !== undefined) {
       subData = { ...subData, towerName: normTower(subData.towerName) };
@@ -568,6 +581,7 @@ export default function App() {
       return;
     }
     if (await appConfirm('هل أنت متأكد من حذف هذا المشترك نهائياً من المنظومة؟\n(تبقى وصولاته المالية محفوظة في التقارير)')) {
+      beginUndo(`حذف المشترك ${subscribers.find(s => s.id === id)?.name || ''}`);
       setSubscribers(prev => prev.filter(s => s.id !== id));
     }
   };
@@ -587,6 +601,7 @@ export default function App() {
   ) => {
     const sub = subscribers.find(s => s.id === subId);
     if (!sub) return;
+    beginUndo(`تجديد اشتراك ${sub.name}`);
     const { updatedSub, payment } = buildRenewal(sub, payments, renewalData, ledgerCtx());
     setPayments(prev => [payment, ...prev]);
     setSubscribers(prev => prev.map(s => s.id === subId ? updatedSub : s));
@@ -605,6 +620,7 @@ export default function App() {
   const handleAddPayment = (subscriberId: string, paymentData: Partial<PaymentRecord>) => {
     const sub = subscribers.find(s => s.id === subscriberId);
     if (!sub) return;
+    beginUndo(`تسجيل دفعة ${sub.name}`);
     const result = buildPayment(sub, payments, paymentData, ledgerCtx());
     if (!result) return;
     const { updatedSub, payment: newRec } = result;
@@ -626,6 +642,7 @@ export default function App() {
     }
     const sub = subscribers.find(s => s.id === subscriberId);
     if (!sub) return;
+    beginUndo(`تعديل دين ${sub.name}`);
     const from = getRemainingDebt(sub);
     const updated = applyDebtAdjustment(sub, newDebt, reason, currentUser.name, settings.warningDaysBeforeExpiry);
     setSubscribers(prev => prev.map(s => s.id === subscriberId ? updated : s));
@@ -640,6 +657,7 @@ export default function App() {
       notify('إنشاء خطط التقسيط وإلغاؤها مخصص للمدير العام فقط.', 'error');
       return;
     }
+    beginUndo(plan ? 'إنشاء خطة تقسيط' : 'إلغاء خطة تقسيط');
     setSubscribers(prev => prev.map(s => {
       if (s.id !== subscriberId) return s;
       const { installmentPlan: _old, ...rest } = s;
@@ -661,6 +679,7 @@ export default function App() {
     const pay = payments.find(p => p.id === paymentId);
     if (!pay) return;
 
+    beginUndo(`حذف الوصل ${pay.receiptNumber}`);
     const sub = subscribers.find(s => s.id === pay.subscriberId);
     // يُخصم من رصيد المشترك فقط إذا كان الوصل تابعاً للدورة الحالية
     const updatedSub = sub ? reversePayment(sub, pay, settings.warningDaysBeforeExpiry) : null;
@@ -681,6 +700,7 @@ export default function App() {
 
   // Handlers: Tickets
   const handleSaveTicket = (ticketData: Partial<SupportTicket>) => {
+    beginUndo(ticketData.id ? 'تعديل بلاغ' : 'إضافة بلاغ');
     if (ticketData.id) {
       setTickets(prev => prev.map(t => t.id === ticketData.id ? ({ ...t, ...ticketData } as SupportTicket) : t));
     } else {
@@ -709,6 +729,7 @@ export default function App() {
   };
 
   const handleQuickResolveTicket = (ticketId: string) => {
+    beginUndo('تحديد البلاغ كمحلول');
     setTickets(prev => prev.map(t => {
       if (t.id === ticketId) {
         return {
@@ -723,6 +744,7 @@ export default function App() {
   };
 
   const handleQuickCloseTicket = (ticketId: string) => {
+    beginUndo('إغلاق بلاغ');
     setTickets(prev => prev.map(t => {
       if (t.id === ticketId) {
         return {
@@ -738,6 +760,7 @@ export default function App() {
 
   const handleDeleteTicket = async (ticketId: string) => {
     if (await appConfirm('هل أنت متأكد من حذف هذه التذكرة؟')) {
+      beginUndo('حذف بلاغ');
       setTickets(prev => prev.filter(t => t.id !== ticketId));
     }
   };
@@ -820,6 +843,7 @@ export default function App() {
 
   // Handlers: Provider Management & Renaming across Zubair
   const handleSaveProvider = (updatedProvider: UpstreamProvider, oldName?: string) => {
+    beginUndo(`حفظ المزود ${updatedProvider.name}`);
     // If provider was renamed, update all Zubair subscribers linked to oldName
     if (oldName && oldName.trim() !== updatedProvider.name.trim()) {
       setSubscribers(prev => prev.map(sub => {
@@ -842,6 +866,7 @@ export default function App() {
   // سعر جديد لباقة: يبدأ لكل مشتركيها عند تجديدهم القادم، ويصبح السعر الافتراضي للباقة
   const handleSchedulePrice = (providerName: string, planName: string, price: { salePrice: number; costPrice: number } | null) => {
     if (currentUser.role === 'technician') return;
+    beginUndo(price ? `جدولة سعر ${planName}` : `إلغاء جدولة سعر ${planName}`);
     const matches = (s: Subscriber) => !s.archived && s.upstreamProvider === providerName && (s.planName === planName || s.planName.includes(planName));
     const changes = (s: Subscriber) => price ? !(s.salePrice === price.salePrice && s.costPrice === price.costPrice) : !!s.pendingPrice;
     const count = subscribers.filter(s => matches(s) && changes(s)).length;
@@ -865,6 +890,7 @@ export default function App() {
   // Handlers: Towers (الأبراج ونقاط البث)
   const handleSaveTower = (tower: TowerPoint, oldName?: string) => {
     const name = normTower(tower.name);
+    beginUndo(`حفظ البرج ${name}`);
     const duplicate = towerPoints.some(t => normTower(t.name) === name && t.id !== tower.id);
     if (duplicate) {
       notify(`يوجد برج آخر بنفس الاسم «${name}».`, 'error');
@@ -885,6 +911,7 @@ export default function App() {
 
   // حذف برج (تفكيك): مشتركوه ينتقلون إلى برج آخر أو يصبحون بدون برج
   const handleDeleteTower = (tower: TowerPoint, moveTo: string) => {
+    beginUndo(`حذف البرج ${tower.name}`);
     const from = normTower(tower.name);
     const to = normTower(moveTo);
     const count = subscribers.filter(s => normTower(s.towerName) === from).length;
@@ -896,6 +923,7 @@ export default function App() {
   };
 
   const handleRegisterTower = (name: string) => {
+    beginUndo(`تسجيل البرج ${normTower(name)}`);
     ensureTowerRegistered(name);
     notify(`تم تسجيل «${normTower(name)}» كبرج.`, 'success');
   };
@@ -908,6 +936,7 @@ export default function App() {
 
   // Handlers: Excel Import
   const handleImportComplete = (importedRows: Partial<Subscriber>[], replaceAll: boolean) => {
+    beginUndo(replaceAll ? 'استيراد إكسل (استبدال الكل)' : `استيراد ${importedRows.length} مشترك من إكسل`);
     // Auto-discover and register any new providers found in the imported Excel file
     const existingProviderNames = new Set(providers.map(p => p.name.trim().toLowerCase()));
     const newProvidersToRegister: UpstreamProvider[] = [];
@@ -1012,6 +1041,7 @@ export default function App() {
     expenses?: Expense[];
   }) => {
     if (currentUser.role !== 'admin') return;
+    beginUndo('استعادة نسخة احتياطية');
     const restoredSettings = { ...INITIAL_SETTINGS, ...(data.settings || {}) };
     setSubscribers((data.subscribers || []).map(s => refreshSubscriberStatus(s, restoredSettings.warningDaysBeforeExpiry)));
     setPayments(data.payments || []);
@@ -1025,6 +1055,7 @@ export default function App() {
 
   const handleClearAllData = () => {
     if (currentUser.role !== 'admin') return;
+    beginUndo('مسح كل البيانات');
     setSubscribers([]);
     setPayments([]);
     setTickets([]);
@@ -1323,8 +1354,8 @@ export default function App() {
             subscribers={activeSubscribers}
             settings={settings}
             towers={towerPoints}
-            onSaveProviders={setProviders}
-            onSaveTowers={setTowerPoints}
+            onSaveProviders={(v) => { beginUndo('تعديل المزودين'); setProviders(v); }}
+            onSaveTowers={(v) => { beginUndo('تعديل الأبراج'); setTowerPoints(v); }}
             onSchedulePrice={currentUser.role === 'technician' ? undefined : handleSchedulePrice}
             onOpenEditTowerModal={(tow) => {
               setTowerToEdit(tow);
@@ -1360,14 +1391,17 @@ export default function App() {
               currentUser={currentUser}
               onSaveExpense={(exp) => {
                 if (currentUser.role === 'technician') return;
+                beginUndo('حفظ مصروف');
                 setExpenses(prev => prev.some(e => e.id === exp.id) ? prev.map(e => (e.id === exp.id ? exp : e)) : [exp, ...prev]);
               }}
               onSaveExpenses={(list) => {
                 if (currentUser.role === 'technician') return;
+                beginUndo(`إضافة ${list.length} مصروف`);
                 setExpenses(prev => [...list, ...prev]);
               }}
               onDeleteExpense={(id) => {
                 if (currentUser.role !== 'admin') return;
+                beginUndo('حذف مصروف');
                 setExpenses(prev => prev.filter(e => e.id !== id));
               }}
             />
@@ -1461,6 +1495,7 @@ export default function App() {
         </React.Suspense>
         )}
       </main>
+      {lastUndo && <div className="h-16 no-print" aria-hidden="true" />}
 
       {/* Footer */}
       <footer className={`relative border-t border-slate-800/60 bg-slate-950/70 backdrop-blur-sm py-4 ${simpleMode ? 'pb-6' : 'pb-24'} lg:pb-4 text-center text-xs text-slate-500 no-print`}>
@@ -1469,6 +1504,8 @@ export default function App() {
           {settings.contactPhone && <> • هاتف وواتساب:{' '}<span className="font-mono text-cyan-400 font-semibold" dir="ltr">{settings.contactPhone}</span></>}
         </p>
       </footer>
+
+      <UndoBar entry={lastUndo} count={undoCount} raised={!simpleMode} onUndo={handleUndo} />
 
       <DebtModal
         subscriber={debtSubscriber}

@@ -54,6 +54,12 @@ Der Windows-Installer ist eine Electron-Hülle (`desktop/`) um dieselbe Adresse.
 - **Kundenliste:** 25 pro Seite (umstellbar), sortierbar nach Name, Ablauf, Schulden oder neueste.
 - **Erinnerungen:** nach Dringlichkeit sortiert, Suche und Turmfilter; „heute gesendet“ bleibt bis Mitternacht markiert.
 - **Übersicht:** „ملخص اليوم“ zeigt heutige Einnahmen nach Zahlungsart, Verlängerungen und wer heute oder morgen abläuft.
+- **Rückgängig (nur Admin):** Nach jeder Aktion (Verlängerung, Zahlung, Schulden ändern, Kunde löschen/bearbeiten,
+  Archiv, Türme, Störungen, Ausgaben, Excel-Import …) erscheint unten der Knopf „تراجع عن: …“. Nach einer Rückfrage wird
+  nur dieser Schritt zurückgenommen, wiederholbar bis zu 30 Schritte. Es werden nur die betroffenen Datensätze
+  zurückgesetzt; Änderungen anderer Geräte bleiben, und die App warnt, falls ein Datensatz inzwischen geändert wurde.
+  Die Liste bleibt nach dem Neuladen erhalten und endet beim Schließen des Tabs oder beim Abmelden. Einstellungen und
+  Benutzerkonten sind nicht enthalten. Buchhalter und Techniker sehen den Knopf nicht.
 - **Zurück:** Jedes Fenster hat oben den Knopf „رجوع“. Die Zurück-Taste des Handys oder Browsers schließt das oberste
   Fenster, statt die App zu verlassen; ohne offenes Fenster geht sie zum vorherigen Bereich.
 - **Animationen:** Fenster gleiten beim Öffnen sanft hinein und blenden beim Schließen aus (am Handy als Blatt von unten).

@@ -6,7 +6,7 @@ UI is **Arabic, RTL**. README, chat replies to the owner: **German**. Commit mes
 ## Save tokens
 - Never read `package-lock.json`, `dist/`, `dist-preview/`, `.wrangler/`, `node_modules/`.
 - `src/App.tsx` (~1600 lines) and the views are big: `grep -n` first, then read only the needed line range.
-- Don't re-read a file after editing it. Batch edits per file.
+- Don't re-read a file after editing it. (Preview build forces the admin user; to test other roles temporarily patch `previewAdmin` in App.tsx and revert.) Batch edits per file.
 - Check with `npm run lint` (tsc for app + worker), `npm test` (vitest, money math) and `npm run build`. CI runs all three.
 - Browser check only when UI changed: `VITE_PREVIEW_MODE=true npx vite build --outDir <tmp>` then
   `npx vite preview --outDir <tmp>` (works without server, no login, empty data — seed localStorage key
@@ -17,6 +17,9 @@ UI is **Arabic, RTL**. README, chat replies to the owner: **German**. Commit mes
   `React.lazy` (`viewLoaders`, preloaded when idle) and receive data + callbacks as props.
 - `src/utils/ledger.ts` — **pure money functions** (`buildRenewal`, `buildPayment`, `applyDebtAdjustment`,
   `reversePayment`). Change money behavior here and add a case in `src/utils/__tests__/ledger.test.ts`.
+- `src/utils/undo.ts` + `src/hooks/useUndo.ts` + `components/UndoBar.tsx` — admin-only undo. Call `beginUndo('label')`
+  as the first line of **every handler that changes subscribers/payments/tickets/providers/towers/expenses**; the hook
+  diffs before/after and stores only the changed records (settings and staff users are not covered).
 - `shared/access.ts` — roles, tab access, collection rules (`COLLECTION_RULES`, `HIDDEN_FROM`). Used by UI **and**
   worker; edit only here. Don't import from `src`/`worker` in it.
 - `src/components/views/*View.tsx` — one per tab; `SimpleHomeView` = simple mode home.
