@@ -28,6 +28,8 @@ import {
   Wallet,
   Search,
   X as CloseIcon,
+  LayoutGrid,
+  Smile,
 } from 'lucide-react';
 import { LazyMotion, MotionConfig } from 'motion/react';
 import * as m from 'motion/react-m';
@@ -112,6 +114,9 @@ interface HeaderProps {
   onOpenSearch: () => void;
   onLogout: () => void;
   onOpenAddUser?: () => void;
+  /** الوضع البسيط: رأس صغير بدون أقسام ولا أرقام */
+  simpleMode?: boolean;
+  onToggleSimpleMode?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -129,6 +134,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSearch,
   onLogout,
   onOpenAddUser,
+  simpleMode,
+  onToggleSimpleMode,
 }) => {
   const [notifPermission, setNotifPermission] = useState<NotificationPermission>('default');
   // زر التثبيت يظهر ما دامت المنظومة مفتوحة في المتصفح وليس كتطبيق مثبت
@@ -186,6 +193,41 @@ export const Header: React.FC<HeaderProps> = ({
       onTriggerNotificationCheck();
     }
   };
+
+  if (simpleMode) {
+    return (
+      <header className="relative bg-slate-900/80 lg:sticky lg:top-0 z-30 shadow-2xl shadow-black/30 backdrop-blur-xl no-print">
+        <div className="gradient-line absolute bottom-0 inset-x-0" aria-hidden="true" />
+        <div className="max-w-3xl mx-auto px-3 sm:px-6 py-3 flex flex-wrap items-center gap-3">
+          <div className="logo-glow w-11 h-11 rounded-xl bg-gradient-to-tr from-cyan-600 via-blue-600 to-indigo-600 flex items-center justify-center text-white flex-shrink-0">
+            <Wifi className="w-6 h-6" />
+          </div>
+          <div className="min-w-[13rem] flex-1">
+            <h1 className="text-lg font-semibold gradient-text">{ispName}</h1>
+            <p className="text-sm text-slate-400 truncate">{currentUser.name}</p>
+          </div>
+          <div className="flex gap-2 ms-auto">
+            <button
+              type="button"
+              onClick={onToggleSimpleMode}
+              className="h-12 px-3 sm:px-4 rounded-xl bg-slate-800 border border-slate-700 text-slate-100 text-base font-semibold flex items-center gap-2 cursor-pointer hover:bg-slate-700"
+            >
+              <LayoutGrid className="w-5 h-5 text-cyan-300" />
+              كل الأقسام
+            </button>
+            <button
+              type="button"
+              onClick={onLogout}
+              className="h-12 px-3 sm:px-4 rounded-xl bg-rose-950/70 border border-rose-800/80 text-rose-200 text-base font-semibold flex items-center gap-2 cursor-pointer hover:bg-rose-900"
+            >
+              <LogOut className="w-5 h-5" />
+              خروج
+            </button>
+          </div>
+        </div>
+      </header>
+    );
+  }
 
   return (
     <LazyMotion features={loadMotionFeatures} strict>
@@ -420,6 +462,16 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
               )}
 
+              {onToggleSimpleMode && (
+                <button
+                  onClick={onToggleSimpleMode}
+                  className="bg-slate-800 hover:bg-slate-700 border border-emerald-700 text-emerald-300 text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <Smile className="w-4 h-4" />
+                  <span>الوضع البسيط</span>
+                </button>
+              )}
+
               <button
                 onClick={onOpenAddModal}
                 className="bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 shadow-md shadow-cyan-600/30 transition cursor-pointer"
@@ -555,6 +607,15 @@ export const Header: React.FC<HeaderProps> = ({
 
     {moreOpen && (
       <MoreSheet onClose={() => setMoreOpen(false)}>
+        {onToggleSimpleMode && (
+          <button
+            type="button"
+            onClick={() => { setMoreOpen(false); onToggleSimpleMode(); }}
+            className="w-full mb-3 h-12 rounded-2xl bg-emerald-600/15 border border-emerald-600/60 text-emerald-200 text-base font-semibold flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <Smile className="w-5 h-5" /> الوضع البسيط (أزرار كبيرة)
+          </button>
+        )}
         <div className="grid grid-cols-3 gap-2">
           {moreTabs.map((t, i) => {
             const Icon = t.icon;

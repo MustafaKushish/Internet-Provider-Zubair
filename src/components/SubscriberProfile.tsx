@@ -27,6 +27,8 @@ interface SubscriberProfileProps {
   onTicket: (sub: Subscriber) => void;
   onPrintReceipt: (sub: Subscriber) => void;
   onArchive?: (ids: string[], archive: boolean, reason?: string) => void;
+  /** الوضع البسيط: أزرار وخط أكبر، بدون أرشفة */
+  simple?: boolean;
 }
 
 const TICKET_STATUS: Record<string, string> = { open: 'مفتوح', in_progress: 'قيد المتابعة', resolved: 'تم الحل', closed: 'مغلق' };
@@ -39,7 +41,7 @@ export const SubscriberProfile: React.FC<SubscriberProfileProps> = props =>
   props.subscriber ? <ProfileInner {...props} sub={props.subscriber} /> : null;
 
 const ProfileInner: React.FC<SubscriberProfileProps & { sub: Subscriber }> = ({
-  sub, payments, tickets, settings, currentUser, onClose, onRenew, onWhatsApp, onDebt, onEdit, onTicket, onPrintReceipt, onArchive,
+  sub, payments, tickets, settings, currentUser, onClose, onRenew, onWhatsApp, onDebt, onEdit, onTicket, onPrintReceipt, onArchive, simple,
 }) => {
   useEscapeKey(onClose);
   const [showPass, setShowPass] = useState(false);
@@ -103,7 +105,10 @@ const ProfileInner: React.FC<SubscriberProfileProps & { sub: Subscriber }> = ({
   };
 
   const act = (fn: (s: Subscriber) => void) => () => { onClose(); fn(sub); };
-  const btn = 'h-9 px-3 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition';
+  // الوضع البسيط: أزرار كبيرة بخط واضح
+  const btn = simple
+    ? 'h-12 px-4 rounded-xl text-base font-semibold flex items-center gap-2 cursor-pointer transition'
+    : 'h-9 px-3 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition';
 
   return (
     <div className="app-overlay fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-sm" onClick={onClose}>
@@ -145,7 +150,7 @@ const ProfileInner: React.FC<SubscriberProfileProps & { sub: Subscriber }> = ({
           <button type="button" onClick={onClose} aria-label="إغلاق" className="text-slate-400 hover:text-white p-1.5 cursor-pointer"><X className="w-5 h-5" /></button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
+        <div className={`flex-1 overflow-y-auto p-5 space-y-4 ${simple ? 'text-sm' : 'text-xs'}`}>
           {/* العمليات */}
           <div className="flex flex-wrap gap-2">
             {office && <button type="button" onClick={act(onRenew)} className={`${btn} bg-cyan-600 hover:bg-cyan-500 text-white`}><RefreshCw className="w-4 h-4" />تجديد</button>}
@@ -154,7 +159,7 @@ const ProfileInner: React.FC<SubscriberProfileProps & { sub: Subscriber }> = ({
             {office && <button type="button" onClick={act(onPrintReceipt)} className={`${btn} bg-slate-800 border border-slate-700 text-slate-200`}><Printer className="w-4 h-4" />وصل</button>}
             <button type="button" onClick={act(onTicket)} className={`${btn} bg-slate-800 border border-slate-700 text-amber-300`}><Wrench className="w-4 h-4" />بلاغ عطل</button>
             <button type="button" onClick={act(onEdit)} className={`${btn} bg-slate-800 border border-slate-700 text-slate-200`}><Edit className="w-4 h-4" />تعديل</button>
-            {onArchive && (
+            {onArchive && !simple && (
               <button type="button" onClick={() => onArchive([sub.id], !sub.archived, sub.archived ? undefined : 'غادر الشبكة')}
                 className={`${btn} bg-slate-800 border border-slate-600 text-slate-300`}>
                 <Archive className="w-4 h-4" />{sub.archived ? 'إعادة من الأرشيف' : 'أرشفة (غادر)'}

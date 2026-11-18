@@ -63,6 +63,7 @@ import {
 // Components & Modals
 import { Header, TAB_ORDER } from './components/Header';
 import { ViewLoader } from './components/ui/ViewLoader';
+import { SimpleHomeView } from './components/views/SimpleHomeView';
 import { SubscriberModal } from './components/SubscriberModal';
 import { QuickRenewModal } from './components/QuickRenewModal';
 import { WhatsAppReminderModal } from './components/WhatsAppReminderModal';
@@ -132,6 +133,19 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<StaffUser>(loadActiveStaffUser);
   const [towerPoints, setTowerPoints] = useState<TowerPoint[]>(loadTowers);
   const [expenses, setExpenses] = useState<Expense[]>(loadExpenses);
+
+  // الوضع البسيط (شاشة واحدة بأزرار كبيرة) يُحفظ لكل مستخدم على هذا الجهاز، ويبدأ مفعلاً
+  const simpleKey = `sas_simple_mode_${currentUser.username}`;
+  const readSimple = () => {
+    try { return localStorage.getItem(simpleKey) !== 'off'; } catch { return true; }
+  };
+  const [simpleMode, setSimpleModeRaw] = useState<boolean>(readSimple);
+  useEffect(() => { setSimpleModeRaw(readSimple()); }, [simpleKey]);
+  const setSimpleMode = (on: boolean) => {
+    setSimpleModeRaw(on);
+    try { localStorage.setItem(simpleKey, on ? 'on' : 'off'); } catch { /* الوضع يبقى لهذه الجلسة فقط */ }
+    window.scrollTo({ top: 0 });
+  };
 
   const [activeTab, setActiveTabRaw] = useState<string>('subscribers');
   // اتجاه حركة دخول القسم: من جهة التبويب الجديد في شريط التنقل (من اليمين لليسار)
@@ -1138,6 +1152,8 @@ export default function App() {
         onOpenLoginModal={() => setIsLoginModalOpen(true)}
         onOpenSearch={() => setIsQuickSearchOpen(true)}
         onLogout={handleLogout}
+        simpleMode={simpleMode}
+        onToggleSimpleMode={() => setSimpleMode(!simpleMode)}
       />
 
       <QuickSearch
@@ -1177,6 +1193,7 @@ export default function App() {
         onTicket={(sub) => { setTicketToEdit(null); setTicketPrefillSubscriberId(sub.id); setIsTicketModalOpen(true); }}
         onPrintReceipt={(sub) => { setSubscriberForReceipt(sub); setReceiptCustomAmount(undefined); setIsReceiptModalOpen(true); }}
         onArchive={currentUser.role === 'admin' ? handleArchive : undefined}
+        simple={simpleMode}
       />
 
       {/* Main Content Area */}
@@ -1206,6 +1223,23 @@ export default function App() {
             </span>
           </div>
         )}
+        {simpleMode ? (
+          <div key="simple" className="view-enter">
+            <SimpleHomeView
+              subscribers={activeSubscribers}
+              settings={settings}
+              currentUser={currentUser}
+              onAdd={() => { setSubscriberToEdit(null); setIsSubscriberModalOpen(true); }}
+              onRenew={(sub) => { setSubscriberToRenew(sub); setIsRenewModalOpen(true); }}
+              onWhatsApp={(sub) => {
+                setSubscriberForWhatsApp(sub);
+                setWhatsAppDefaultTab(getRemainingDebt(sub) > 0 ? 'debt' : getDaysRemaining(sub.expiryDate) < 0 ? 'expired' : 'expiry');
+                setIsWhatsAppModalOpen(true);
+              }}
+              onProfile={(sub) => setProfileSubscriberId(sub.id)}
+            />
+          </div>
+        ) : (
         <div
           key={safeActiveTab}
           className="view-enter"
@@ -1496,10 +1530,11 @@ export default function App() {
           />
         )}
         </div>
+        )}
       </main>
 
       {/* Footer */}
-      <footer className="relative border-t border-slate-800/60 bg-slate-950/70 backdrop-blur-sm py-4 pb-24 lg:pb-4 text-center text-xs text-slate-500 no-print">
+      <footer className={`relative border-t border-slate-800/60 bg-slate-950/70 backdrop-blur-sm py-4 ${simpleMode ? 'pb-6' : 'pb-24'} lg:pb-4 text-center text-xs text-slate-500 no-print`}>
         <p>
           {settings.ispName} (العراق - البصرة - قضاء الزبير) © {new Date().getFullYear()}
           {settings.contactPhone && <> • هاتف وواتساب:{' '}<span className="font-mono text-cyan-400 font-semibold" dir="ltr">{settings.contactPhone}</span></>}

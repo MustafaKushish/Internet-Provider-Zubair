@@ -43,6 +43,11 @@ Der Windows-Installer ist eine Electron-Hülle (`desktop/`) um dieselbe Adresse.
 
 ## Bedienung
 
+- **Einfacher Modus (Standard):** eine einzige Seite mit großer Suche („البحث عن مشترك“), drei Filtern
+  (يحتاج متابعة / منتهي / كل المشتركين) und pro Kunde nur drei große, beschriftete Knöpfe: تجديد, واتساب, الملف.
+  Alles andere (Schulden, Quittung, Bearbeiten, Störung) steckt im Kundenprofil („الملف“). Oben führt „كل الأقسام“
+  zur vollständigen Ansicht, von dort zurück über „الوضع البسيط“ (Handy: unter „المزيد“). Die Wahl wird pro
+  Benutzer auf dem Gerät gespeichert.
 - **Schnellsuche:** Lupe oben oder `Strg+K` (bzw. `/`). Findet Kunden nach Name, Telefon (mit oder ohne 0, auch arabische Ziffern),
   Benutzername oder IP. „احمد“ findet auch „أحمد“. `Enter` öffnet direkt die Verlängerung.
 - **Handy:** kompakte Kopfzeile, Leiste unten mit den wichtigsten Bereichen, alles Weitere unter „المزيد“.
