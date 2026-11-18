@@ -62,6 +62,9 @@ Der Windows-Installer ist eine Electron-Hülle (`desktop/`) um dieselbe Adresse.
 
 - **Kundenprofil:** Auf den Namen tippen (Liste, Erinnerungen) oder in der Schnellsuche „الملف“. Zeigt alle Daten, Kunde seit,
   Gesamtzahlungen, letzte Zahlung, Ratenplan und den kompletten Verlauf (Belege, Schuldenänderungen, Störungen) mit allen Aktionen.
+- **Teilzahlung von Schulden** (Profil → „الدين والتقسيط“ → „تسديد الدين (كله أو جزء منه)“): Jeder Betrag bis zur
+  vollen Schuld geht. Schnellknöpfe für die halbe Schuld und runde Beträge, die Restschuld wird sofort angezeigt, die
+  Zahlungsart wählt man per Knopf. Auf Wunsch geht eine WhatsApp an den Kunden mit dem erhaltenen Betrag und dem Rest.
 - **Ratenpläne für alte Schulden** (im Schuldenfenster): Der Admin wählt 2–12 Monatsraten und das Datum der ersten Rate.
   Jede Schuldenzahlung zählt automatisch als Rate. Die App zeigt Fortschritt, nächste Rate und Rückstand; Erinnerungen
   schicken dann die Raten-Nachricht statt der ganzen Schuld. Anlegen und Aufheben nur durch den Admin (vom Server erzwungen),
