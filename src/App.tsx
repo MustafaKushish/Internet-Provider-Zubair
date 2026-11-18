@@ -62,6 +62,7 @@ import {
 
 // Components & Modals
 import { Header, TAB_ORDER } from './components/Header';
+import { canAccessTab } from '../shared/access';
 import { ViewLoader } from './components/ui/ViewLoader';
 import { pushTabHistory, setTabBackHandler } from './components/ui/backStack';
 import { SimpleHomeView } from './components/views/SimpleHomeView';
@@ -81,47 +82,50 @@ import { SyncStatusBadge } from './components/SyncStatusBadge';
 import { QuickSearch } from './components/QuickSearch';
 import { SubscriberProfile } from './components/SubscriberProfile';
 import { DataHealthPanel } from './components/DataHealthPanel';
-import { AuditLogView } from './components/views/AuditLogView';
 import { backupReminderDue, daysSinceBackup, downloadFullBackup, snoozeBackupReminder } from './utils/backup';
 import { authApi, usersApi, getToken, setToken, ApiError, PREVIEW_MODE } from './sync/api';
 import { useCloudSync } from './sync/useCloudSync';
 
 // Views
-import { SubscribersView } from './components/views/SubscribersView';
-import { DashboardView } from './components/views/DashboardView';
 // التقارير تحتوي على مكتبة الرسوم البيانية؛ تُحمَّل عند فتح التبويب فقط
 const ReportsView = React.lazy(() => import('./components/views/ReportsView').then(m => ({ default: m.ReportsView })));
-import { RemindersView } from './components/views/RemindersView';
-import { TicketsView } from './components/views/TicketsView';
-import { ProvidersView } from './components/views/ProvidersView';
-import { UsersManagementView } from './components/views/UsersManagementView';
-import { TowersView } from './components/views/TowersView';
 // المستشار الذكي يُحمَّل عند فتح التبويب فقط
 const CashView = React.lazy(() => import('./components/views/CashView').then(m => ({ default: m.CashView })));
 const AdvisorView = React.lazy(() => import('./components/views/AdvisorView').then(m => ({ default: m.AdvisorView })));
 import { NO_TOWER_LABEL, normTower } from './utils/towers';
 import { withRemainingDebt } from './utils/debt';
+import { applyDebtAdjustment, buildPayment, buildRenewal, reversePayment } from './utils/ledger';
 import { DebtModal } from './components/DebtModal';
-import { SettingsView } from './components/views/SettingsView';
 import { appConfirm, notify } from './components/ui/Dialogs';
 
-// صلاحيات التبويبات حسب الدور (تُطبَّق على المحتوى نفسه وليس على أزرار القائمة فقط)
-const TAB_ACCESS: Record<string, UserRole[]> = {
-  subscribers: ['admin', 'accountant', 'technician'],
-  reminders: ['admin', 'accountant', 'technician'],
-  tickets: ['admin', 'accountant', 'technician'],
-  dashboard: ['admin', 'accountant'],
-  reports: ['admin', 'accountant'],
-  providers: ['admin', 'accountant'],
-  towers: ['admin', 'accountant', 'technician'],
-  advisor: ['admin', 'accountant'],
-  cash: ['admin', 'accountant'],
-  users: ['admin'],
-  settings: ['admin'],
+// الأقسام تُحمَّل عند فتحها فقط (تسريع فتح المنظومة)، وتُحمَّل مسبقاً في وقت الفراغ
+const viewLoaders = {
+  SubscribersView: () => import('./components/views/SubscribersView').then(m => ({ default: m.SubscribersView })),
+  DashboardView: () => import('./components/views/DashboardView').then(m => ({ default: m.DashboardView })),
+  RemindersView: () => import('./components/views/RemindersView').then(m => ({ default: m.RemindersView })),
+  TicketsView: () => import('./components/views/TicketsView').then(m => ({ default: m.TicketsView })),
+  ProvidersView: () => import('./components/views/ProvidersView').then(m => ({ default: m.ProvidersView })),
+  UsersManagementView: () => import('./components/views/UsersManagementView').then(m => ({ default: m.UsersManagementView })),
+  TowersView: () => import('./components/views/TowersView').then(m => ({ default: m.TowersView })),
+  SettingsView: () => import('./components/views/SettingsView').then(m => ({ default: m.SettingsView })),
+  AuditLogView: () => import('./components/views/AuditLogView').then(m => ({ default: m.AuditLogView })),
 };
+const SubscribersView = React.lazy(viewLoaders.SubscribersView);
+const DashboardView = React.lazy(viewLoaders.DashboardView);
+const RemindersView = React.lazy(viewLoaders.RemindersView);
+const TicketsView = React.lazy(viewLoaders.TicketsView);
+const ProvidersView = React.lazy(viewLoaders.ProvidersView);
+const UsersManagementView = React.lazy(viewLoaders.UsersManagementView);
+const TowersView = React.lazy(viewLoaders.TowersView);
+const SettingsView = React.lazy(viewLoaders.SettingsView);
+const AuditLogView = React.lazy(viewLoaders.AuditLogView);
 
-const canAccessTab = (role: UserRole, tab: string): boolean =>
-  (TAB_ACCESS[tab] || []).includes(role);
+function preloadViews() {
+  const run = () => Object.values(viewLoaders).forEach(load => { void load().catch(() => {}); });
+  const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number };
+  if (w.requestIdleCallback) w.requestIdleCallback(run, { timeout: 8000 });
+  else setTimeout(run, 4000);
+}
 
 export default function App() {
   const [subscribers, setSubscribers] = useState<Subscriber[]>(() => loadSubscribers(loadSettings().warningDaysBeforeExpiry));
@@ -147,6 +151,8 @@ export default function App() {
     try { localStorage.setItem(simpleKey, on ? 'on' : 'off'); } catch { /* الوضع يبقى لهذه الجلسة فقط */ }
     window.scrollTo({ top: 0 });
   };
+
+  useEffect(preloadViews, []);
 
   const [activeTab, setActiveTabRaw] = useState<string>('subscribers');
   // اتجاه حركة دخول القسم: من جهة التبويب الجديد في شريط التنقل (من اليمين لليسار)
@@ -567,6 +573,8 @@ export default function App() {
   };
 
   // Handlers: Quick Renewal
+  const ledgerCtx = () => ({ warningDays: settings.warningDaysBeforeExpiry, collectedBy: currentUser.name || settings.agentName });
+
   const handleConfirmRenewal = (
     subId: string,
     renewalData: {
@@ -579,58 +587,8 @@ export default function App() {
   ) => {
     const sub = subscribers.find(s => s.id === subId);
     if (!sub) return;
-
-    const months = Math.max(1, Math.round(renewalData.durationMonths || 1));
-    const amountPaid = Math.max(0, Number(renewalData.amountPaid) || 0);
-    const today = todayStr();
-
-    // إذا كان الاشتراك ما زال سارياً نمدّد من تاريخ الانتهاء، وإلا من اليوم — بأشهر تقويمية
-    const baseDate = parseLocalDate(sub.expiryDate) > parseLocalDate(today) ? sub.expiryDate : today;
-    const newExpiry = addMonthsToDateStr(baseDate, months);
-
-    // الدين غير المسدد من الدورة السابقة يُرحَّل ولا يُمسح
-    const previousDebt = getRemainingDebt(sub);
-    const cycleId = uid('cycle');
-
-    // السعر الجديد المجدول يبدأ من هذه الدورة، والتجديد يعيد المشترك من الأرشيف
-    const { pendingPrice, archived: _a, archivedAt: _b, archivedBy: _c, archiveReason: _d, ...base } = sub;
-    const newSale = pendingPrice?.salePrice ?? sub.salePrice;
-    const newCost = pendingPrice?.costPrice ?? sub.costPrice;
-    const updatedSub: Subscriber = refreshSubscriberStatus({
-      ...base,
-      salePrice: newSale,
-      costPrice: newCost,
-      startDate: baseDate,
-      expiryDate: newExpiry,
-      paidAmount: amountPaid,
-      cycleMonths: months,
-      carriedDebt: previousDebt,
-      currentCycleId: cycleId,
-      status: sub.status === 'suspended' ? 'active' : sub.status,
-      lastPaymentDate: amountPaid > 0 ? today : sub.lastPaymentDate,
-    }, settings.warningDaysBeforeExpiry);
-
-    const newPayment: PaymentRecord = {
-      id: uid('pay'),
-      receiptNumber: nextReceiptNumber(payments, today),
-      subscriberId: sub.id,
-      subscriberName: sub.name,
-      amount: amountPaid,
-      date: today,
-      paymentMethod: renewalData.paymentMethod,
-      paymentType: 'renewal',
-      cycleMonths: months,
-      lateDays: Math.max(0, diffDays(sub.expiryDate, today)) || undefined,
-      notes: renewalData.notes,
-      collectedBy: currentUser.name || settings.agentName,
-      remainingBalanceAfter: getRemainingDebt(updatedSub),
-      costAmount: newCost * months,
-      provider: sub.upstreamProvider,
-      towerName: sub.towerName,
-      cycleId,
-    };
-
-    setPayments(prev => [newPayment, ...prev]);
+    const { updatedSub, payment } = buildRenewal(sub, payments, renewalData, ledgerCtx());
+    setPayments(prev => [payment, ...prev]);
     setSubscribers(prev => prev.map(s => s.id === subId ? updatedSub : s));
 
     if (renewalData.sendWhatsAppReceipt) {
@@ -647,39 +605,13 @@ export default function App() {
   const handleAddPayment = (subscriberId: string, paymentData: Partial<PaymentRecord>) => {
     const sub = subscribers.find(s => s.id === subscriberId);
     if (!sub) return;
-    const amount = Math.max(0, Number(paymentData.amount) || 0);
-    if (amount <= 0) return;
-
-    const date = paymentData.date || todayStr();
-    const updatedSub = refreshSubscriberStatus({
-      ...sub,
-      paidAmount: sub.paidAmount + amount,
-      lastPaymentDate: date,
-    }, settings.warningDaysBeforeExpiry);
-
-    const newRec: PaymentRecord = {
-      id: uid('pay'),
-      receiptNumber: nextReceiptNumber(payments, date),
-      subscriberId: sub.id,
-      subscriberName: sub.name,
-      amount,
-      date,
-      paymentMethod: paymentData.paymentMethod || 'cash',
-      paymentType: paymentData.paymentType || 'debt_installment',
-      notes: paymentData.notes || '',
-      collectedBy: currentUser.name || settings.agentName,
-      remainingBalanceAfter: getRemainingDebt(updatedSub),
-      // الأقساط والإضافات لا تحمل كلفة جملة جديدة (الكلفة سُجّلت مع التجديد)
-      costAmount: 0,
-      provider: sub.upstreamProvider,
-      towerName: sub.towerName,
-      cycleId: sub.currentCycleId,
-    };
-
+    const result = buildPayment(sub, payments, paymentData, ledgerCtx());
+    if (!result) return;
+    const { updatedSub, payment: newRec } = result;
     setPayments(prev => [newRec, ...prev]);
     setSubscribers(prev => prev.map(s => s.id === sub.id ? updatedSub : s));
     setSubscriberForHistory(prev => (prev && prev.id === sub.id ? updatedSub : prev));
-    notify(`تم تسجيل وصل ${newRec.receiptNumber} بمبلغ ${formatCurrency(amount, settings.currency)}. المتبقي: ${formatCurrency(getRemainingDebt(updatedSub), settings.currency)}`, 'success');
+    notify(`تم تسجيل وصل ${newRec.receiptNumber} بمبلغ ${formatCurrency(newRec.amount, settings.currency)}. المتبقي: ${formatCurrency(getRemainingDebt(updatedSub), settings.currency)}`, 'success');
   };
 
   const handleAddPaymentFromHistory = (paymentData: Partial<PaymentRecord>) => {
@@ -695,11 +627,7 @@ export default function App() {
     const sub = subscribers.find(s => s.id === subscriberId);
     if (!sub) return;
     const from = getRemainingDebt(sub);
-    const updated = refreshSubscriberStatus({
-      ...sub,
-      ...withRemainingDebt(sub, newDebt),
-      debtLog: [...(sub.debtLog || []), { at: new Date().toISOString(), by: currentUser.name, from, to: Math.max(0, Math.round(newDebt)), reason }],
-    }, settings.warningDaysBeforeExpiry);
+    const updated = applyDebtAdjustment(sub, newDebt, reason, currentUser.name, settings.warningDaysBeforeExpiry);
     setSubscribers(prev => prev.map(s => s.id === subscriberId ? updated : s));
     notify(newDebt <= 0
       ? `تم حذف دين ${sub.name} (${formatCurrency(from, settings.currency)}).`
@@ -723,13 +651,6 @@ export default function App() {
   const [debtSubscriberId, setDebtSubscriberId] = useState<string | null>(null);
   const debtSubscriber = debtSubscriberId ? subscribers.find(s => s.id === debtSubscriberId) || null : null;
 
-  // هل الوصل تابع للدورة الحالية للمشترك؟
-  const paymentBelongsToCurrentCycle = (pay: PaymentRecord, sub: Subscriber): boolean => {
-    if (pay.cycleId && sub.currentCycleId) return pay.cycleId === sub.currentCycleId;
-    // وصولات قديمة بلا معرّف دورة: نعتمد على التاريخ
-    return pay.date >= sub.startDate;
-  };
-
   // Handler: Delete payment/invoice (Admin only)
   const handleDeletePayment = (paymentId: string) => {
     if (currentUser.role !== 'admin') {
@@ -741,17 +662,11 @@ export default function App() {
     if (!pay) return;
 
     const sub = subscribers.find(s => s.id === pay.subscriberId);
-    let updatedSub: Subscriber | null = null;
-
     // يُخصم من رصيد المشترك فقط إذا كان الوصل تابعاً للدورة الحالية
-    if (sub && paymentBelongsToCurrentCycle(pay, sub)) {
-      const u = refreshSubscriberStatus({
-        ...sub,
-        paidAmount: Math.max(0, sub.paidAmount - pay.amount),
-      }, settings.warningDaysBeforeExpiry);
-      updatedSub = u;
-      setSubscribers(prev => prev.map(s => s.id === u.id ? u : s));
-      setSubscriberForHistory(prev => (prev && prev.id === u.id ? u : prev));
+    const updatedSub = sub ? reversePayment(sub, pay, settings.warningDaysBeforeExpiry) : null;
+    if (updatedSub) {
+      setSubscribers(prev => prev.map(s => s.id === updatedSub.id ? updatedSub : s));
+      setSubscriberForHistory(prev => (prev && prev.id === updatedSub.id ? updatedSub : prev));
     }
 
     setPayments(prev => prev.filter(p => p.id !== paymentId));
@@ -1252,6 +1167,7 @@ export default function App() {
             />
           </div>
         ) : (
+        <React.Suspense fallback={<ViewLoader />}>
         <div
           key={safeActiveTab}
           className="view-enter"
@@ -1542,6 +1458,7 @@ export default function App() {
           />
         )}
         </div>
+        </React.Suspense>
         )}
       </main>
 

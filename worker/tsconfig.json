@@ -9,5 +9,5 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["index.ts", "advisor.ts"]
+  "include": ["index.ts", "advisor.ts", "../shared/*.ts"]
 }

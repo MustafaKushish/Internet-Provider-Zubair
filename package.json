@@ -10,7 +10,8 @@
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit && tsc -p worker --noEmit",
     "dev:api": "wrangler dev --port 8787 -c wrangler.dev.jsonc",
-    "deploy": "vite build && wrangler deploy"
+    "deploy": "vite build && wrangler deploy",
+    "test": "vitest run"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.132.1",
@@ -36,6 +37,7 @@
     "tailwindcss": "^4.3.3",
     "tsx": "^4.21.0",
     "typescript": "^7.0.2",
+    "vitest": "^5.1.1",
     "wrangler": "^4.148.0"
   }
 }

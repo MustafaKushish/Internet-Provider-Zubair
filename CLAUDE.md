@@ -5,19 +5,25 @@ UI is **Arabic, RTL**. README, chat replies to the owner: **German**. Commit mes
 
 ## Save tokens
 - Never read `package-lock.json`, `dist/`, `dist-preview/`, `.wrangler/`, `node_modules/`.
-- `src/App.tsx` (~1700 lines) and the views are big: `grep -n` first, then read only the needed line range.
+- `src/App.tsx` (~1600 lines) and the views are big: `grep -n` first, then read only the needed line range.
 - Don't re-read a file after editing it. Batch edits per file.
-- Check with `npm run lint` (tsc for app + worker) and `npm run build`. No test suite exists.
+- Check with `npm run lint` (tsc for app + worker), `npm test` (vitest, money math) and `npm run build`. CI runs all three.
 - Browser check only when UI changed: `VITE_PREVIEW_MODE=true npx vite build --outDir <tmp>` then
   `npx vite preview --outDir <tmp>` (works without server, no login, empty data — seed localStorage key
   `sas_plus_subscribers_kashish_v1`).
 
 ## Layout
-- `src/App.tsx` — all app state, handlers (`handleAddPayment`, `handleConfirmRenewal`, `handleAdjustDebt`, …),
-  tab routing (`TAB_ACCESS`), simple mode, modals. Views receive data + callbacks as props.
+- `src/App.tsx` — app state, thin handlers (set state + notify), tab routing, simple mode, modals. Views are
+  `React.lazy` (`viewLoaders`, preloaded when idle) and receive data + callbacks as props.
+- `src/utils/ledger.ts` — **pure money functions** (`buildRenewal`, `buildPayment`, `applyDebtAdjustment`,
+  `reversePayment`). Change money behavior here and add a case in `src/utils/__tests__/ledger.test.ts`.
+- `shared/access.ts` — roles, tab access, collection rules (`COLLECTION_RULES`, `HIDDEN_FROM`). Used by UI **and**
+  worker; edit only here. Don't import from `src`/`worker` in it.
 - `src/components/views/*View.tsx` — one per tab; `SimpleHomeView` = simple mode home.
 - `src/components/*Modal.tsx`, `SubscriberProfile.tsx`, `QuickSearch.tsx`, `Header.tsx` (tabs, mobile bottom nav).
-- `src/components/ui/` — `Dialogs.tsx` (`appConfirm`, `notify` instead of confirm/alert), `overlayExit.ts`, `CountUp`, `ViewLoader`.
+- `src/components/ui/` — `Dialogs.tsx` (`appConfirm`, `notify` instead of confirm/alert), `overlayExit.ts`, `CountUp`, `ViewLoader`,
+  `BackButton` ("رجوع" in every dialog header), `backStack.ts` + `useEscapeKey` (Escape / phone back closes the top dialog;
+  back with no dialog goes to the previous tab).
 - `src/utils/storage.ts` — localStorage load/save, money math (`getAmountDue`, `getRemainingDebt`), formatting, WhatsApp, Excel.
 - `src/utils/debt.ts` (months-based debt), `installments.ts` (plans), `search.ts` (Arabic-tolerant search), `dates.ts` (local dates, `todayStr`).
 - `src/sync/` — offline-first sync: local data + shadow copy, push diffs / pull by cursor to `/api/sync`.
@@ -30,11 +36,12 @@ UI is **Arabic, RTL**. README, chat replies to the owner: **German**. Commit mes
   never edit `paidAmount` directly in a form. Partial payments: `handleAddPayment` adds to `paidAmount`.
 - Renewal carries unpaid debt into `carriedDebt`. Only admin may lower debt (`handleAdjustDebt`, logged in `debtLog`);
   the server rejects a `paidAmount` increase not covered by payment records in the same push.
-- Roles: `admin`, `accountant`, `technician`. Technicians see no money and cannot renew. Enforce in UI **and** worker `RULES`.
+- Roles: `admin`, `accountant`, `technician`. Technicians see no money and cannot renew. Rules live in `shared/access.ts`.
 - Archived subscribers (`archived`) are excluded from lists/stats (`activeSubscribers` in App).
 
 ## UI conventions
-- Tailwind 4 classes, dark slate theme. Overlays: root div gets `app-overlay` (animations are automatic).
+- Tailwind 4 classes, dark slate theme. Overlays: root div gets `app-overlay` (animations are automatic), call
+  `useEscapeKey(onClose)` in the dialog and use `<BackButton>` in its header.
 - Simple mode (default per user/device): big labeled buttons, ≥16px text. Keep new features reachable from
   `SubscriberProfile` instead of adding buttons to the simple list.
 - Labels visible on inputs; buttons start with a verb; Arabic number/day forms (`formatMonthsAr`, `daysAr`).

@@ -35,36 +35,33 @@ import { LazyMotion, MotionConfig } from 'motion/react';
 import * as m from 'motion/react-m';
 import { getNotificationPermission, requestNotificationPermission } from '../utils/notifications';
 import { StaffUser } from '../types/isp';
+import { canAccessTab } from '../../shared/access';
 import { canPromptInstall, isStandalone, onInstallAvailabilityChange, requestInstall } from '../pwa';
 import { notify } from './ui/Dialogs';
 import { useEscapeKey } from './ui/useEscapeKey';
 
-type Role = StaffUser['role'];
-const ALL: Role[] = ['admin', 'accountant', 'technician'];
-const OFFICE: Role[] = ['admin', 'accountant'];
 
 interface TabDef {
   id: string;
   label: string;   // الاسم الكامل (الحاسوب)
   short: string;   // اسم قصير لشريط الهاتف السفلي
   icon: React.ComponentType<{ className?: string }>;
-  roles: Role[];
   accent?: 'indigo';
 }
 
-// ترتيب الأقسام؛ الصلاحيات نفسها تُفرض أيضاً في App (TAB_ACCESS) وعلى الخادم
+// ترتيب الأقسام؛ الصلاحيات في shared/access.ts (تُفرض أيضاً على الخادم)
 const TABS: TabDef[] = [
-  { id: 'subscribers', label: 'المشتركين والاشتراكات', short: 'المشتركون', icon: Users, roles: ALL },
-  { id: 'dashboard', label: 'لوحة المؤشرات', short: 'المؤشرات', icon: LayoutDashboard, roles: OFFICE },
-  { id: 'reports', label: 'التقارير المالية والجرد الدوري', short: 'التقارير', icon: BarChart3, roles: OFFICE },
-  { id: 'cash', label: 'الصندوق والمصاريف', short: 'الصندوق', icon: Wallet, roles: OFFICE },
-  { id: 'reminders', label: 'تذكيرات الواتساب والديون', short: 'التذكيرات', icon: MessageSquare, roles: ALL },
-  { id: 'tickets', label: 'البلاغات والدعم الفني', short: 'البلاغات', icon: Wrench, roles: ALL },
-  { id: 'advisor', label: 'المستشار الذكي', short: 'المستشار', icon: Sparkles, roles: OFFICE, accent: 'indigo' },
-  { id: 'towers', label: 'الأبراج', short: 'الأبراج', icon: TowerControl, roles: ALL },
-  { id: 'providers', label: 'المزودون وباقات الزبير', short: 'المزودون', icon: Server, roles: OFFICE },
-  { id: 'users', label: 'المستخدمون والمشرفون', short: 'المستخدمون', icon: ShieldCheck, roles: ['admin'], accent: 'indigo' },
-  { id: 'settings', label: 'إعدادات المنظومة', short: 'الإعدادات', icon: Settings, roles: ['admin'] },
+  { id: 'subscribers', label: 'المشتركين والاشتراكات', short: 'المشتركون', icon: Users },
+  { id: 'dashboard', label: 'لوحة المؤشرات', short: 'المؤشرات', icon: LayoutDashboard },
+  { id: 'reports', label: 'التقارير المالية والجرد الدوري', short: 'التقارير', icon: BarChart3 },
+  { id: 'cash', label: 'الصندوق والمصاريف', short: 'الصندوق', icon: Wallet },
+  { id: 'reminders', label: 'تذكيرات الواتساب والديون', short: 'التذكيرات', icon: MessageSquare },
+  { id: 'tickets', label: 'البلاغات والدعم الفني', short: 'البلاغات', icon: Wrench },
+  { id: 'advisor', label: 'المستشار الذكي', short: 'المستشار', icon: Sparkles, accent: 'indigo' },
+  { id: 'towers', label: 'الأبراج', short: 'الأبراج', icon: TowerControl },
+  { id: 'providers', label: 'المزودون وباقات الزبير', short: 'المزودون', icon: Server },
+  { id: 'users', label: 'المستخدمون والمشرفون', short: 'المستخدمون', icon: ShieldCheck, accent: 'indigo' },
+  { id: 'settings', label: 'إعدادات المنظومة', short: 'الإعدادات', icon: Settings },
 ];
 
 /** ترتيب الأقسام في شريط التنقل (يحدد اتجاه حركة دخول القسم) */
@@ -143,7 +140,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [iosHelpOpen, setIosHelpOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
 
-  const visibleTabs = TABS.filter(t => t.roles.includes(currentUser.role));
+  const visibleTabs = TABS.filter(t => canAccessTab(currentUser.role, t.id));
   const isTablet = useIsTablet();
   const primaryTabs = visibleTabs
     .filter(t => MOBILE_PRIMARY.includes(t.id))

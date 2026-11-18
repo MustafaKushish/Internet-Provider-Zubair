@@ -175,7 +175,8 @@ export interface ReportSummary {
   towerBreakdown: { tower: string; userCount: number; revenue: number }[];
 }
 
-export type UserRole = 'admin' | 'accountant' | 'technician';
+export type { Role as UserRole } from '../../shared/access';
+import type { Role as UserRole } from '../../shared/access';
 
 export interface StaffUser {
   id: string;

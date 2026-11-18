@@ -8,6 +8,7 @@
  */
 
 import { handleAdvisorChat, advisorStatus } from './advisor';
+import { COLLECTION_RULES, HIDDEN_FROM, isRole, type Collection, type Role } from '../shared/access';
 
 export interface Env {
   DB: D1Database;
@@ -19,27 +20,7 @@ export interface Env {
   AI?: { run: (model: string, input: any) => Promise<any> }; // Cloudflare Workers AI
 }
 
-type Role = 'admin' | 'accountant' | 'technician';
-type Collection = 'subscribers' | 'payments' | 'tickets' | 'providers' | 'towers' | 'settings' | 'expenses';
-
-const ALL: Role[] = ['admin', 'accountant', 'technician'];
-
-// من يحق له الإنشاء / التعديل / الحذف في كل مجموعة
-const RULES: Record<Collection, { create: Role[]; update: Role[]; delete: Role[] }> = {
-  subscribers: { create: ALL, update: ALL, delete: ['admin'] },
-  payments: { create: ALL, update: ['admin', 'accountant'], delete: ['admin'] },
-  tickets: { create: ALL, update: ALL, delete: ALL },
-  providers: { create: ['admin', 'accountant'], update: ['admin', 'accountant'], delete: ['admin', 'accountant'] },
-  towers: { create: ['admin', 'accountant'], update: ['admin', 'accountant'], delete: ['admin', 'accountant'] },
-  settings: { create: ['admin'], update: ['admin'], delete: [] },
-  // المصاريف التشغيلية (إيجار، مولد، رواتب…): يسجلها المكتب، والحذف للمدير فقط
-  expenses: { create: ['admin', 'accountant'], update: ['admin', 'accountant'], delete: ['admin'] },
-};
-
-// مجموعات مالية لا تُرسل للفني عند السحب
-const HIDDEN_FROM: Partial<Record<Collection, Role[]>> = {
-  expenses: ['technician'],
-};
+const RULES = COLLECTION_RULES;
 
 const SESSION_HOURS = 24;
 // الخطة المجانية في Cloudflare تسمح بـ 10ms من وقت المعالج لكل طلب؛ 5000 دورة ≈ 3ms.
@@ -189,7 +170,7 @@ function validatePassword(pw: unknown): string {
 }
 
 function validateRole(r: unknown): Role {
-  if (r === 'admin' || r === 'accountant' || r === 'technician') return r;
+  if (isRole(r)) return r;
   throw new HttpError(400, 'الدور غير صالح.');
 }
 

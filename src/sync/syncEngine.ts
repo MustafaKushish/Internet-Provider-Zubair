@@ -1,4 +1,5 @@
 import { apiRequest, ApiError } from './api';
+import { COLLECTION_NAMES, type Collection } from '../../shared/access';
 
 /**
  * مزامنة تلقائية بين بيانات المتصفح والخادم
@@ -10,8 +11,8 @@ import { apiRequest, ApiError } from './api';
  * - البيانات تبقى محفوظة في المتصفح، فالعمل يستمر بدون إنترنت ويُرفع عند عودة الاتصال
  */
 
-export type CollectionName = 'subscribers' | 'payments' | 'tickets' | 'providers' | 'towers' | 'settings' | 'expenses';
-export const COLLECTIONS: CollectionName[] = ['subscribers', 'payments', 'tickets', 'providers', 'towers', 'settings', 'expenses'];
+export type CollectionName = Collection;
+export const COLLECTIONS: CollectionName[] = COLLECTION_NAMES;
 
 type Item = { id: string; [key: string]: any };
 
