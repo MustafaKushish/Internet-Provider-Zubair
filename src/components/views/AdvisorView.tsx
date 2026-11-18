@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useEscapeKey } from '../ui/useEscapeKey';
 import { Expense, PaymentRecord, Subscriber, SupportTicket, SystemSettings, TowerPoint, UpstreamProvider } from '../../types/isp';
 import { buildBusinessSnapshot, ADVISOR_NOTES_MAX } from '../../ai/businessSnapshot';
 import { NO_TOWER_LABEL, normTower } from '../../utils/towers';
@@ -128,6 +129,8 @@ export const AdvisorView: React.FC<AdvisorViewProps> = (props) => {
   const [remaining, setRemaining] = useState<number | null>(null);
   const [showData, setShowData] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
+  useEscapeKey(() => setShowData(false), showData);
+  useEscapeKey(() => setShowNotes(false), showNotes);
   const [notesDraft, setNotesDraft] = useState('');
   const towerNames = useMemo(() => {
     const names = new Set<string>();

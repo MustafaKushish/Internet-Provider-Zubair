@@ -4,6 +4,7 @@ import { useEscapeKey } from './ui/useEscapeKey';
 import { Subscriber, SystemSettings } from '../types/isp';
 import { getWhatsAppTemplates, generateWhatsAppLink } from '../utils/storage';
 import { X, Send, Copy, Check, MessageSquare, Key, AlertCircle, Clock, Receipt, UserCheck } from 'lucide-react';
+import { BackButton } from './ui/BackButton';
 
 interface WhatsAppReminderModalProps {
   isOpen: boolean;
@@ -83,12 +84,7 @@ const WhatsAppReminderModalInner: React.FC<WhatsAppReminderModalProps & { subscr
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <BackButton onClick={onClose} />
         </div>
 
         {/* Template Type Tabs */}

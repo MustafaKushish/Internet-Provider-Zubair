@@ -6,6 +6,7 @@ import { formatMonthsAr, monthsLate } from '../utils/debt';
 import { NO_TOWER_LABEL, normTower } from '../utils/towers';
 import { matchesSubscriber } from '../utils/search';
 import { useEscapeKey } from './ui/useEscapeKey';
+import { BackButton } from './ui/BackButton';
 
 interface QuickSearchProps {
   open: boolean;
@@ -78,9 +79,7 @@ const QuickSearchInner: React.FC<QuickSearchProps> = ({
             className="flex-1 bg-transparent py-4 text-base text-white placeholder-slate-500 focus:outline-none"
             autoComplete="off"
           />
-          <button type="button" onClick={onClose} aria-label="إغلاق" className="text-slate-400 hover:text-white p-1 cursor-pointer">
-            <X className="w-5 h-5" />
-          </button>
+          <BackButton onClick={onClose} />
         </div>
 
         <div className="max-h-[65vh] overflow-y-auto">

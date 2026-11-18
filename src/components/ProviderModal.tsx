@@ -3,6 +3,7 @@ import { useEscapeKey } from './ui/useEscapeKey';
 import { UpstreamProvider, ProviderPlan, Subscriber } from '../types/isp';
 import { Server, X, Plus, Edit2, Trash2, Check, AlertCircle, Phone, FileText, Gauge, DollarSign } from 'lucide-react';
 import { notify } from './ui/Dialogs';
+import { BackButton } from './ui/BackButton';
 
 interface ProviderModalProps {
   isOpen: boolean;
@@ -173,12 +174,7 @@ const ProviderModalInner: React.FC<ProviderModalProps> = ({
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <BackButton onClick={onClose} />
         </div>
 
         {/* Form Body */}

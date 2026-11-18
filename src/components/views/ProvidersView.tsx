@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useEscapeKey } from '../ui/useEscapeKey';
 import { UpstreamProvider, ProviderPlan, Subscriber, SystemSettings, TowerPoint } from '../../types/isp';
 import { formatCurrency } from '../../utils/storage';
 import {
@@ -64,6 +65,8 @@ export const ProvidersView: React.FC<ProvidersViewProps> = ({
   const [newPlanCost, setNewPlanCost] = useState<number>(24000);
   const [newPlanSale, setNewPlanSale] = useState<number>(35000);
   const [newPlanSpeed, setNewPlanSpeed] = useState('30 Mbps');
+  useEscapeKey(() => setPriceDialog(null), !!priceDialog);
+  useEscapeKey(() => setNewPlanModal(null), !!newPlanModal);
 
   const filteredProviders = providers.filter(p =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||

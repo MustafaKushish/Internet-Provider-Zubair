@@ -4,6 +4,7 @@ import { Subscriber, SystemSettings } from '../types/isp';
 import { formatCurrency, getRemainingDebt } from '../utils/storage';
 import { todayStr } from '../utils/dates';
 import { X, Printer, Wifi, ShieldCheck, CheckCircle } from 'lucide-react';
+import { BackButton } from './ui/BackButton';
 
 interface ReceiptModalProps {
   isOpen: boolean;
@@ -55,12 +56,7 @@ const ReceiptModalInner: React.FC<ReceiptModalProps & { subscriber: Subscriber }
               <Printer className="w-4 h-4" />
               <span>طباعة الوصل</span>
             </button>
-            <button
-              onClick={onClose}
-              className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-700/50 transition cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <BackButton onClick={onClose} />
           </div>
         </div>
 

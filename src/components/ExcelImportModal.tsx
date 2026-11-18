@@ -3,6 +3,7 @@ import { useEscapeKey } from './ui/useEscapeKey';
 import { Subscriber } from '../types/isp';
 import { parseExcelSubscribers } from '../utils/storage';
 import { X, Upload, FileSpreadsheet, Check, AlertCircle, RefreshCw } from 'lucide-react';
+import { BackButton } from './ui/BackButton';
 
 interface ExcelImportModalProps {
   isOpen: boolean;
@@ -67,12 +68,7 @@ const ExcelImportModalInner: React.FC<ExcelImportModalProps> = ({
               <p className="text-xs text-slate-400">انقل بياناتك القديمة بسهولة دون الحاجة لكتابة كل مشترك يدوياً</p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-700/50 transition cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <BackButton onClick={onClose} />
         </div>
 
         {/* Content */}

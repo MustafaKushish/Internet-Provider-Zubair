@@ -63,6 +63,7 @@ import {
 // Components & Modals
 import { Header, TAB_ORDER } from './components/Header';
 import { ViewLoader } from './components/ui/ViewLoader';
+import { pushTabHistory, setTabBackHandler } from './components/ui/backStack';
 import { SimpleHomeView } from './components/views/SimpleHomeView';
 import { SubscriberModal } from './components/SubscriberModal';
 import { QuickRenewModal } from './components/QuickRenewModal';
@@ -151,11 +152,22 @@ export default function App() {
   // اتجاه حركة دخول القسم: من جهة التبويب الجديد في شريط التنقل (من اليمين لليسار)
   const [viewDir, setViewDir] = useState<1 | -1>(1);
   // لا يمكن فتح تبويب غير مسموح لدور المستخدم الحالي
-  const setActiveTab = (tab: string) => {
+  const showTab = (tab: string) => {
     const next = canAccessTab(currentUser.role, tab) ? tab : 'subscribers';
     setViewDir(TAB_ORDER.indexOf(next) >= TAB_ORDER.indexOf(activeTab) ? 1 : -1);
     setActiveTabRaw(next);
+    return next;
   };
+  const setActiveTab = (tab: string) => pushTabHistory(showTab(tab));
+  // زر رجوع في الهاتف/المتصفح يعود للقسم السابق
+  const showTabRef = React.useRef(showTab);
+  showTabRef.current = showTab;
+  useEffect(() => {
+    pushTabHistory(activeTab, true);
+    setTabBackHandler(tab => showTabRef.current(tab));
+    return () => setTabBackHandler(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const safeActiveTab = canAccessTab(currentUser.role, activeTab) ? activeTab : 'subscribers';
 
   const [isTowerModalOpen, setIsTowerModalOpen] = useState(false);

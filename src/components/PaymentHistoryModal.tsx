@@ -20,6 +20,7 @@ import {
   Lock
 } from 'lucide-react';
 import { appConfirm } from './ui/Dialogs';
+import { BackButton } from './ui/BackButton';
 
 interface PaymentHistoryModalProps {
   isOpen: boolean;
@@ -119,12 +120,7 @@ ${settings.ispName} - ${settings.contactPhone}`;
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-700/50 transition cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <BackButton onClick={onClose} />
         </div>
 
         {/* Financial Summary Top Bar */}

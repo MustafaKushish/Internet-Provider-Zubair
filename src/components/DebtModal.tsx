@@ -7,6 +7,7 @@ import { todayStr } from '../utils/dates';
 import { formatCurrency, generateWhatsAppLink, getAmountDue, getRemainingDebt } from '../utils/storage';
 import { debtInMonths, formatMonthsAr, monthsLate } from '../utils/debt';
 import { X, Wallet, Lock, Minus, Plus, History, Trash2, Save, CreditCard, AlertTriangle, CalendarClock } from 'lucide-react';
+import { BackButton } from './ui/BackButton';
 
 interface DebtModalProps {
   subscriber: Subscriber | null;
@@ -139,9 +140,7 @@ const DebtModalInner: React.FC<DebtModalProps & { subscriber: Subscriber }> = ({
               <p className="text-xs text-slate-400">{sub.planName} • {sub.upstreamProvider} • الشهر بـ {money(price)}</p>
             </div>
           </div>
-          <button type="button" onClick={onClose} className="text-slate-400 hover:text-white p-2 rounded-lg cursor-pointer" aria-label="إغلاق">
-            <X className="w-5 h-5" />
-          </button>
+          <BackButton onClick={onClose} />
         </div>
 
         <div className="p-5 space-y-5 text-xs" style={{ fontVariantNumeric: 'tabular-nums' }}>

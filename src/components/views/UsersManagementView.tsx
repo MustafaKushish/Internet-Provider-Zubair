@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useEscapeKey } from '../ui/useEscapeKey';
 import { StaffUser, UserRole } from '../../types/isp';
 import {
   Users,
@@ -48,6 +49,7 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
   const [phone, setPhone] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
+  useEscapeKey(() => setIsModalOpen(false), isModalOpen);
 
   const handleOpenAdd = () => {
     setEditingUser(null);

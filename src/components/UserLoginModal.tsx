@@ -3,6 +3,7 @@ import { useEscapeKey } from './ui/useEscapeKey';
 import { StaffUser } from '../types/isp';
 import { loginAndStore } from '../sync/api';
 import { X, Lock, Key, User, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { BackButton } from './ui/BackButton';
 
 interface UserLoginModalProps {
   isOpen: boolean;
@@ -69,12 +70,7 @@ const UserLoginModalInner: React.FC<UserLoginModalProps> = ({
               <p className="text-xs text-slate-400">حسابك الحالي: {currentUser.name}</p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-700/50 transition cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <BackButton onClick={onClose} />
         </div>
 
         {/* Content */}

@@ -4,6 +4,7 @@ import { todayStr, parseLocalDate, toLocalDateStr, addMonthsToDateStr } from '..
 import { getRemainingDebt } from '../utils/storage';
 import { Subscriber, UpstreamProvider, StaffUser } from '../types/isp';
 import { X, Key, Eye, EyeOff, Sparkles, Calendar, DollarSign, TowerControl, Phone, User, ShieldCheck, Wrench } from 'lucide-react';
+import { BackButton } from './ui/BackButton';
 
 interface SubscriberModalProps {
   isOpen: boolean;
@@ -206,12 +207,7 @@ export const SubscriberModal: React.FC<SubscriberModalProps> = ({
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-700/50 transition cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <BackButton onClick={onClose} />
         </div>
 
         {/* Modal Body Form */}

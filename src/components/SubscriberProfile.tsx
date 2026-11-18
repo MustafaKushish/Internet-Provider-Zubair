@@ -12,6 +12,7 @@ import {
   X, Phone, MessageSquare, RefreshCw, Wallet, Edit, Wrench, Printer, TowerControl, Copy, Eye, EyeOff,
   Receipt, Scale, UserPlus, CalendarClock, MapPin, StickyNote, Archive,
 } from 'lucide-react';
+import { BackButton } from './ui/BackButton';
 
 interface SubscriberProfileProps {
   subscriber: Subscriber | null;
@@ -147,7 +148,7 @@ const ProfileInner: React.FC<SubscriberProfileProps & { sub: Subscriber }> = ({
               </div>
             </div>
           </div>
-          <button type="button" onClick={onClose} aria-label="إغلاق" className="text-slate-400 hover:text-white p-1.5 cursor-pointer"><X className="w-5 h-5" /></button>
+          <BackButton onClick={onClose} />
         </div>
 
         <div className={`flex-1 overflow-y-auto p-5 space-y-4 ${simple ? 'text-sm' : 'text-xs'}`}>

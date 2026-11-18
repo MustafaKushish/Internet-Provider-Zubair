@@ -5,6 +5,7 @@ import { X, RefreshCw, Calendar, DollarSign, CreditCard, Send, CheckCircle2 } fr
 import confetti from 'canvas-confetti';
 import { getRemainingDebt } from '../utils/storage';
 import { todayStr, parseLocalDate, addMonthsToDateStr } from '../utils/dates';
+import { BackButton } from './ui/BackButton';
 
 interface QuickRenewModalProps {
   isOpen: boolean;
@@ -96,12 +97,7 @@ const QuickRenewModalInner: React.FC<QuickRenewModalProps & { subscriber: Subscr
               <p className="text-xs text-cyan-300 font-semibold">{subscriber.name} ({subscriber.username})</p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <BackButton onClick={onClose} />
         </div>
 
         {/* Modal Form */}

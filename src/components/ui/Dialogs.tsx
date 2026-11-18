@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Info, X } from 'lucide-react';
+import { registerBackClose } from './backStack';
 
 /**
  * نوافذ تأكيد وتنبيهات داخل المنظومة بدلاً من confirm() و alert() الخاصة بالمتصفح
@@ -108,7 +109,9 @@ export const DialogHost: React.FC = () => {
       if (e.key === 'Escape') answer(false);
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    // زر رجوع في الهاتف = إلغاء
+    const unregister = registerBackClose(() => answer(false));
+    return () => { window.removeEventListener('keydown', onKey); unregister(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current?.id]);
 

@@ -4,6 +4,7 @@ import { todayStr } from '../utils/dates';
 import { SupportTicket, Subscriber, IssueType, TicketPriority, TicketStatus } from '../types/isp';
 import { X, Wrench, AlertTriangle, CheckCircle2, User, Phone, TowerControl, Send, ShieldAlert, FileText } from 'lucide-react';
 import { generateWhatsAppLink } from '../utils/storage';
+import { BackButton } from './ui/BackButton';
 
 interface TicketModalProps {
   isOpen: boolean;
@@ -150,12 +151,7 @@ ${resolutionNotes ? `ملاحظات الحل: ${resolutionNotes}` : ''}
               <p className="text-xs text-slate-400">إدارة ومتابعة مشاكل المشتركين وانقطاعات الخدمة والنزاعات المالية</p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-700/50 transition cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <BackButton onClick={onClose} />
         </div>
 
         {/* Form Body */}
