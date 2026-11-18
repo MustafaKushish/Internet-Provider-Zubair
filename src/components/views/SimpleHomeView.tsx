@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { MessageCircle, RefreshCw, Search, UserPlus, UserRound, X } from 'lucide-react';
+import { AlertCircle, BellRing, CheckCircle2, MessageCircle, RefreshCw, Search, UserPlus, UserRound, Users, Wallet, X } from 'lucide-react';
 import { StaffUser, Subscriber, SystemSettings } from '../../types/isp';
 import { formatCurrency, getDaysRemaining, getRemainingDebt } from '../../utils/storage';
 import { matchesSubscriber } from '../../utils/search';
@@ -31,11 +31,27 @@ function daysAr(n: number): string {
   return n <= 10 ? `${n} أيام` : `${n} يوماً`;
 }
 
-function statusLine(days: number, expiry: string): { text: string; cls: string } {
-  if (days < 0) return { text: `منتهي منذ ${daysAr(-days)}`, cls: 'text-rose-300' };
-  if (days === 0) return { text: 'ينتهي اليوم', cls: 'text-amber-300' };
-  if (days <= 7) return { text: `ينتهي بعد ${daysAr(days)}`, cls: 'text-amber-300' };
-  return { text: `فعّال حتى ${expiry}`, cls: 'text-emerald-300' };
+type Tone = 'cyan' | 'rose' | 'amber' | 'emerald' | 'slate';
+
+/** ألوان موحّدة: أحمر = منتهي فقط، كهرماني = ينتهي قريباً أو دين، أخضر = ساري */
+const TONE: Record<Tone, { text: string; soft: string; ring: string }> = {
+  cyan: { text: 'text-cyan-200', soft: 'bg-cyan-500/15 text-cyan-200', ring: 'border-cyan-400 bg-cyan-500/15' },
+  rose: { text: 'text-rose-200', soft: 'bg-rose-500/15 text-rose-200', ring: 'border-rose-400 bg-rose-500/15' },
+  amber: { text: 'text-amber-200', soft: 'bg-amber-500/15 text-amber-200', ring: 'border-amber-400 bg-amber-500/15' },
+  emerald: { text: 'text-emerald-200', soft: 'bg-emerald-500/15 text-emerald-200', ring: 'border-emerald-400 bg-emerald-500/15' },
+  slate: { text: 'text-slate-100', soft: 'bg-white/10 text-slate-100', ring: 'border-slate-300 bg-white/10' },
+};
+
+function statusOf(days: number, expiry: string): { text: string; tone: Tone } {
+  if (days < 0) return { text: `منتهي منذ ${daysAr(-days)}`, tone: 'rose' };
+  if (days === 0) return { text: 'ينتهي اليوم', tone: 'amber' };
+  if (days <= 7) return { text: `ينتهي بعد ${daysAr(days)}`, tone: 'amber' };
+  return { text: `ساري حتى ${expiry}`, tone: 'emerald' };
+}
+
+function greeting(): string {
+  const h = new Date().getHours();
+  return h < 12 ? 'صباح الخير' : 'مساء الخير';
 }
 
 export const SimpleHomeView: React.FC<SimpleHomeViewProps> = ({
@@ -82,108 +98,118 @@ export const SimpleHomeView: React.FC<SimpleHomeViewProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, query, filter, searching]);
 
-  const chips: Array<{ id: Filter; label: string }> = [
-    { id: 'attention', label: 'يحتاج متابعة' },
-    { id: 'expired', label: 'منتهي' },
-    ...(office ? [{ id: 'debts' as Filter, label: 'عليهم ديون' }] : []),
-    { id: 'all', label: 'كل المشتركين' },
+  const tiles: Array<{ id: Filter; label: string; icon: React.ComponentType<{ className?: string }>; tone: Tone }> = [
+    { id: 'attention', label: 'يحتاج متابعة', icon: BellRing, tone: 'cyan' },
+    { id: 'expired', label: 'منتهي', icon: AlertCircle, tone: 'rose' },
+    ...(office ? [{ id: 'debts' as Filter, label: 'عليهم ديون', icon: Wallet, tone: 'amber' as Tone }] : []),
+    { id: 'all', label: 'كل المشتركين', icon: Users, tone: 'slate' },
   ];
+  const today = new Intl.DateTimeFormat('ar-IQ-u-nu-latn', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date());
 
   return (
-    <div className="space-y-5 max-w-3xl mx-auto text-base">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="text-2xl font-semibold text-white">أهلاً {currentUser.name.split(' ')[0]}</h2>
-          <p className="text-base text-slate-400 mt-1">ابحث عن المشترك ثم اضغط الزر المطلوب.</p>
+    <div className="space-y-4 max-w-3xl mx-auto text-base leading-relaxed">
+      {/* الترحيب + إضافة مشترك */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-xl sm:text-2xl font-semibold text-white truncate">{greeting()}، {currentUser.name.split(' ')[0]}</h2>
+          <p className="text-sm text-slate-400">{today}</p>
         </div>
         <button
           type="button"
           onClick={onAdd}
-          className="h-14 px-6 rounded-2xl bg-cyan-600 hover:bg-cyan-500 text-white text-lg font-semibold flex items-center gap-2 cursor-pointer shadow-lg shadow-cyan-900/40"
+          className="h-12 px-4 sm:px-5 rounded-2xl bg-cyan-600 text-white text-base font-semibold flex items-center gap-2 cursor-pointer flex-shrink-0"
         >
-          <UserPlus className="w-6 h-6" />
-          إضافة مشترك جديد
+          <UserPlus className="w-5 h-5" />
+          أضف مشتركاً
         </button>
       </div>
 
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-4">
-        <div>
-          <label htmlFor="simple-search" className="block text-base font-semibold text-slate-200 mb-2">
-            البحث عن مشترك
-          </label>
-          <div className="relative">
-            <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-6 h-6 text-slate-400 pointer-events-none" />
-            <input
-              id="simple-search"
-              type="search"
-              value={query}
-              onChange={e => { setQuery(e.target.value); setLimit(PAGE); }}
-              autoComplete="off"
-              className="w-full h-14 rounded-xl bg-slate-950 border-2 border-slate-700 focus:border-cyan-500 outline-none pr-13 pl-14 text-lg text-white placeholder:text-slate-500"
-              placeholder="مثلاً: أحمد أو 0780"
-              aria-describedby="simple-search-help"
-            />
-            {searching && (
-              <button
-                type="button"
-                onClick={() => setQuery('')}
-                aria-label="مسح البحث"
-                className="absolute left-2 top-1/2 -translate-y-1/2 w-11 h-11 rounded-lg text-slate-300 hover:bg-slate-800 flex items-center justify-center cursor-pointer"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            )}
-          </div>
-          <p id="simple-search-help" className="text-sm text-slate-400 mt-2">اكتب الاسم أو رقم الهاتف.</p>
+      {/* البحث: المهمة الأولى */}
+      <div className="bg-slate-900 border border-slate-700 rounded-2xl p-3 sm:p-4">
+        <label htmlFor="simple-search" className="block text-sm font-semibold text-slate-300 mb-2">البحث عن مشترك</label>
+        <div className="relative">
+          <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-6 h-6 text-cyan-300 pointer-events-none" />
+          <input
+            id="simple-search"
+            type="search"
+            value={query}
+            onChange={e => { setQuery(e.target.value); setLimit(PAGE); }}
+            autoComplete="off"
+            className="w-full h-14 rounded-xl bg-slate-950 border-2 border-slate-700 focus:border-cyan-400 outline-none pr-13 pl-14 text-lg text-white placeholder:text-slate-500"
+            placeholder="الاسم أو رقم الهاتف"
+          />
+          {searching && (
+            <button
+              type="button"
+              onClick={() => setQuery('')}
+              aria-label="مسح البحث"
+              className="absolute left-2 top-1/2 -translate-y-1/2 w-11 h-11 rounded-lg text-slate-300 hover:bg-slate-800 flex items-center justify-center cursor-pointer"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          )}
         </div>
-
-        {!searching && (
-          <div className="flex flex-wrap gap-2" role="group" aria-label="عرض">
-            {chips.map(c => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => { setFilter(c.id); setLimit(PAGE); }}
-                aria-pressed={filter === c.id}
-                className={`h-12 px-4 rounded-xl text-base font-semibold border-2 cursor-pointer ${
-                  filter === c.id
-                    ? 'bg-cyan-500/15 border-cyan-500 text-cyan-200'
-                    : 'bg-slate-950 border-slate-700 text-slate-300 hover:border-slate-500'
-                }`}
-              >
-                {c.label} <span className="tabular-nums">({counts[c.id]})</span>
-              </button>
-            ))}
-          </div>
-        )}
       </div>
 
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-800 text-base text-slate-300">
-          {searching ? `نتائج البحث: ${visible.length}` : `${chips.find(c => c.id === filter)!.label}: ${visible.length}`}
+      {/* نظرة اليوم = الفلاتر */}
+      {!searching && (
+        <div className={`grid grid-cols-2 gap-3 ${tiles.length === 4 ? 'sm:grid-cols-4' : 'sm:grid-cols-3'}`} role="group" aria-label="عرض">
+          {tiles.map(t => {
+            const Icon = t.icon;
+            const active = filter === t.id;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => { setFilter(t.id); setLimit(PAGE); }}
+                aria-pressed={active}
+                className={`min-h-[4.5rem] rounded-2xl border-2 p-3 flex items-center gap-3 text-right cursor-pointer ${active ? TONE[t.tone].ring : 'bg-slate-900 border-slate-700 hover:border-slate-500'}`}
+              >
+                <span className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${TONE[t.tone].soft}`}>
+                  <Icon className="w-5 h-5" />
+                </span>
+                <span className="min-w-0">
+                  <span className={`block text-2xl font-bold tabular-nums leading-tight ${TONE[t.tone].text}`}>{counts[t.id]}</span>
+                  <span className="block text-sm text-slate-300 leading-snug">{t.label}</span>
+                </span>
+              </button>
+            );
+          })}
         </div>
+      )}
+
+      {/* القائمة */}
+      <div className="bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden">
+        {searching && <p className="px-4 py-3 border-b border-slate-800 text-sm text-slate-300">نتائج البحث: {visible.length}</p>}
 
         {visible.length === 0 ? (
-          <div className="px-4 py-12 text-center space-y-2">
-            <p className="text-lg text-white">{searching ? 'لا يوجد مشترك بهذا الاسم أو الرقم.' : filter === 'attention' ? 'لا يوجد أحد يحتاج متابعة اليوم.' : 'لا يوجد مشتركون هنا.'}</p>
+          <div className="px-4 py-12 text-center space-y-3">
+            <CheckCircle2 className="w-12 h-12 text-emerald-300 mx-auto" />
+            <p className="text-lg text-white">{searching ? 'لا يوجد مشترك بهذا الاسم أو الرقم.' : filter === 'attention' ? 'لا أحد يحتاج متابعة اليوم.' : 'لا يوجد مشتركون هنا.'}</p>
             <p className="text-base text-slate-400">{searching ? 'تأكد من الكتابة أو جرّب جزءاً من الاسم.' : 'كل شيء على ما يرام.'}</p>
+            {!searching && filter !== 'all' && counts.all > 0 && (
+              <button type="button" onClick={() => setFilter('all')} className="h-12 px-5 rounded-xl bg-slate-800 border border-slate-700 text-white font-semibold cursor-pointer">
+                عرض كل المشتركين ({counts.all})
+              </button>
+            )}
           </div>
         ) : (
           <ul className="divide-y divide-slate-800">
             {visible.slice(0, limit).map(({ sub, days, debt }) => {
-              const st = statusLine(days, sub.expiryDate);
+              const st = statusOf(days, sub.expiryDate);
               return (
                 <li key={sub.id} className="p-4 space-y-3">
-                  <button
-                    type="button"
-                    onClick={() => onProfile(sub)}
-                    className="w-full text-right cursor-pointer group"
-                  >
-                    <span className="block text-lg font-semibold text-white group-hover:text-cyan-200">{sub.name}</span>
-                    <span className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-base">
-                      <span className={st.cls}>{st.text}</span>
-                      {office && debt > 0 && <span className="text-rose-300">عليه {formatCurrency(debt, settings.currency)}</span>}
-                      {sub.phone && <span className="text-slate-400 tabular-nums" dir="ltr">{sub.phone}</span>}
+                  <button type="button" onClick={() => onProfile(sub)} className="w-full flex items-center gap-3 text-right cursor-pointer group">
+                    <span className={`w-12 h-12 rounded-2xl flex items-center justify-center text-lg font-bold flex-shrink-0 ${TONE.slate.soft}`}>
+                      {sub.name.trim().charAt(0)}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-lg font-semibold text-white group-hover:text-cyan-200 truncate">{sub.name}</span>
+                      <span className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-0.5 text-sm">
+                        <span className={`px-2 py-0.5 rounded-full ${TONE[st.tone].soft}`}>{st.text}</span>
+                        {office && debt > 0 && <span className="text-amber-200 tabular-nums">دين {formatCurrency(debt, settings.currency)}</span>}
+                        {sub.phone && <span className="text-slate-400 tabular-nums" dir="ltr">{sub.phone}</span>}
+                      </span>
                     </span>
                   </button>
                   <div className={`grid gap-2 ${office ? 'grid-cols-3' : 'grid-cols-2'}`}>
@@ -191,7 +217,7 @@ export const SimpleHomeView: React.FC<SimpleHomeViewProps> = ({
                       <button
                         type="button"
                         onClick={() => onRenew(sub)}
-                        className="h-12 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-base font-semibold flex items-center justify-center gap-2 cursor-pointer"
+                        className="h-12 rounded-xl bg-emerald-600 text-white text-base font-semibold flex items-center justify-center gap-2 cursor-pointer"
                       >
                         <RefreshCw className="w-5 h-5" /> تجديد
                       </button>
@@ -202,7 +228,7 @@ export const SimpleHomeView: React.FC<SimpleHomeViewProps> = ({
                       disabled={!sub.phone}
                       className="h-12 rounded-xl bg-slate-800 border border-slate-700 hover:bg-slate-700 text-white text-base font-semibold flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                      <MessageCircle className="w-5 h-5 text-emerald-400" /> واتساب
+                      <MessageCircle className="w-5 h-5 text-emerald-300" /> واتساب
                     </button>
                     <button
                       type="button"
@@ -225,7 +251,7 @@ export const SimpleHomeView: React.FC<SimpleHomeViewProps> = ({
               onClick={() => setLimit(l => l + PAGE)}
               className="w-full h-12 rounded-xl bg-slate-800 border border-slate-700 text-white text-base font-semibold cursor-pointer hover:bg-slate-700"
             >
-              عرض المزيد ({visible.length - limit} متبقي)
+              عرض المزيد ({visible.length - limit} متبقٍ)
             </button>
           </div>
         )}

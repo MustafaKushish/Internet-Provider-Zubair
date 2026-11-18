@@ -43,6 +43,9 @@ Der Windows-Installer ist eine Electron-Hülle (`desktop/`) um dieselbe Adresse.
 
 ## Bedienung
 
+- **Startseite (einfacher Modus):** Begrüßung nach Tageszeit mit Datum, daneben „أضف مشتركاً“. Darunter die Suche und
+  vier Kacheln, die zugleich Überblick und Filter sind: „يحتاج متابعة“, „منتهي“, „عليهم ديون“, „كل المشتركين“ mit Zahl.
+  Farben haben eine feste Bedeutung: Rot nur für abgelaufen, Gelb für bald ablaufend oder Schulden, Grün für aktiv.
 - **Einfacher Modus (Standard):** eine einzige Seite mit großer Suche („البحث عن مشترك“), drei Filtern
   (يحتاج متابعة / منتهي / كل المشتركين) und pro Kunde nur drei große, beschriftete Knöpfe: تجديد, واتساب, الملف.
   Alles andere (Schulden, Quittung, Bearbeiten, Störung) steckt im Kundenprofil („الملف“). Oben führt „كل الأقسام“

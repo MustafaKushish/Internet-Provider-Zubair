@@ -217,9 +217,9 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               type="button"
               onClick={onLogout}
-              className="h-12 px-3 sm:px-4 rounded-xl bg-rose-950/70 border border-rose-800/80 text-rose-200 text-base font-semibold flex items-center gap-2 cursor-pointer hover:bg-rose-900"
+              className="h-12 px-3 sm:px-4 rounded-xl bg-slate-800 border border-slate-700 text-slate-100 text-base font-semibold flex items-center gap-2 cursor-pointer hover:bg-slate-700"
             >
-              <LogOut className="w-5 h-5" />
+              <LogOut className="w-5 h-5 text-rose-300" />
               خروج
             </button>
           </div>
@@ -263,7 +263,7 @@ export const Header: React.FC<HeaderProps> = ({
             type="button"
             onClick={onLogout}
             aria-label="تسجيل الخروج"
-            className="w-9 h-9 rounded-xl bg-rose-950/70 border border-rose-800/80 text-rose-300 flex items-center justify-center cursor-pointer"
+            className="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 text-rose-300 flex items-center justify-center cursor-pointer"
           >
             <LogOut className="w-4 h-4" />
           </button>
@@ -349,7 +349,7 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 onClick={onLogout}
                 title="تسجيل الخروج وقفل المنظومة (أمان) • يتم القفل تلقائياً بعد 60 دقيقة من الخمول"
-                className="bg-rose-950/70 hover:bg-rose-900 border border-rose-800/80 text-rose-300 hover:text-white px-2.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-md shadow-rose-950/40"
+                className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 hover:text-white px-2.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
               >
                 <LogOut className="w-4 h-4 text-rose-400" />
                 <span className="hidden sm:inline">خروج</span>

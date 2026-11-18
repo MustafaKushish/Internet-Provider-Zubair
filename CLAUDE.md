@@ -56,4 +56,6 @@ UI is **Arabic, RTL**. README, chat replies to the owner: **German**. Commit mes
   `bg-slate-900` = glass card, `bg-slate-800` = glass chip/button, `border-slate-700` = soft white border. Don't use
   `text-slate-700..900` outside `.bg-white` paper (it would be translucent). `bg-slate-950` stays opaque (inputs, page).
   Blur only on header, bottom nav and dialogs (performance). Primary `bg-cyan/emerald/indigo-600|700` buttons get gradients.
+- Color meaning: cyan = brand/primary, rose = expired/danger only, amber = expiring soon or debt, emerald = active/paid.
+  Show a status color once per row (pill), keep avatars/secondary buttons neutral. Logout is neutral with a rose icon.
 - Motion: transform/opacity only, honor `prefers-reduced-motion` (already global in `index.css`).

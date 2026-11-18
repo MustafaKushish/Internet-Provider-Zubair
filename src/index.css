@@ -223,10 +223,10 @@ button, a {
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(38% 32% at 88% 6%, rgb(34 211 238 / 0.26), transparent 70%),
-    radial-gradient(34% 30% at 6% 26%, rgb(99 102 241 / 0.30), transparent 70%),
-    radial-gradient(42% 34% at 58% 100%, rgb(168 85 247 / 0.20), transparent 70%),
-    radial-gradient(30% 26% at 18% 88%, rgb(14 165 233 / 0.16), transparent 70%);
+    radial-gradient(40% 34% at 88% 4%, rgb(34 211 238 / 0.22), transparent 70%),
+    radial-gradient(36% 32% at 6% 24%, rgb(59 130 246 / 0.22), transparent 70%),
+    radial-gradient(44% 36% at 55% 104%, rgb(20 184 166 / 0.16), transparent 70%),
+    radial-gradient(30% 26% at 20% 86%, rgb(14 165 233 / 0.12), transparent 70%);
   animation: aurora-drift 26s ease-in-out infinite alternate;
 }
 .app-grid-bg {
@@ -300,7 +300,7 @@ tbody tr {
   --color-slate-700: rgb(255 255 255 / 0.15); /* حدود وحالة المرور */
 }
 body {
-  background-color: #060a16;
+  background-color: #071021; /* كحلي دافئ قليلاً بدل الأسود الأزرق */
 }
 
 /* الورق الأبيض (الوصل) يحتاج ألوان النص الأصلية لا الزجاجية */
