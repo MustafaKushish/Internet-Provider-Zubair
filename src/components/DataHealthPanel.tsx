@@ -43,7 +43,7 @@ export const DataHealthPanel: React.FC<DataHealthPanelProps> = ({ subscribers, s
       return [...m.values()].filter(g => g.length > 1);
     };
     const phoneGroups = dupBy(s => { const d = phoneDigits(s.phone || ''); return d.length >= 9 ? d : ''; });
-    const userGroups = dupBy(s => (s.username || '').trim().toLowerCase());
+    const userGroups = dupBy(s => (s.username || '').trim());
     const staleAfter = (months: number) => live.filter(s => -getDaysRemaining(s.expiryDate) > months * 30 && s.status !== 'suspended');
     const stale = staleAfter(staleMonths);
     const anyStale = staleAfter(3).length > 0;

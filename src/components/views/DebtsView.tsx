@@ -139,6 +139,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({ subscribers, payments, set
             <Search className="w-5 h-5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               id="debts-search"
+            autoCapitalize="none" autoCorrect="off" spellCheck={false}
               type="search"
               value={search}
               onChange={e => setSearch(e.target.value)}

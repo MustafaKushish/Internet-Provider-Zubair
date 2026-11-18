@@ -245,6 +245,7 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              autoCapitalize="none" autoCorrect="off" spellCheck={false}
               placeholder="ابحث بالاسم، رقم الهاتف، اسم المستخدم (PPPoE)، أو الآي بي..."
               className="w-full bg-slate-950 border border-slate-700/80 rounded-xl pr-10 pl-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
             />

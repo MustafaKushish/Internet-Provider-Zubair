@@ -271,11 +271,16 @@ export const SubscriberModal: React.FC<SubscriberModalProps> = ({
                     required
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    aria-describedby="username-case-hint"
                     placeholder="ahmed_net1"
                     className="w-full bg-slate-800 border border-slate-700 rounded-lg pr-9 pl-3.5 py-2.5 text-sm text-cyan-300 font-mono focus:outline-none focus:border-cyan-500 text-left"
                     dir="ltr"
                   />
                 </div>
+                <p id="username-case-hint" className="text-xs text-slate-400 mt-1">الحروف الكبيرة والصغيرة تُعدّ مختلفة: اكتب اليوزر تماماً كما في الراوتر.</p>
               </div>
 
               <div>
@@ -297,6 +302,9 @@ export const SubscriberModal: React.FC<SubscriberModalProps> = ({
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                     placeholder="كلمة مرور الراوتر"
                     className="w-full bg-slate-800 border border-slate-700 rounded-lg pr-3 pl-10 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-cyan-500 text-left"
                     dir="ltr"

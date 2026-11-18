@@ -175,6 +175,7 @@ export const RemindersView: React.FC<RemindersViewProps> = ({
           <Search className="w-4 h-4 text-slate-500 absolute right-3 top-2.5" />
           <input
             id="reminders-search"
+            autoCapitalize="none" autoCorrect="off" spellCheck={false}
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="بحث بالاسم أو الهاتف أو اليوزر…"

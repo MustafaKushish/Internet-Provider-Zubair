@@ -44,6 +44,10 @@ UI is **Arabic, RTL**. README, chat replies to the owner: **German**. Commit mes
 - Renewal carries unpaid debt into `carriedDebt`. Only admin may lower debt (`handleAdjustDebt`, logged in `debtLog`);
   the server rejects a `paidAmount` increase not covered by payment records in the same push.
 - Roles: `admin`, `accountant`, `technician`. Technicians see no money and cannot renew. Rules live in `shared/access.ts`.
+- Subscriber usernames (PPPoE) are **case-sensitive** (`Ali` ≠ `ali`): never `.toLowerCase()` them for comparing or storing.
+  Search uses smart case (`search.ts`: a capital letter in the query = exact username); import dedupe is `importDedupe.ts`.
+  Username/search/password inputs need `autoCapitalize="none" autoCorrect="off" spellCheck={false}`. Names stay
+  tolerant (`normalizeNameKey`). Staff login names are case-insensitive on purpose (D1 `COLLATE NOCASE`).
 - Archived subscribers (`archived`) are excluded from lists/stats (`activeSubscribers` in App).
 
 ## UI conventions

@@ -24,11 +24,18 @@ export function phoneDigits(text: string): string {
   return normalizeSearch(text).replace(/\D/g, '').replace(/^00964|^964/, '').replace(/^0+/, '');
 }
 
-/** هل يطابق المشترك نص البحث؟ (الاسم، الهاتف، اليوزر، الآي بي، الماك، البرج، العنوان) */
+/**
+ * هل يطابق المشترك نص البحث؟ (الاسم، الهاتف، اليوزر، الآي بي، الماك، البرج، العنوان)
+ * اليوزر (PPPoE) يفرّق بين الحروف الكبيرة والصغيرة: الكتابة بحروف صغيرة فقط تجد الاثنين،
+ * وإذا احتوى النص على حرف كبير يُطابَق اليوزر كما هو بالضبط («Ali» لا يجد «ali»).
+ */
 export function matchesSubscriber(sub: Subscriber, query: string): boolean {
   const q = normalizeSearch(query);
   if (!q) return true;
-  const fields = [sub.name, sub.username, sub.ipAddress, sub.macAddress, sub.towerName, sub.address, sub.planName];
+  const rawQuery = (query || '').trim();
+  if (/[A-Z]/.test(rawQuery) && sub.username?.includes(rawQuery)) return true;
+  const exactUser = /[A-Z]/.test(rawQuery);
+  const fields = [sub.name, exactUser ? undefined : sub.username, sub.ipAddress, sub.macAddress, sub.towerName, sub.address, sub.planName];
   if (fields.some(f => f && normalizeSearch(f).includes(q))) return true;
   const digits = phoneDigits(query);
   return digits.length >= 3 && !!sub.phone && phoneDigits(sub.phone).includes(digits);

@@ -72,6 +72,7 @@ const QuickSearchInner: React.FC<QuickSearchProps> = ({
           <input
             ref={inputRef}
             id="quick-search-input"
+            autoCapitalize="none" autoCorrect="off" spellCheck={false}
             value={query}
             onChange={e => setQuery(e.target.value)}
             onKeyDown={onKeyDown}

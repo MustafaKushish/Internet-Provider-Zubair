@@ -67,6 +67,11 @@ Der Windows-Installer ist eine Electron-Hülle (`desktop/`) um dieselbe Adresse.
   Leiste und Fenster haben echten Weichzeichner. Hauptknöpfe haben einen Farbverlauf. Das Raster ist entfallen, die
   Menüleiste am Computer nutzt Kurznamen und passt in eine Zeile. Bei „Transparenz reduzieren“ am Gerät und beim
   Drucken sind die Flächen deckend.
+- **Groß-/Kleinschreibung bei Benutzernamen:** „Ali“, „ali“ und „ALI“ sind drei verschiedene Zugänge. Excel-Import und
+  Datenprüfung halten sie auseinander (nur derselbe Benutzername exakt gilt als doppelt). In der Suche findet eine
+  kleingeschriebene Eingabe alle, eine Eingabe mit Großbuchstaben nur den exakten Benutzernamen. Die Handy-Tastatur
+  schreibt in Benutzername, Passwort und Suchfeldern nichts mehr automatisch groß. Anmeldenamen der Mitarbeiter sind
+  weiterhin nicht schreibungsabhängig.
 - **Zurück:** Jedes Fenster hat oben den Knopf „رجوع“. Die Zurück-Taste des Handys oder Browsers schließt das oberste
   Fenster, statt die App zu verlassen; ohne offenes Fenster geht sie zum vorherigen Bereich.
 - **Animationen:** Fenster gleiten beim Öffnen sanft hinein und blenden beim Schließen aus (am Handy als Blatt von unten).

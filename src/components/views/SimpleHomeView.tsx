@@ -131,6 +131,7 @@ export const SimpleHomeView: React.FC<SimpleHomeViewProps> = ({
           <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-6 h-6 text-cyan-300 pointer-events-none" />
           <input
             id="simple-search"
+            autoCapitalize="none" autoCorrect="off" spellCheck={false}
             type="search"
             value={query}
             onChange={e => { setQuery(e.target.value); setLimit(PAGE); }}

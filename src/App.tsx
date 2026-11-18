@@ -96,6 +96,7 @@ const CashView = React.lazy(() => import('./components/views/CashView').then(m =
 const AdvisorView = React.lazy(() => import('./components/views/AdvisorView').then(m => ({ default: m.AdvisorView })));
 import { NO_TOWER_LABEL, normTower } from './utils/towers';
 import { withRemainingDebt } from './utils/debt';
+import { splitImportDuplicates } from './utils/importDedupe';
 import { applyDebtAdjustment, buildPayment, buildRenewal, reversePayment } from './utils/ledger';
 import { DebtModal } from './components/DebtModal';
 import { appConfirm, notify } from './components/ui/Dialogs';
@@ -981,27 +982,8 @@ export default function App() {
       setProviders(prev => [...prev, ...newProvidersToRegister]);
     }
 
-    // منع التكرار: نتجاوز أي صف يطابق مشتركاً موجوداً (أو صفاً سابقاً في نفس الملف) باسم المستخدم أو بالاسم
-    const seenUsernames = new Set<string>();
-    const seenNames = new Set<string>();
-    if (!replaceAll) {
-      subscribers.forEach(s => {
-        if (s.username) seenUsernames.add(s.username.trim().toLowerCase());
-        seenNames.add(normalizeNameKey(s.name));
-      });
-    }
-    const skippedNames: string[] = [];
-    const uniqueRows = importedRows.filter(row => {
-      const uname = row.username?.trim().toLowerCase();
-      const nameKey = normalizeNameKey(row.name || '');
-      if ((uname && seenUsernames.has(uname)) || (nameKey && seenNames.has(nameKey))) {
-        skippedNames.push(row.name || row.username || '');
-        return false;
-      }
-      if (uname) seenUsernames.add(uname);
-      if (nameKey) seenNames.add(nameKey);
-      return true;
-    });
+    // منع التكرار: نتجاوز أي صف يطابق مشتركاً موجوداً (أو صفاً سابقاً في نفس الملف) باليوزر تماماً أو بالاسم
+    const { unique: uniqueRows, skipped: skippedNames } = splitImportDuplicates(importedRows, replaceAll ? [] : subscribers);
 
     const today = todayStr();
     const formatted: Subscriber[] = uniqueRows.map((row, idx) => {
