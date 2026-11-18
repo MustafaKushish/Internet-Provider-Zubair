@@ -52,4 +52,8 @@ UI is **Arabic, RTL**. README, chat replies to the owner: **German**. Commit mes
 - Simple mode (default per user/device): big labeled buttons, ≥16px text. Keep new features reachable from
   `SubscriberProfile` instead of adding buttons to the simple list.
 - Labels visible on inputs; buttons start with a verb; Arabic number/day forms (`formatMonthsAr`, `daysAr`).
+- Glass design lives in `src/index.css` ("التصميم الزجاجي"): Tailwind `slate-900/800/700` are redefined as translucent, so
+  `bg-slate-900` = glass card, `bg-slate-800` = glass chip/button, `border-slate-700` = soft white border. Don't use
+  `text-slate-700..900` outside `.bg-white` paper (it would be translucent). `bg-slate-950` stays opaque (inputs, page).
+  Blur only on header, bottom nav and dialogs (performance). Primary `bg-cyan/emerald/indigo-600|700` buttons get gradients.
 - Motion: transform/opacity only, honor `prefers-reduced-motion` (already global in `index.css`).

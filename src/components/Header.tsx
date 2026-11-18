@@ -499,7 +499,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Navigation Tabs */}
-        <nav aria-label="أقسام المنظومة" className="flex flex-wrap items-center gap-1 sm:gap-1.5 mt-3 pt-2 border-t border-slate-800/80">
+        <nav aria-label="أقسام المنظومة" className="flex flex-wrap items-center gap-0.5 mt-3 pt-2 border-t border-slate-800/80">
           {visibleTabs.map(t => {
             const Icon = t.icon;
             const active = activeTab === t.id;
@@ -513,7 +513,8 @@ export const Header: React.FC<HeaderProps> = ({
                 key={t.id}
                 onClick={() => setActiveTab(t.id)}
                 aria-current={active ? 'page' : undefined}
-                className={`px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 whitespace-nowrap transition cursor-pointer relative ${active ? activeCls : idleCls}`}
+                title={t.label}
+                className={`px-2 sm:px-2.5 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-1.5 whitespace-nowrap transition cursor-pointer relative ${active ? activeCls : idleCls}`}
               >
                 {active && (
                   <m.span
@@ -524,7 +525,7 @@ export const Header: React.FC<HeaderProps> = ({
                   />
                 )}
                 <Icon className={`relative w-4 h-4 transition-transform duration-300 ${active ? 'scale-110' : ''} ${t.id === 'users' ? 'text-indigo-400' : ''}`} />
-                <span className="relative">{t.label}</span>
+                <span className="relative">{t.short}</span>
                 {badgeFor(t.id)}
               </button>
             );
