@@ -102,6 +102,7 @@ import { appConfirm, notify } from './components/ui/Dialogs';
 
 // الأقسام تُحمَّل عند فتحها فقط (تسريع فتح المنظومة)، وتُحمَّل مسبقاً في وقت الفراغ
 const viewLoaders = {
+  DebtsView: () => import('./components/views/DebtsView').then(m => ({ default: m.DebtsView })),
   SubscribersView: () => import('./components/views/SubscribersView').then(m => ({ default: m.SubscribersView })),
   DashboardView: () => import('./components/views/DashboardView').then(m => ({ default: m.DashboardView })),
   RemindersView: () => import('./components/views/RemindersView').then(m => ({ default: m.RemindersView })),
@@ -113,6 +114,7 @@ const viewLoaders = {
   AuditLogView: () => import('./components/views/AuditLogView').then(m => ({ default: m.AuditLogView })),
 };
 const SubscribersView = React.lazy(viewLoaders.SubscribersView);
+const DebtsView = React.lazy(viewLoaders.DebtsView);
 const DashboardView = React.lazy(viewLoaders.DashboardView);
 const RemindersView = React.lazy(viewLoaders.RemindersView);
 const TicketsView = React.lazy(viewLoaders.TicketsView);
@@ -649,6 +651,20 @@ export default function App() {
     notify(newDebt <= 0
       ? `تم حذف دين ${sub.name} (${formatCurrency(from, settings.currency)}).`
       : `دين ${sub.name} أصبح ${formatCurrency(getRemainingDebt(updated), settings.currency)}.`, 'success');
+  };
+
+  // وعد المشترك بالتسديد في تاريخ محدد: يُؤجَّل في صفحة الديون حتى ذلك التاريخ
+  const handleSetPromise = (subId: string, date: string | null) => {
+    if (currentUser.role === 'technician') return;
+    const sub = subscribers.find(s => s.id === subId);
+    if (!sub) return;
+    beginUndo(date ? `وعد ${sub.name} بالدفع` : `إلغاء وعد ${sub.name}`);
+    setSubscribers(prev => prev.map(s => {
+      if (s.id !== subId) return s;
+      const { promiseDate: _a, promiseSetAt: _b, ...rest } = s;
+      return date ? { ...rest, promiseDate: date, promiseSetAt: todayStr() } : rest;
+    }));
+    notify(date ? `سُجّل الوعد: لن تظهر مطالبة ${sub.name} حتى ${date}.` : 'تم إلغاء الوعد.', 'success');
   };
 
   // خطة تقسيط دين: إنشاء أو إلغاء (للمدير فقط، والخادم يرفضها من غيره)
@@ -1330,6 +1346,17 @@ export default function App() {
           />
         )}
 
+        {safeActiveTab === 'debts' && (
+          <DebtsView
+            subscribers={activeSubscribers}
+            payments={payments}
+            settings={settings}
+            onOpenDebt={(sub) => setDebtSubscriberId(sub.id)}
+            onOpenProfile={(sub) => setProfileSubscriberId(sub.id)}
+            onSetPromise={handleSetPromise}
+          />
+        )}
+
         {safeActiveTab === 'tickets' && (
           <TicketsView
             tickets={tickets}
@@ -1498,7 +1525,7 @@ export default function App() {
       {lastUndo && <div className="h-16 no-print" aria-hidden="true" />}
 
       {/* Footer */}
-      <footer className={`relative border-t border-slate-800/60 bg-slate-950/70 backdrop-blur-sm py-4 ${simpleMode ? 'pb-6' : 'pb-24'} lg:pb-4 text-center text-xs text-slate-500 no-print`}>
+      <footer className={`relative border-t border-slate-800/60 bg-slate-950/70 backdrop-blur-sm py-4 ${simpleMode ? 'pb-6' : 'pb-24'} lg:pb-4 text-center text-xs text-slate-400 no-print`}>
         <p>
           {settings.ispName} (العراق - البصرة - قضاء الزبير) © {new Date().getFullYear()}
           {settings.contactPhone && <> • هاتف وواتساب:{' '}<span className="font-mono text-cyan-400 font-semibold" dir="ltr">{settings.contactPhone}</span></>}

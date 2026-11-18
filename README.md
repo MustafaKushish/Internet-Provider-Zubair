@@ -106,6 +106,19 @@ Der Windows-Installer ist eine Electron-Hülle (`desktop/`) um dieselbe Adresse.
   **nächsten Verlängerung** (laufende Periode und Schulden bleiben unverändert), zeigt den Mehrumsatz und liefert einen
   fertigen WhatsApp-Ankündigungstext.
 
+## Schuldenseite („الديون والمطالبات“, Admin und Buchhalter)
+
+- **Oben:** Gesamtschuld, Zahl der Schuldner, in 30 Tagen bezahlte Schulden und Schulden mit 3+ Monaten Rückstand.
+- **Drei Ansichten:** „للمطالبة اليوم“ (wen man heute mahnt), „مؤجّل“ (Zahlungsversprechen oder Rate noch nicht fällig),
+  „الكل“. Die Liste ist nach Priorität sortiert: gebrochenes Versprechen, überfällige Rate, dann Höhe und Alter der Schuld.
+- **Wer gerade gemahnt wurde**, verschwindet für 3 Tage aus „heute“ (nur auf diesem Gerät gemerkt), damit niemand doppelt
+  angeschrieben wird.
+- **Pro Schuldner drei Knöpfe:** „طالب“ (WhatsApp, mit Vorschlag „Teilzahlung X reicht jetzt“ und Erinnerung an das
+  Versprechen), „سدّد“ (Schuldenfenster) und „وعد“ (Datum des Zahlungsversprechens; bis dahin wird nicht gemahnt, danach
+  steht der Kunde ganz oben). Jede Zahlung nach dem Versprechen hebt es auf.
+- **Schuldenfenster:** Zahlen steht oben; Ratenplan und Schuld ändern/löschen liegen hinter „خيارات أخرى“ (nur Admin).
+- Die Seite „التذكيرات“ ist jetzt nur noch für Verlängerungen. Im einfachen Modus gibt es den Filter „عليهم ديون“.
+
 ## Kasse und Ausgaben („الصندوق والمصاريف“, Admin und Buchhalter)
 
 - **Kassenabschluss pro Tag:** Was jeder Mitarbeiter kassiert hat, getrennt nach Bar, Zain Cash, Qi Card und Überweisung,

@@ -26,6 +26,7 @@ export const TAB_ACCESS: Record<string, Role[]> = {
   providers: OFFICE_ROLES,
   advisor: OFFICE_ROLES,
   cash: OFFICE_ROLES,
+  debts: OFFICE_ROLES,
   users: ADMIN_ONLY,
   settings: ADMIN_ONLY,
 };

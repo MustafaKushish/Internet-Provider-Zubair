@@ -54,6 +54,7 @@ const DebtModalInner: React.FC<DebtModalProps & { subscriber: Subscriber }> = ({
   const [payAmount, setPayAmount] = useState<number>(Math.min(debt, price || debt));
   const [method, setMethod] = useState<PaymentRecord['paymentMethod']>('cash');
   const [payNote, setPayNote] = useState('');
+  const [more, setMore] = useState(false); // خيارات المدير: التقسيط وتعديل الدين
   const [sendWhatsApp, setSendWhatsApp] = useState(!!sub.phone);
   const payRounded = Math.max(0, Math.round(payAmount || 0));
   const leftAfter = Math.max(0, debt - payRounded);
@@ -143,7 +144,7 @@ const DebtModalInner: React.FC<DebtModalProps & { subscriber: Subscriber }> = ({
           <BackButton onClick={onClose} />
         </div>
 
-        <div className="p-5 space-y-5 text-xs" style={{ fontVariantNumeric: 'tabular-nums' }}>
+        <div className="p-5 space-y-5 text-sm leading-relaxed" style={{ fontVariantNumeric: 'tabular-nums' }}>
           {/* Summary */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             <div className="bg-rose-950/40 border border-rose-900 rounded-xl p-3 col-span-2 sm:col-span-1">
@@ -164,8 +165,84 @@ const DebtModalInner: React.FC<DebtModalProps & { subscriber: Subscriber }> = ({
             </div>
           </div>
 
+          {/* Pay: كامل الدين أو جزء منه */}
+          {debt > 0 && (
+            <section className="space-y-3 border border-emerald-900/70 bg-emerald-950/10 rounded-xl p-3.5 text-sm">
+              <div>
+                <h3 className="font-bold text-white text-base flex items-center gap-1.5"><CreditCard className="w-5 h-5 text-emerald-400" /> تسديد الدين (كله أو جزء منه)</h3>
+                <p className="text-slate-400 mt-0.5">يمكن للمشترك دفع أي مبلغ الآن، والباقي يبقى ديناً عليه.</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {partialQuick.map(a => (
+                  <button key={`p${a}`} type="button" onClick={() => setPayAmount(a)} aria-pressed={payRounded === a}
+                    className={`h-10 px-3 rounded-lg font-semibold cursor-pointer ${payRounded === a ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-emerald-300 hover:bg-slate-700'}`}>
+                    {a === Math.round(debt / 2 / 1000) * 1000 ? `نصف الدين (${money(a)})` : money(a)}
+                  </button>
+                ))}
+                {price > 0 && quick.filter(m => m * price < debt && !partialQuick.includes(m * price)).map(m => (
+                  <button key={m} type="button" onClick={() => setPayAmount(m * price)} aria-pressed={payRounded === m * price}
+                    className={`h-10 px-3 rounded-lg font-semibold cursor-pointer ${payRounded === m * price ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-emerald-300 hover:bg-slate-700'}`}>
+                    {formatMonthsAr(m)} ({money(m * price)})
+                  </button>
+                ))}
+                <button type="button" onClick={() => setPayAmount(debt)} aria-pressed={payRounded === debt}
+                  className={`h-10 px-3 rounded-lg font-semibold cursor-pointer ${payRounded === debt ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-emerald-300 hover:bg-slate-700'}`}>
+                  كل الدين ({money(debt)})
+                </button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label className="block">
+                  <span className="block text-slate-300 font-semibold mb-1">المبلغ المستلم الآن</span>
+                  <input id="debt-pay-amount" type="number" inputMode="numeric" min={0} max={debt} step={1000} value={payAmount || ''}
+                    onChange={e => { setError(null); setPayAmount(Number(e.target.value)); }}
+                    className="w-full h-12 bg-slate-950 border-2 border-slate-700 rounded-lg px-3 text-lg text-white font-mono focus:outline-none focus:border-emerald-500" />
+                </label>
+                <div className={`rounded-lg p-3 border-2 ${leftAfter === 0 && payRounded > 0 ? 'border-emerald-700 bg-emerald-950/30' : 'border-amber-800/70 bg-amber-950/20'}`} aria-live="polite">
+                  <span className="block text-slate-300 font-semibold">يبقى عليه بعد التسديد</span>
+                  <span className={`text-lg font-bold ${leftAfter === 0 && payRounded > 0 ? 'text-emerald-300' : 'text-amber-300'}`}>
+                    {payRounded > debt ? '—' : leftAfter === 0 && payRounded > 0 ? 'لا شيء، سُدِّد بالكامل' : money(leftAfter)}
+                  </span>
+                  {isPartial && price > 0 && leftAfter >= price && <span className="block text-slate-400">= {formatMonthsAr(Math.round((leftAfter / price) * 10) / 10)}</span>}
+                </div>
+              </div>
+              <div>
+                <span className="block text-slate-300 font-semibold mb-1">طريقة الدفع</span>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" role="group" aria-label="طريقة الدفع">
+                  {METHODS.map(m => (
+                    <button key={m.value} type="button" onClick={() => setMethod(m.value)} aria-pressed={method === m.value}
+                      className={`h-10 rounded-lg font-semibold cursor-pointer border ${method === m.value ? 'bg-emerald-600/20 border-emerald-500 text-emerald-200' : 'bg-slate-950 border-slate-700 text-slate-300 hover:border-slate-500'}`}>
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <label className="block">
+                <span className="block text-slate-300 font-semibold mb-1">ملاحظة (اختياري)</span>
+                <input id="debt-pay-note" type="text" value={payNote} onChange={e => setPayNote(e.target.value)}
+                  className="w-full h-10 bg-slate-950 border border-slate-700 rounded-lg px-3 text-white focus:outline-none focus:border-emerald-500" />
+              </label>
+              {sub.phone && (
+                <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
+                  <input type="checkbox" checked={sendWhatsApp} onChange={e => setSendWhatsApp(e.target.checked)} className="w-5 h-5 accent-emerald-500" />
+                  إرسال رسالة واتساب للمشترك بالمبلغ المستلم والمتبقي
+                </label>
+              )}
+              <button type="button" onClick={pay} disabled={payRounded <= 0 || payRounded > debt}
+                className="w-full h-12 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-base font-bold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+                {payRounded <= 0 ? 'أدخل المبلغ المستلم' : payRounded > debt ? `المبلغ أكبر من الدين (${money(debt)})` : isPartial ? `تسجيل دفعة جزئية ${money(payRounded)}` : `تسديد كامل الدين ${money(payRounded)}`}
+              </button>
+            </section>
+          )}
+
+          {isAdmin && !more && (
+            <button type="button" onClick={() => setMore(true)}
+              className="w-full min-h-12 rounded-xl bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-200 text-base font-semibold cursor-pointer">
+              خيارات أخرى: تقسيط، تعديل أو حذف الدين
+            </button>
+          )}
+
           {/* خطة التقسيط */}
-          {(progress || (debt > 0 && onSetPlan)) && (
+          {(progress || (more && debt > 0 && onSetPlan)) && (
             <section className="space-y-2.5 border border-indigo-900/70 bg-indigo-950/20 rounded-xl p-3.5">
               <h3 className="font-bold text-white text-sm flex items-center gap-1.5">
                 <CalendarClock className="w-4 h-4 text-indigo-300" /> تقسيط الدين
@@ -240,76 +317,8 @@ const DebtModalInner: React.FC<DebtModalProps & { subscriber: Subscriber }> = ({
             </section>
           )}
 
-          {/* Pay: كامل الدين أو جزء منه */}
-          {debt > 0 && (
-            <section className="space-y-3 border border-emerald-900/70 bg-emerald-950/10 rounded-xl p-3.5 text-sm">
-              <div>
-                <h3 className="font-bold text-white text-base flex items-center gap-1.5"><CreditCard className="w-5 h-5 text-emerald-400" /> تسديد الدين (كله أو جزء منه)</h3>
-                <p className="text-slate-400 mt-0.5">يمكن للمشترك دفع أي مبلغ الآن، والباقي يبقى ديناً عليه.</p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {partialQuick.map(a => (
-                  <button key={`p${a}`} type="button" onClick={() => setPayAmount(a)} aria-pressed={payRounded === a}
-                    className={`h-10 px-3 rounded-lg font-semibold cursor-pointer ${payRounded === a ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-emerald-300 hover:bg-slate-700'}`}>
-                    {a === Math.round(debt / 2 / 1000) * 1000 ? `نصف الدين (${money(a)})` : money(a)}
-                  </button>
-                ))}
-                {price > 0 && quick.filter(m => m * price < debt && !partialQuick.includes(m * price)).map(m => (
-                  <button key={m} type="button" onClick={() => setPayAmount(m * price)} aria-pressed={payRounded === m * price}
-                    className={`h-10 px-3 rounded-lg font-semibold cursor-pointer ${payRounded === m * price ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-emerald-300 hover:bg-slate-700'}`}>
-                    {formatMonthsAr(m)} ({money(m * price)})
-                  </button>
-                ))}
-                <button type="button" onClick={() => setPayAmount(debt)} aria-pressed={payRounded === debt}
-                  className={`h-10 px-3 rounded-lg font-semibold cursor-pointer ${payRounded === debt ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-emerald-300 hover:bg-slate-700'}`}>
-                  كل الدين ({money(debt)})
-                </button>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <label className="block">
-                  <span className="block text-slate-300 font-semibold mb-1">المبلغ المستلم الآن</span>
-                  <input id="debt-pay-amount" type="number" inputMode="numeric" min={0} max={debt} step={1000} value={payAmount || ''}
-                    onChange={e => { setError(null); setPayAmount(Number(e.target.value)); }}
-                    className="w-full h-12 bg-slate-950 border-2 border-slate-700 rounded-lg px-3 text-lg text-white font-mono focus:outline-none focus:border-emerald-500" />
-                </label>
-                <div className={`rounded-lg p-3 border-2 ${leftAfter === 0 && payRounded > 0 ? 'border-emerald-700 bg-emerald-950/30' : 'border-amber-800/70 bg-amber-950/20'}`} aria-live="polite">
-                  <span className="block text-slate-300 font-semibold">يبقى عليه بعد التسديد</span>
-                  <span className={`text-lg font-bold ${leftAfter === 0 && payRounded > 0 ? 'text-emerald-300' : 'text-amber-300'}`}>
-                    {payRounded > debt ? '—' : leftAfter === 0 && payRounded > 0 ? 'لا شيء، سُدِّد بالكامل' : money(leftAfter)}
-                  </span>
-                  {isPartial && price > 0 && leftAfter >= price && <span className="block text-slate-400">= {formatMonthsAr(Math.round((leftAfter / price) * 10) / 10)}</span>}
-                </div>
-              </div>
-              <div>
-                <span className="block text-slate-300 font-semibold mb-1">طريقة الدفع</span>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" role="group" aria-label="طريقة الدفع">
-                  {METHODS.map(m => (
-                    <button key={m.value} type="button" onClick={() => setMethod(m.value)} aria-pressed={method === m.value}
-                      className={`h-10 rounded-lg font-semibold cursor-pointer border ${method === m.value ? 'bg-emerald-600/20 border-emerald-500 text-emerald-200' : 'bg-slate-950 border-slate-700 text-slate-300 hover:border-slate-500'}`}>
-                      {m.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <label className="block">
-                <span className="block text-slate-300 font-semibold mb-1">ملاحظة (اختياري)</span>
-                <input id="debt-pay-note" type="text" value={payNote} onChange={e => setPayNote(e.target.value)}
-                  className="w-full h-10 bg-slate-950 border border-slate-700 rounded-lg px-3 text-white focus:outline-none focus:border-emerald-500" />
-              </label>
-              {sub.phone && (
-                <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
-                  <input type="checkbox" checked={sendWhatsApp} onChange={e => setSendWhatsApp(e.target.checked)} className="w-5 h-5 accent-emerald-500" />
-                  إرسال رسالة واتساب للمشترك بالمبلغ المستلم والمتبقي
-                </label>
-              )}
-              <button type="button" onClick={pay} disabled={payRounded <= 0 || payRounded > debt}
-                className="w-full h-12 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-base font-bold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
-                {payRounded <= 0 ? 'أدخل المبلغ المستلم' : payRounded > debt ? `المبلغ أكبر من الدين (${money(debt)})` : isPartial ? `تسجيل دفعة جزئية ${money(payRounded)}` : `تسديد كامل الدين ${money(payRounded)}`}
-              </button>
-            </section>
-          )}
-
           {/* Adjust (admin only) */}
+          {more && isAdmin && (
           <section className="space-y-2.5 border border-slate-800 rounded-xl p-3.5">
             <h3 className="font-bold text-white text-sm flex items-center gap-1.5">
               {isAdmin ? <Wallet className="w-4 h-4 text-amber-400" /> : <Lock className="w-4 h-4 text-slate-500" />}
@@ -363,6 +372,7 @@ const DebtModalInner: React.FC<DebtModalProps & { subscriber: Subscriber }> = ({
               </>
             )}
           </section>
+          )}
 
           {error && (
             <div role="alert" className="bg-rose-950/50 border border-rose-800 rounded-lg p-2.5 text-rose-200 flex gap-2">

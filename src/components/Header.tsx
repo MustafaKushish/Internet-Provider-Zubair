@@ -26,6 +26,7 @@ import {
   Share,
   MoreHorizontal,
   Wallet,
+  HandCoins,
   Search,
   X as CloseIcon,
   LayoutGrid,
@@ -55,6 +56,7 @@ const TABS: TabDef[] = [
   { id: 'dashboard', label: 'لوحة المؤشرات', short: 'المؤشرات', icon: LayoutDashboard },
   { id: 'reports', label: 'التقارير المالية والجرد الدوري', short: 'التقارير', icon: BarChart3 },
   { id: 'cash', label: 'الصندوق والمصاريف', short: 'الصندوق', icon: Wallet },
+  { id: 'debts', label: 'الديون والمطالبات', short: 'الديون', icon: HandCoins },
   { id: 'reminders', label: 'تذكيرات الواتساب والديون', short: 'التذكيرات', icon: MessageSquare },
   { id: 'tickets', label: 'البلاغات والدعم الفني', short: 'البلاغات', icon: Wrench },
   { id: 'advisor', label: 'المستشار الذكي', short: 'المستشار', icon: Sparkles, accent: 'indigo' },
@@ -73,7 +75,7 @@ const loadMotionFeatures = () => import('./ui/motionFeatures').then(r => r.defau
 const PILL_SPRING = { type: 'spring', stiffness: 420, damping: 34, mass: 0.8 } as const;
 
 // الأقسام الظاهرة مباشرة في الشريط السفلي (الباقي في «المزيد»): 4 في الهاتف و 6 في التابلت
-const MOBILE_PRIMARY = ['subscribers', 'reminders', 'dashboard', 'tickets', 'cash', 'reports', 'towers'];
+const MOBILE_PRIMARY = ['subscribers', 'debts', 'reminders', 'dashboard', 'tickets', 'cash', 'reports', 'towers'];
 
 function useIsTablet(): boolean {
   const query = '(min-width: 768px)';
@@ -239,7 +241,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
           <div className="min-w-0 flex-1">
             <h1 className="text-sm font-bold gradient-text truncate">{ispName}</h1>
-            <p className="text-[10px] text-slate-400 truncate">{currentUser.name} • {currentUser.role === 'admin' ? 'المدير' : currentUser.role === 'accountant' ? 'محاسب' : 'فني'}</p>
+            <p className="text-xs text-slate-400 truncate">{currentUser.name} • {currentUser.role === 'admin' ? 'المدير' : currentUser.role === 'accountant' ? 'محاسب' : 'فني'}</p>
           </div>
           <button
             type="button"
@@ -253,7 +255,7 @@ export const Header: React.FC<HeaderProps> = ({
             type="button"
             onClick={onOpenAddModal}
             aria-label="إضافة مشترك"
-            className="h-9 px-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold flex items-center gap-1 cursor-pointer"
+            className="h-9 px-3 rounded-xl bg-cyan-700 hover:bg-cyan-600 text-white text-sm font-bold flex items-center gap-1 cursor-pointer"
           >
             <Plus className="w-4 h-4" /> <span>مشترك</span>
           </button>
@@ -267,26 +269,26 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         </div>
         <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-3 px-3 pb-0.5">
-          <span className="flex-shrink-0 bg-slate-800/80 border border-slate-700/60 rounded-lg px-2.5 py-1 text-[11px] text-slate-300">
+          <span className="flex-shrink-0 bg-slate-800/80 border border-slate-700/60 rounded-lg px-2.5 py-1 text-xs text-slate-300">
             نشط <b className="text-white">{stats.activeCount}</b> من {stats.totalSubscribers}
           </span>
           {currentUser.role !== 'technician' && (
-            <span className="flex-shrink-0 bg-emerald-950/40 border border-emerald-800/40 rounded-lg px-2.5 py-1 text-[11px] text-emerald-300">
+            <span className="flex-shrink-0 bg-emerald-950/40 border border-emerald-800/40 rounded-lg px-2.5 py-1 text-xs text-emerald-300">
               ربح شهري <b className="text-emerald-400">{stats.totalProfit.toLocaleString()}</b>
             </span>
           )}
           {currentUser.role !== 'technician' && stats.totalDebts > 0 && (
-            <button type="button" onClick={() => go('reminders')} className="flex-shrink-0 bg-rose-950/40 border border-rose-800/40 rounded-lg px-2.5 py-1 text-[11px] text-rose-300 cursor-pointer">
+            <button type="button" onClick={() => go('reminders')} className="flex-shrink-0 bg-rose-950/40 border border-rose-800/40 rounded-lg px-2.5 py-1 text-xs text-rose-300 cursor-pointer">
               ديون <b className="text-rose-400">{stats.totalDebts.toLocaleString()}</b>
             </button>
           )}
           {alertsCount > 0 && (
-            <button type="button" onClick={() => go('reminders')} className="flex-shrink-0 bg-amber-950/50 border border-amber-700/50 rounded-lg px-2.5 py-1 text-[11px] text-amber-300 cursor-pointer">
+            <button type="button" onClick={() => go('reminders')} className="flex-shrink-0 bg-amber-950/50 border border-amber-700/50 rounded-lg px-2.5 py-1 text-xs text-amber-300 cursor-pointer">
               {stats.expiringSoonCount} قريباً • {stats.expiredCount} متأخر
             </button>
           )}
           {stats.openTicketsCount > 0 && (
-            <button type="button" onClick={() => go('tickets')} className="flex-shrink-0 bg-amber-950/50 border border-amber-700/50 rounded-lg px-2.5 py-1 text-[11px] text-amber-300 cursor-pointer">
+            <button type="button" onClick={() => go('tickets')} className="flex-shrink-0 bg-amber-950/50 border border-amber-700/50 rounded-lg px-2.5 py-1 text-xs text-amber-300 cursor-pointer">
               {stats.openTicketsCount} عطل مفتوح
             </button>
           )}
@@ -566,7 +568,7 @@ export const Header: React.FC<HeaderProps> = ({
               type="button"
               onClick={() => go(t.id)}
               aria-current={active ? 'page' : undefined}
-              className={`relative flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] md:text-xs font-semibold cursor-pointer transition-colors ${active ? 'text-cyan-300' : 'text-slate-400'}`}
+              className={`relative flex flex-col items-center justify-center gap-0.5 py-2 text-xs font-semibold cursor-pointer transition-colors ${active ? 'text-cyan-300' : 'text-slate-400'}`}
             >
               {active && (
                 <m.span
@@ -593,7 +595,7 @@ export const Header: React.FC<HeaderProps> = ({
             type="button"
             onClick={() => setMoreOpen(true)}
             aria-expanded={moreOpen}
-            className={`flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-semibold cursor-pointer ${moreTabs.some(t => t.id === activeTab) ? 'text-cyan-400' : 'text-slate-400'}`}
+            className={`flex flex-col items-center justify-center gap-0.5 py-2 text-xs font-semibold cursor-pointer ${moreTabs.some(t => t.id === activeTab) ? 'text-cyan-400' : 'text-slate-400'}`}
           >
             <MoreHorizontal className="w-5 h-5" />
             <span>المزيد</span>

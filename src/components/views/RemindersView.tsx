@@ -2,10 +2,11 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { NO_TOWER_LABEL, normTower } from '../../utils/towers';
 import { todayStr } from '../../utils/dates';
 import { matchesSubscriber } from '../../utils/search';
-import { useEscapeKey } from '../ui/useEscapeKey';
+import { ReminderQueue } from '../ReminderQueue';
+import { reminderMessage } from '../../utils/reminders';
 import { PaymentRecord, Subscriber, SystemSettings } from '../../types/isp';
-import { installmentMessage, planProgress } from '../../utils/installments';
-import { formatCurrency, getDaysRemaining, generateWhatsAppLink, getWhatsAppTemplates, getRemainingDebt } from '../../utils/storage';
+import { planProgress } from '../../utils/installments';
+import { formatCurrency, getDaysRemaining, generateWhatsAppLink, getRemainingDebt } from '../../utils/storage';
 import { debtInMonths, formatMonthsAr, monthsLate } from '../../utils/debt';
 import {
   MessageSquare,
@@ -53,7 +54,7 @@ export const RemindersView: React.FC<RemindersViewProps> = ({
   payments = [],
   onOpenProfile,
 }) => {
-  const [filterTab, setFilterTab] = useState<'all_alerts' | 'expiring' | 'expired' | 'debts'>('all_alerts');
+  const [filterTab, setFilterTab] = useState<'all_alerts' | 'expiring' | 'expired'>('all_alerts');
   const [sentRecords, setSentRecords] = useState<Record<string, boolean>>(loadSent);
   const [search, setSearch] = useState('');
   const [tower, setTower] = useState('all');
@@ -69,11 +70,10 @@ export const RemindersView: React.FC<RemindersViewProps> = ({
 
   const expiringSubscribers = subscribers.filter(s => s.status === 'expiring_soon');
   const expiredSubscribers = subscribers.filter(s => s.status === 'expired');
-  const debtSubscribers = subscribers.filter(s => getRemainingDebt(s) > 0);
 
   const allAlerts = useMemo(() => {
     const map = new Map<string, Subscriber>();
-    [...expiredSubscribers, ...expiringSubscribers, ...debtSubscribers].forEach(s => map.set(s.id, s));
+    [...expiredSubscribers, ...expiringSubscribers].forEach(s => map.set(s.id, s));
     return Array.from(map.values());
   }, [subscribers]);
 
@@ -81,7 +81,7 @@ export const RemindersView: React.FC<RemindersViewProps> = ({
 
   // الأولوية: من ينتهي قريباً (الأقرب أولاً)، ثم المنتهون حديثاً (أسهل استرجاعاً)، ثم المدينون الأكبر ديناً
   const activeList = useMemo(() => {
-    const base = filterTab === 'expiring' ? expiringSubscribers : filterTab === 'expired' ? expiredSubscribers : filterTab === 'debts' ? debtSubscribers : allAlerts;
+    const base = filterTab === 'expiring' ? expiringSubscribers : filterTab === 'expired' ? expiredSubscribers : allAlerts;
     const rank = (s: Subscriber) => {
       const d = getDaysRemaining(s.expiryDate);
       if (d >= 0 && s.status === 'expiring_soon') return [0, d];
@@ -108,13 +108,7 @@ export const RemindersView: React.FC<RemindersViewProps> = ({
   const pendingQueue = activeList.filter(s => s.phone && !sentRecords[`${s.id}_${typeFor(s)}`]);
   const startQueue = () => { setQueue(pendingQueue); setQueueIndex(0); };
 
-  // نص الرسالة: لمن عنده خطة تقسيط نشطة تُرسل رسالة القسط بدل المطالبة بكل الدين
-  const messageFor = (sub: Subscriber, type: 'expiry' | 'expired' | 'debt'): string => {
-    const pr = type === 'debt' ? planProgress(sub, payments) : null;
-    if (pr && pr.status !== 'done') return installmentMessage(sub, pr, settings);
-    const templates = getWhatsAppTemplates(sub, settings);
-    return type === 'expired' ? templates.expiredNotice : type === 'debt' ? templates.debtReminder : templates.expiryReminder;
-  };
+  const messageFor = (sub: Subscriber, type: 'expiry' | 'expired' | 'debt'): string => reminderMessage(sub, type, settings, payments);
 
   const handleInstantWhatsApp = (sub: Subscriber, type: 'expiry' | 'expired' | 'debt') => {
     const msg = messageFor(sub, type);
@@ -131,10 +125,10 @@ export const RemindersView: React.FC<RemindersViewProps> = ({
           <div>
             <h2 className="text-base font-bold text-white flex items-center gap-2">
               <MessageSquare className="w-5 h-5 text-emerald-400" />
-              <span>مركز تذكيرات الواتساب والمطالبات المالية</span>
+              <span>مركز تذكيرات التجديد</span>
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              أرسل تذكيرات التجديد، إشعارات انتهاء الاشتراك، ومطالبات الديون للمشتركين بضغطة زر واحدة
+              أرسل تذكيرات التجديد وإشعارات انتهاء الاشتراك بضغطة زر واحدة. الديون في قسم «الديون».
             </p>
           </div>
 
@@ -171,17 +165,6 @@ export const RemindersView: React.FC<RemindersViewProps> = ({
             >
               <AlertCircle className="w-3.5 h-3.5" />
               <span>منتهي ({expiredSubscribers.length})</span>
-            </button>
-            <button
-              onClick={() => setFilterTab('debts')}
-              className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer flex items-center gap-1 ${
-                filterTab === 'debts'
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-slate-800 text-indigo-400 hover:bg-slate-750'
-              }`}
-            >
-              <CreditCard className="w-3.5 h-3.5" />
-              <span>بذمتهم ديون ({debtSubscribers.length})</span>
             </button>
           </div>
         </div>
@@ -228,8 +211,8 @@ export const RemindersView: React.FC<RemindersViewProps> = ({
         {activeList.length === 0 ? (
           <div className="col-span-full py-16 text-center bg-slate-900 border border-slate-800 rounded-2xl">
             <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto mb-2" />
-            <h3 className="text-sm font-bold text-white">لا توجد أي تنبيهات أو ديون معلقة في هذا القسم</h3>
-            <p className="text-xs text-slate-500 mt-1">كافة الاشتراكات نشطة ومسددة بالكامل في الوقت الحالي.</p>
+            <h3 className="text-sm font-bold text-white">لا توجد أي تنبيهات تجديد في هذا القسم</h3>
+            <p className="text-xs text-slate-500 mt-1">كل الاشتراكات سارية في الوقت الحالي.</p>
           </div>
         ) : (
           activeList.slice(0, limit).map((sub) => {
@@ -406,68 +389,6 @@ export const RemindersView: React.FC<RemindersViewProps> = ({
           </button>
         </div>
       )}
-    </div>
-  );
-};
-
-/** نافذة الإرسال المتتالي: مشترك واحد في كل مرة مع معاينة الرسالة */
-const ReminderQueue: React.FC<{
-  queue: Subscriber[];
-  index: number;
-  settings: SystemSettings;
-  typeFor: (s: Subscriber) => 'expiry' | 'expired' | 'debt';
-  messageFor: (s: Subscriber, type: 'expiry' | 'expired' | 'debt') => string;
-  onSend: (s: Subscriber) => void;
-  onSkip: () => void;
-  onClose: () => void;
-}> = ({ queue, index, settings, typeFor, messageFor, onSend, onSkip, onClose }) => {
-  useEscapeKey(onClose);
-  const sub = queue[index];
-  const done = !sub;
-  const type = sub ? typeFor(sub) : 'expiry';
-  const message = sub ? messageFor(sub, type) : '';
-  const debt = sub ? getRemainingDebt(sub) : 0;
-  return (
-    <div className="app-overlay fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-sm" onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-label="الإرسال المتتالي" onClick={e => e.stopPropagation()}
-        className="w-full sm:max-w-lg bg-slate-900 border border-slate-700 rounded-t-3xl sm:rounded-2xl p-5 space-y-3 shadow-2xl"
-        style={{ paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom))' }}>
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-white">الإرسال المتتالي</h3>
-          <span className="text-xs text-slate-400">{Math.min(index + 1, queue.length)} / {queue.length}</span>
-        </div>
-        <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
-          <div className="h-full bg-emerald-500 transition-all" style={{ width: `${(Math.min(index, queue.length) / queue.length) * 100}%` }} />
-        </div>
-        {done ? (
-          <div className="text-center py-6 space-y-2">
-            <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto" />
-            <p className="text-sm font-bold text-white">انتهت القائمة 👏</p>
-            <p className="text-xs text-slate-400">تم المرور على {queue.length} مشترك.</p>
-            <button type="button" onClick={onClose} className="mt-2 px-5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold cursor-pointer">إغلاق</button>
-          </div>
-        ) : (
-          <>
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <div className="font-bold text-white">{sub.name}</div>
-                <div className="text-[11px] text-slate-400 font-mono" dir="ltr">{sub.phone}</div>
-              </div>
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${type === 'expired' ? 'bg-rose-950 border-rose-800 text-rose-300' : type === 'debt' ? 'bg-indigo-950 border-indigo-800 text-indigo-300' : 'bg-amber-950 border-amber-800 text-amber-300'}`}>
-                {type === 'expired' ? `متأخر ${formatMonthsAr(monthsLate(sub.expiryDate))}` : type === 'debt' ? `دين ${formatCurrency(debt, settings.currency)}` : `ينتهي خلال ${getDaysRemaining(sub.expiryDate)} يوم`}
-              </span>
-            </div>
-            <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-slate-300 bg-slate-950 border border-slate-800 rounded-xl p-3 max-h-48 overflow-y-auto">{message}</pre>
-            <div className="flex gap-2">
-              <button type="button" onClick={() => onSend(sub)} autoFocus
-                className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold flex items-center justify-center gap-1.5 cursor-pointer">
-                <Send className="w-4 h-4" /> إرسال واتساب والتالي
-              </button>
-              <button type="button" onClick={onSkip} className="px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 text-xs font-bold cursor-pointer">تخطي</button>
-            </div>
-          </>
-        )}
-      </div>
     </div>
   );
 };

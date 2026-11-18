@@ -20,6 +20,10 @@ UI is **Arabic, RTL**. README, chat replies to the owner: **German**. Commit mes
 - `src/utils/undo.ts` + `src/hooks/useUndo.ts` + `components/UndoBar.tsx` — admin-only undo. Call `beginUndo('label')`
   as the first line of **every handler that changes subscribers/payments/tickets/providers/towers/expenses**; the hook
   diffs before/after and stores only the changed records (settings and staff users are not covered).
+- `src/utils/debtBoard.ts` (pure: ranking, promise/plan/cool-down states, suggested amount, summary) + `views/DebtsView.tsx`
+  (debts tab: 3 buttons per debtor: طالب / سدّد / وعد). `reminders.ts` builds WhatsApp text. Subscriber fields
+  `promiseDate`/`promiseSetAt` hold a promise-to-pay; a later payment cancels it. Reminder history is device-local
+  (`sas_plus_debt_reminded_v1`). `RemindersView` is now renewals only.
 - `shared/access.ts` — roles, tab access, collection rules (`COLLECTION_RULES`, `HIDDEN_FROM`). Used by UI **and**
   worker; edit only here. Don't import from `src`/`worker` in it.
 - `src/components/views/*View.tsx` — one per tab; `SimpleHomeView` = simple mode home.

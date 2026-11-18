@@ -10,7 +10,7 @@ import { matchesSubscriber } from '../../utils/search';
  * كل الإجراءات الأخرى موجودة داخل «الملف» أو في الوضع الكامل.
  */
 
-type Filter = 'attention' | 'expired' | 'all';
+type Filter = 'attention' | 'expired' | 'debts' | 'all';
 
 interface SimpleHomeViewProps {
   subscribers: Subscriber[];
@@ -67,6 +67,7 @@ export const SimpleHomeView: React.FC<SimpleHomeViewProps> = ({
   const counts = {
     attention: rows.filter(needsAttention).length,
     expired: rows.filter(r => r.days < 0).length,
+    debts: rows.filter(r => r.debt > 0).length,
     all: rows.length,
   };
 
@@ -75,7 +76,7 @@ export const SimpleHomeView: React.FC<SimpleHomeViewProps> = ({
     // أثناء البحث نبحث في كل المشتركين بغض النظر عن الفلتر
     const base = searching
       ? rows.filter(r => matchesSubscriber(r.sub, query))
-      : rows.filter(r => (filter === 'all' ? true : filter === 'expired' ? r.days < 0 : needsAttention(r)));
+      : rows.filter(r => (filter === 'all' ? true : filter === 'expired' ? r.days < 0 : filter === 'debts' ? r.debt > 0 : needsAttention(r)));
     // الأكثر تأخراً أولاً، ثم الأقرب انتهاءً، ثم الأكبر ديناً
     return [...base].sort((a, b) => a.days - b.days || b.debt - a.debt || a.sub.name.localeCompare(b.sub.name, 'ar'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -84,6 +85,7 @@ export const SimpleHomeView: React.FC<SimpleHomeViewProps> = ({
   const chips: Array<{ id: Filter; label: string }> = [
     { id: 'attention', label: 'يحتاج متابعة' },
     { id: 'expired', label: 'منتهي' },
+    ...(office ? [{ id: 'debts' as Filter, label: 'عليهم ديون' }] : []),
     { id: 'all', label: 'كل المشتركين' },
   ];
 

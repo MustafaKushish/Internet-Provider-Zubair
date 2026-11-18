@@ -33,6 +33,8 @@ export interface Subscriber {
   notes?: string;
   createdAt: string;
   lastPaymentDate?: string;
+  promiseDate?: string;    // وعد المشترك بالتسديد في هذا التاريخ (صفحة الديون)
+  promiseSetAt?: string;   // تاريخ تسجيل الوعد: أي دفعة بعده تعني أنه وفى
   cycleMonths?: number;    // عدد أشهر الدورة الحالية (افتراضياً 1)
   carriedDebt?: number;    // دين سابق مُرحَّل من الدورات السابقة
   currentCycleId?: string; // معرّف الدورة الحالية لربط الوصولات بها
