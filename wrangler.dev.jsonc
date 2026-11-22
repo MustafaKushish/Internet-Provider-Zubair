@@ -15,5 +15,7 @@
       // database_id يُنشأ تلقائياً عند أول نشر (wrangler deploy)
     }
   ],
+  // إشعارات الخلفية: كل يوم 04:00 UTC = 07:00 بتوقيت بغداد
+  "triggers": { "crons": ["0 4 * * *"] },
   "observability": { "enabled": true }
 }

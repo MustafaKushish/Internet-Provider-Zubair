@@ -8,7 +8,8 @@
  */
 
 import { handleAdvisorChat, advisorStatus } from './advisor';
-import { COLLECTION_RULES, HIDDEN_FROM, isRole, type Collection, type Role } from '../shared/access';
+import { COLLECTION_RULES, HIDDEN_FROM, OFFICE_ROLES, isRole, type Collection, type Role } from '../shared/access';
+import { PUSH_SCHEMA, digestForDevice, getVapid, isAllowedEndpoint, removePushSubscription, runDailyPush, savePushSubscription, sendTestToUser } from './push';
 
 export interface Env {
   DB: D1Database;
@@ -23,6 +24,9 @@ export interface Env {
 const RULES = COLLECTION_RULES;
 
 const SESSION_HOURS = 24;
+// «تذكرني على هذا الجهاز»: جلسة طويلة تتجدد عند الاستعمال (فتح التطبيق أو المزامنة)
+const REMEMBER_DAYS = 60;
+const DAY_MS = 86_400_000;
 // الخطة المجانية في Cloudflare تسمح بـ 10ms من وقت المعالج لكل طلب؛ 5000 دورة ≈ 3ms.
 // الحماية من التخمين يوفرها أيضاً قفل الحساب بعد 10 محاولات خاطئة.
 const PBKDF2_ITERATIONS = 5_000;
@@ -82,6 +86,7 @@ const SCHEMA = [
     fields TEXT
   )`,
   `CREATE INDEX IF NOT EXISTS audit_log_at ON audit_log(at)`,
+  ...PUSH_SCHEMA,
   `CREATE TABLE IF NOT EXISTS ai_usage (
     user_id TEXT NOT NULL,
     day TEXT NOT NULL,
@@ -204,13 +209,13 @@ function publicUser(u: UserRow) {
   };
 }
 
-async function createSession(db: D1Database, userId: string) {
+async function createSession(db: D1Database, userId: string, remember = false) {
   const token = randomHex(32);
   const now = Date.now();
   await db.batch([
     db.prepare('DELETE FROM sessions WHERE expires_at < ?').bind(now),
     db.prepare('INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)')
-      .bind(await sha256(token), userId, now + SESSION_HOURS * 3600_000),
+      .bind(await sha256(token), userId, now + (remember ? REMEMBER_DAYS * DAY_MS : SESSION_HOURS * 3600_000)),
     db.prepare('UPDATE staff_users SET last_login = ? WHERE id = ?').bind(new Date(now).toISOString(), userId),
   ]);
   return token;
@@ -221,12 +226,18 @@ async function authenticate(req: Request, db: D1Database): Promise<{ user: UserR
   const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
   if (!token) throw new HttpError(401, 'يجب تسجيل الدخول.');
   const tokenHash = await sha256(token);
+  const now = Date.now();
   const user = await db
-    .prepare(`SELECT u.* FROM sessions s JOIN staff_users u ON u.id = s.user_id
+    .prepare(`SELECT u.*, s.expires_at AS session_expires FROM sessions s JOIN staff_users u ON u.id = s.user_id
               WHERE s.token_hash = ? AND s.expires_at > ?`)
-    .bind(tokenHash, Date.now())
-    .first<UserRow>();
+    .bind(tokenHash, now)
+    .first<UserRow & { session_expires: number }>();
   if (!user || !user.is_active) throw new HttpError(401, 'انتهت الجلسة، يرجى تسجيل الدخول من جديد.');
+  // جلسة «تذكرني» (أطول من جلسة اليوم العادية) تتجدد لـ 60 يوماً، وبكتابة واحدة في اليوم على الأكثر
+  const left = user.session_expires - now;
+  if (left > SESSION_HOURS * 3600_000 && left < (REMEMBER_DAYS - 1) * DAY_MS) {
+    await db.prepare('UPDATE sessions SET expires_at = ? WHERE token_hash = ?').bind(now + REMEMBER_DAYS * DAY_MS, tokenHash).run();
+  }
   return { user, tokenHash };
 }
 
@@ -240,7 +251,7 @@ async function countUsers(db: D1Database): Promise<number> {
 }
 
 async function handleSetup(req: Request, db: D1Database) {
-  const body = await readJson<{ name?: string; username?: string; password?: string }>(req);
+  const body = await readJson<{ name?: string; username?: string; password?: string; remember?: boolean }>(req);
   const username = (body.username || '').trim();
   const name = (body.name || '').trim() || 'المدير العام';
   if (!username) throw new HttpError(400, 'اسم المستخدم مطلوب.');
@@ -257,11 +268,11 @@ async function handleSetup(req: Request, db: D1Database) {
     .run();
   if (!res.meta.changes) throw new HttpError(409, 'تم إعداد المنظومة مسبقاً.');
   const user = await db.prepare('SELECT * FROM staff_users WHERE id = ?').bind(id).first<UserRow>();
-  return json({ token: await createSession(db, id), user: publicUser(user!) });
+  return json({ token: await createSession(db, id, body.remember === true), user: publicUser(user!) });
 }
 
 async function handleLogin(req: Request, db: D1Database) {
-  const body = await readJson<{ username?: string; password?: string }>(req);
+  const body = await readJson<{ username?: string; password?: string; remember?: boolean }>(req);
   const username = (body.username || '').trim();
   const password = (body.password || '').trim();
   if (!username || !password) throw new HttpError(400, 'أدخل اسم المستخدم وكلمة المرور.');
@@ -285,7 +296,7 @@ async function handleLogin(req: Request, db: D1Database) {
   if (!user.is_active) throw new HttpError(403, 'هذا الحساب معطل حالياً من قبل إدارة المنظومة.');
 
   await db.prepare('DELETE FROM login_failures WHERE username = ?').bind(username).run();
-  const token = await createSession(db, user.id);
+  const token = await createSession(db, user.id, body.remember === true);
   return json({ token, user: publicUser({ ...user, last_login: new Date(now).toISOString() }) });
 }
 
@@ -724,6 +735,14 @@ async function handleApi(req: Request, env: Env, url: URL): Promise<Response> {
   }
   if (path === '/api/setup' && method === 'POST') return handleSetup(req, db);
   if (path === '/api/auth/login' && method === 'POST') return handleLogin(req, db);
+  // نص إشعار الخلفية: عام لكنه مرتبط بجهاز مسجّل (هاش عنوان الاشتراك غير القابل للتخمين) ويحوي أرقاماً فقط
+  if (path === '/api/push/digest' && method === 'GET') {
+    const h = url.searchParams.get('h') || '';
+    if (!/^[0-9a-f]{64}$/.test(h)) throw new HttpError(400, 'طلب غير صالح.');
+    const d = await digestForDevice(db, h);
+    if (!d) throw new HttpError(404, 'جهاز غير مسجل.');
+    return json(d);
+  }
 
   const { user, tokenHash } = await authenticate(req, db);
 
@@ -743,6 +762,23 @@ async function handleApi(req: Request, env: Env, url: URL): Promise<Response> {
   if (userMatch && method === 'PUT') { requireAdmin(user); return handleUpdateUser(req, db, user, decodeURIComponent(userMatch[1])); }
   if (userMatch && method === 'DELETE') { requireAdmin(user); return handleDeleteUser(db, user, decodeURIComponent(userMatch[1])); }
 
+  if (path.startsWith('/api/push/')) {
+    if (!OFFICE_ROLES.includes(user.role)) throw new HttpError(403, 'الإشعارات مخصصة للمدير والمحاسب.');
+    const allowLocal = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+    if (path === '/api/push/key' && method === 'GET') return json({ key: (await getVapid(db)).publicKey });
+    if (path === '/api/push/subscribe' && method === 'POST') {
+      const body = await readJson<{ endpoint?: string }>(req);
+      if (!isAllowedEndpoint(body.endpoint, allowLocal)) throw new HttpError(400, 'عنوان الإشعارات غير مدعوم.');
+      await savePushSubscription(db, user.id, user.role, body.endpoint, url.origin);
+      return json({ ok: true });
+    }
+    if (path === '/api/push/unsubscribe' && method === 'POST') {
+      const body = await readJson<{ endpoint?: string }>(req);
+      if (typeof body.endpoint === 'string') await removePushSubscription(db, body.endpoint);
+      return json({ ok: true });
+    }
+    if (path === '/api/push/test' && method === 'POST') return json({ results: await sendTestToUser(db, user.id) });
+  }
   if (path === '/api/audit' && method === 'GET') { requireAdmin(user); return handleAudit(url, db); }
   if (path === '/api/sync' && method === 'GET') return handlePull(url, db, user.role);
   if (path === '/api/sync' && method === 'POST') return handlePush(req, db, user);
@@ -766,5 +802,12 @@ export default {
     }
     if (env.ASSETS) return env.ASSETS.fetch(req);
     return new Response('Not found', { status: 404 });
+  },
+  // cron يومي (انظر triggers في wrangler.jsonc): إشعارات الخلفية للاشتراكات القريبة من الانتهاء
+  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil((async () => {
+      await ensureSchema(env.DB);
+      console.log('daily push', JSON.stringify(await runDailyPush(env.DB)));
+    })());
   },
 };

@@ -85,7 +85,8 @@ import { QuickSearch } from './components/QuickSearch';
 import { SubscriberProfile } from './components/SubscriberProfile';
 import { DataHealthPanel } from './components/DataHealthPanel';
 import { backupReminderDue, daysSinceBackup, downloadFullBackup, snoozeBackupReminder } from './utils/backup';
-import { authApi, usersApi, getToken, setToken, ApiError, PREVIEW_MODE } from './sync/api';
+import { authApi, usersApi, getToken, setToken, setRemembered, isRemembered, ApiError, PREVIEW_MODE } from './sync/api';
+import { refreshPush } from './utils/push';
 import { useCloudSync } from './sync/useCloudSync';
 
 // Views
@@ -218,8 +219,9 @@ export default function App() {
 
   // Security Lock & Inactivity Auto-logout (60 minutes)
   // By default when opening the app, username and password are required
+  // «تذكرني على هذا الجهاز» (localStorage) يبقي الدخول بعد إغلاق التطبيق؛ بدونه لا يبقى إلا ما دامت الصفحة مفتوحة (sessionStorage)
   const hasActiveSession = () =>
-    PREVIEW_MODE || (sessionStorage.getItem('sas_plus_authenticated_session') === 'active' && !!getToken());
+    PREVIEW_MODE || (!!getToken() && (isRemembered() || sessionStorage.getItem('sas_plus_authenticated_session') === 'active'));
   const [isLocked, setIsLocked] = useState<boolean>(() => !hasActiveSession());
   const [lockReason, setLockReason] = useState<'manual' | 'inactivity' | 'auth_required' | 'session_expired' | null>(() => {
     return hasActiveSession() ? null : 'auth_required';
@@ -246,7 +248,8 @@ export default function App() {
   }, [isLocked]);
 
   useEffect(() => {
-    if (isLocked || PREVIEW_MODE) return;
+    // الجهاز المحفوظ لا يُقفل بسبب الخمول (القفل اليدوي «خروج» يبقى متاحاً)
+    if (isLocked || PREVIEW_MODE || isRemembered()) return;
 
     let timeoutId: any;
 
@@ -277,6 +280,7 @@ export default function App() {
     }
     if (getToken()) authApi.logout().catch(() => undefined);
     setToken(null);
+    setRemembered(false);
     sessionStorage.removeItem('sas_plus_authenticated_session');
     setIsLocked(true);
     setLockReason(reason);
@@ -392,6 +396,11 @@ export default function App() {
     const intervalId = setInterval(recompute, 60 * 60 * 1000);
     return () => clearInterval(intervalId);
   }, [settings.warningDaysBeforeExpiry]);
+
+  // بعد الدخول (أو فتح التطبيق المحفوظ): نتأكد أن هذا الجهاز ما زال مسجلاً لإشعارات الخلفية
+  useEffect(() => {
+    if (!isLocked && !PREVIEW_MODE && currentUser.role !== 'technician') void refreshPush();
+  }, [isLocked, currentUser.id]);
 
   // Automatically check and trigger browser notifications for subscribers about to expire if permission granted
   useEffect(() => {

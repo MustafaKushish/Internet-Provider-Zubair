@@ -24,6 +24,12 @@ UI is **Arabic, RTL**. README, chat replies to the owner: **German**. Commit mes
   (debts tab: 3 buttons per debtor: طالب / سدّد / وعد). `reminders.ts` builds WhatsApp text. Subscriber fields
   `promiseDate`/`promiseSetAt` hold a promise-to-pay; a later payment cancels it. Reminder history is device-local
   (`sas_plus_debt_reminded_v1`). `RemindersView` is now renewals only.
+- Sessions/notifications: login has "remember this device" (`isRemembered` in `sync/api.ts`, localStorage). Remembered =
+  60-day server session that renews on use (`authenticate` in worker) and **no idle lock**; otherwise 24 h + page-session
+  + 60 min idle lock. Background notifications = Web Push without a payload: `worker/push.ts` (daily cron in
+  `wrangler*.jsonc`, VAPID keys auto-created in `meta`, table `push_subs`), `shared/digest.ts` (counts only, no names) and
+  `shared/vapid.ts`; `public/sw.js` fetches `/api/push/digest` on `push`; `src/utils/push.ts` subscribes (bell button).
+  Only admin/accountant receive pushes. Local test: `wrangler dev --test-scheduled`, trigger `/cdn-cgi/handler/scheduled?cron=...`.
 - `shared/access.ts` — roles, tab access, collection rules (`COLLECTION_RULES`, `HIDDEN_FROM`). Used by UI **and**
   worker; edit only here. Don't import from `src`/`worker` in it.
 - `src/components/views/*View.tsx` — one per tab; `SimpleHomeView` = simple mode home.

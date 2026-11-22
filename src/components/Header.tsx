@@ -35,6 +35,8 @@ import {
 import { LazyMotion, MotionConfig } from 'motion/react';
 import * as m from 'motion/react-m';
 import { getNotificationPermission, requestNotificationPermission } from '../utils/notifications';
+import { enablePush, sendTestPush } from '../utils/push';
+import { PREVIEW_MODE } from '../sync/api';
 import { StaffUser } from '../types/isp';
 import { canAccessTab } from '../../shared/access';
 import { canPromptInstall, isStandalone, onInstallAvailabilityChange, requestInstall } from '../pwa';
@@ -181,15 +183,26 @@ export const Header: React.FC<HeaderProps> = ({
     setNotifPermission(getNotificationPermission());
   }, []);
 
+  // الجرس: يطلب الصلاحية، يفحص التنبيهات الآن، ثم يفعّل إشعارات الخلفية (تصل والتطبيق مغلق) ويرسل تجربة
   const handleNotificationClick = async () => {
-    if (notifPermission !== 'granted') {
-      const granted = await requestNotificationPermission();
+    let granted = notifPermission === 'granted';
+    if (!granted) {
+      granted = await requestNotificationPermission();
       setNotifPermission(granted ? 'granted' : 'denied');
-      if (granted) {
-        onTriggerNotificationCheck();
-      }
-    } else {
-      onTriggerNotificationCheck();
+    }
+    if (!granted) {
+      notify('الإشعارات محظورة لهذا الموقع. فعّلها من إعدادات المتصفح (رمز القفل بجانب العنوان) ثم اضغط الجرس.', 'warning');
+      return;
+    }
+    onTriggerNotificationCheck();
+    if (PREVIEW_MODE || currentUser.role === 'technician') return;
+    const r = await enablePush();
+    if (!r.ok) { notify(r.reason, 'warning'); return; }
+    try {
+      const n = await sendTestPush();
+      notify(n > 0 ? 'تم تفعيل إشعارات الخلفية ✅ أرسلنا لك إشعاراً تجريبياً الآن.' : 'تم تسجيل هذا الجهاز. ستصلك التنبيهات كل صباح الساعة 7.', 'success');
+    } catch {
+      notify('تم تسجيل هذا الجهاز. ستصلك التنبيهات كل صباح الساعة 7.', 'success');
     }
   };
 
@@ -206,6 +219,14 @@ export const Header: React.FC<HeaderProps> = ({
             <p className="text-sm text-slate-400 truncate">{currentUser.name}</p>
           </div>
           <div className="flex gap-2 ms-auto">
+            <button
+              type="button"
+              onClick={handleNotificationClick}
+              className="h-12 px-3 sm:px-4 rounded-xl bg-slate-800 border border-slate-700 text-slate-100 text-base font-semibold flex items-center gap-2 cursor-pointer hover:bg-slate-700"
+            >
+              {notifPermission === 'granted' ? <Bell className="w-5 h-5 text-emerald-300" /> : <BellOff className="w-5 h-5 text-amber-300" />}
+              {notifPermission === 'granted' ? 'الإشعارات' : 'فعّل الإشعارات'}
+            </button>
             <button
               type="button"
               onClick={onToggleSimpleMode}

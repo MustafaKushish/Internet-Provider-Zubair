@@ -33,6 +33,20 @@ export function setToken(token: string | null): void {
   }
 }
 
+const REMEMBER_KEY = 'sas_plus_remember_device';
+
+/** «تذكرني على هذا الجهاز»: يبقى الدخول بعد إغلاق التطبيق، بلا قفل بسبب الخمول */
+export function isRemembered(): boolean {
+  try { return localStorage.getItem(REMEMBER_KEY) === '1'; } catch { return false; }
+}
+
+export function setRemembered(on: boolean): void {
+  try {
+    if (on) localStorage.setItem(REMEMBER_KEY, '1');
+    else localStorage.removeItem(REMEMBER_KEY);
+  } catch { /* التخزين غير متاح */ }
+}
+
 export async function apiRequest<T>(path: string, options: { method?: string; body?: unknown } = {}): Promise<T> {
   const headers: Record<string, string> = {};
   const token = getToken();
@@ -69,10 +83,10 @@ type AuthResult = { token: string; user: StaffUser };
 
 export const authApi = {
   status: () => apiRequest<{ ok: boolean; needsSetup: boolean }>('/api/status'),
-  setup: (name: string, username: string, password: string) =>
-    apiRequest<AuthResult>('/api/setup', { body: { name, username, password } }),
-  login: (username: string, password: string) =>
-    apiRequest<AuthResult>('/api/auth/login', { body: { username, password } }),
+  setup: (name: string, username: string, password: string, remember = false) =>
+    apiRequest<AuthResult>('/api/setup', { body: { name, username, password, remember } }),
+  login: (username: string, password: string, remember = false) =>
+    apiRequest<AuthResult>('/api/auth/login', { body: { username, password, remember } }),
   logout: () => apiRequest<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
   me: () => apiRequest<{ user: StaffUser }>('/api/auth/me'),
   changePassword: (currentPassword: string, newPassword: string) =>
@@ -88,8 +102,9 @@ export const usersApi = {
 };
 
 /** تسجيل الدخول وحفظ رمز الجلسة */
-export async function loginAndStore(username: string, password: string): Promise<StaffUser> {
-  const res = await authApi.login(username, password);
+export async function loginAndStore(username: string, password: string, remember: boolean = isRemembered()): Promise<StaffUser> {
+  const res = await authApi.login(username, password, remember);
   setToken(res.token);
+  setRemembered(remember);
   return res.user;
 }

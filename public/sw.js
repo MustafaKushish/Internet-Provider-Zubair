@@ -48,3 +48,49 @@ self.addEventListener('fetch', event => {
     );
   }
 });
+
+// ---- إشعارات الخلفية (Web Push) ----
+// يصل «نبض» فارغ من الخادم؛ نجلب النص (أرقام فقط) من /api/push/digest ثم نعرض الإشعار.
+// إن فشل الجلب نعرض إشعاراً عاماً (المتصفح يشترط عرض إشعار عند كل نبض).
+async function sha256Hex(text) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+self.addEventListener('push', event => {
+  event.waitUntil((async () => {
+    let title = 'أولاد كشيش';
+    let body = 'لديك تنبيهات جديدة في المنظومة.';
+    try {
+      const sub = await self.registration.pushManager.getSubscription();
+      if (sub) {
+        const res = await fetch('/api/push/digest?h=' + (await sha256Hex(sub.endpoint)), { cache: 'no-store' });
+        if (res.ok) {
+          const d = await res.json();
+          title = d.title || title;
+          body = d.body || body;
+        }
+      }
+    } catch (e) { /* نعرض النص العام */ }
+    await self.registration.showNotification(title, {
+      body,
+      tag: 'sas-digest',
+      renotify: true,
+      dir: 'rtl',
+      lang: 'ar',
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
+      data: { url: '/' },
+    });
+  })());
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+      for (const c of list) if ('focus' in c) return c.focus();
+      return self.clients.openWindow('/');
+    }),
+  );
+});

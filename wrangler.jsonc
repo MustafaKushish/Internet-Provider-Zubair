@@ -19,5 +19,7 @@
   ],
   // Cloudflare Workers AI للمستشار الذكي (حصة يومية مجانية ضمن الحساب)
   "ai": { "binding": "AI" },
+  // إشعارات الخلفية: كل يوم 04:00 UTC = 07:00 بتوقيت بغداد
+  "triggers": { "crons": ["0 4 * * *"] },
   "observability": { "enabled": true }
 }

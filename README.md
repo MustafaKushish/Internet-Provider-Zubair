@@ -78,6 +78,23 @@ Der Windows-Installer ist eine Electron-Hülle (`desktop/`) um dieselbe Adresse.
   Beim Bereichswechsel kommt der neue Bereich von der Seite seines Tabs, die Karten erscheinen nacheinander, und der
   Markierungsbalken gleitet zum neuen Tab. Ist am Gerät „Bewegung reduzieren“ eingeschaltet, laufen keine Animationen.
 
+## Angemeldet bleiben und Benachrichtigungen im Hintergrund
+
+- **Warum sich die App abmeldete:** Die App merkte sich die Anmeldung nur, solange die Seite offen war. Beendet das Handy
+  die App nach ein paar Minuten im Hintergrund, war sie beim Öffnen wieder gesperrt. Dazu kam eine Sperre nach 60 Minuten
+  ohne Bedienung.
+- **Jetzt:** Beim Anmelden gibt es den Haken „تذكرني على هذا الجهاز“ (standardmäßig an). Dann bleibt die Anmeldung bis zu
+  60 Tage bestehen (verlängert sich bei jeder Nutzung) und die Untätigkeits-Sperre entfällt. „خروج“ meldet weiterhin ab.
+  Auf einem fremden oder geteilten Gerät den Haken ausschalten: dann gilt wie bisher 24 Stunden und 60 Minuten Sperre.
+- **Benachrichtigungen auch bei geschlossener App:** Einmal pro Gerät auf den Glockenknopf tippen („فعّل الإشعارات“, im
+  einfachen Modus oben). Danach schickt der Server jeden Morgen um 7 Uhr (Bagdad) eine Nachricht, wenn Kunden bald
+  ablaufen oder gerade abgelaufen sind, z. B. „ينتهي قريباً: 3 • انتهى مؤخراً: 1 • ديون: 405,000 د.ع (5 مدين)“. Es stehen
+  nur Zahlen drin, keine Namen. Die Glocke sendet auch sofort eine Testnachricht.
+- **Wer bekommt sie:** nur Admin und Buchhalter. **iPhone/iPad:** nur wenn die App über „Zur Home-Bildschirm hinzufügen“
+  installiert ist und von dort geöffnet wird.
+- **Einrichtung:** nichts von Hand. Die Schlüssel legt der Server beim ersten Mal selbst an, die neue Tabelle entsteht
+  automatisch, und der tägliche Zeitplan steht in `wrangler.jsonc` (wird beim normalen Deploy mit angelegt).
+
 ## Kundenprofil, Ratenpläne und Kundenbewegung
 
 - **Kundenprofil:** Auf den Namen tippen (Liste, Erinnerungen) oder in der Schnellsuche „الملف“. Zeigt alle Daten, Kunde seit,

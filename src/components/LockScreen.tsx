@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { authApi, loginAndStore, setToken } from '../sync/api';
+import { authApi, loginAndStore, setRemembered, setToken } from '../sync/api';
 import { StaffUser } from '../types/isp';
 import {
   Lock,
@@ -39,6 +39,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
   const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
   const [setupName, setSetupName] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [remember, setRemember] = useState(true); // الافتراضي: يبقى الدخول على هذا الجهاز
 
   useEffect(() => {
     authApi.status()
@@ -69,11 +70,12 @@ export const LockScreen: React.FC<LockScreenProps> = ({
     setBusy(true);
     try {
       if (needsSetup) {
-        const res = await authApi.setup(setupName.trim(), username, pwd);
+        const res = await authApi.setup(setupName.trim(), username, pwd, remember);
         setToken(res.token);
+        setRemembered(remember);
         onUnlock(res.user);
       } else {
-        onUnlock(await loginAndStore(username, pwd));
+        onUnlock(await loginAndStore(username, pwd, remember));
       }
     } catch (err) {
       setError((err as Error).message);
@@ -234,6 +236,19 @@ export const LockScreen: React.FC<LockScreenProps> = ({
               />
             </div>
           )}
+
+          <label className="flex items-start gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={remember}
+              onChange={e => setRemember(e.target.checked)}
+              className="w-5 h-5 mt-0.5 accent-cyan-500 flex-shrink-0"
+            />
+            <span className="text-sm text-slate-200 leading-relaxed">
+              تذكرني على هذا الجهاز
+              <span className="block text-xs text-slate-400">يبقى الدخول مفتوحاً (حتى 60 يوماً) فتصلك الإشعارات. لا تفعّله على جهاز مشترك.</span>
+            </span>
+          </label>
 
           {error && (
             <div className="bg-rose-950/70 border border-rose-800 p-2.5 rounded-xl text-rose-300 flex items-center gap-2 text-xs">
