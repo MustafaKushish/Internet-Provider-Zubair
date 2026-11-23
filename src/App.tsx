@@ -1571,7 +1571,7 @@ export default function App() {
       {lastUndo && <div className="h-16 no-print" aria-hidden="true" />}
 
       {/* Footer */}
-      <footer className={`relative border-t border-slate-800/60 bg-slate-950/70 backdrop-blur-sm py-4 ${simpleMode ? 'pb-6' : 'pb-24'} lg:pb-4 text-center text-xs text-slate-400 no-print`}>
+      <footer className={`relative border-t border-slate-800/60 bg-slate-950/70 backdrop-blur-sm py-4 ${simpleMode ? 'pb-6' : 'pb-[calc(7.5rem+env(safe-area-inset-bottom))]'} lg:pb-4 text-center text-xs text-slate-400 no-print`}>
         <p>
           {settings.ispName} (العراق - البصرة - قضاء الزبير) © {new Date().getFullYear()}
           {settings.contactPhone && <> • هاتف وواتساب:{' '}<span className="font-mono text-cyan-400 font-semibold" dir="ltr">{settings.contactPhone}</span></>}

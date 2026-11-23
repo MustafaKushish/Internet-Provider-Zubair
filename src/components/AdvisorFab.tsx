@@ -26,8 +26,7 @@ export const AdvisorFab: React.FC<{ raised: boolean } & AdvisorPanelProps> = ({ 
           onPointerEnter={() => { void loadPanel(); }}
           aria-label="اسأل المستشار الذكي"
           title="المستشار الذكي"
-          className={`fixed right-3 z-40 w-12 h-12 rounded-full bg-gradient-to-tr from-cyan-600 to-indigo-600 text-white flex items-center justify-center cursor-pointer shadow-lg shadow-black/40 border border-white/20 hover:brightness-110 no-print ${raised ? 'bottom-[4.75rem] lg:bottom-4' : 'bottom-4'}`}
-          style={{ marginBottom: 'env(safe-area-inset-bottom)' }}
+          className={`fixed right-3 z-40 w-12 h-12 rounded-full bg-gradient-to-tr from-cyan-600 to-indigo-600 text-white flex items-center justify-center cursor-pointer shadow-lg shadow-black/40 border border-white/20 hover:brightness-110 no-print ${raised ? 'bottom-[calc(6.25rem+env(safe-area-inset-bottom))] lg:bottom-4' : 'bottom-4'}`}
         >
           <Sparkles className={`w-5 h-5 ${busy ? 'animate-pulse' : ''}`} />
           {busy && <span className="absolute inset-0 rounded-full ring-2 ring-cyan-300/60 animate-ping" aria-hidden="true" />}

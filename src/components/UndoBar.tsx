@@ -6,7 +6,7 @@ import { UndoEntry } from '../utils/undo';
 export const UndoBar: React.FC<{ entry: UndoEntry | null; count: number; raised: boolean; onUndo: () => void }> = ({ entry, count, raised, onUndo }) => {
   if (!entry) return null;
   return (
-    <div className={`animate-rise fixed right-3 z-40 no-print ${raised ? 'bottom-36 lg:bottom-20' : 'bottom-20'}`} key={entry.id}>
+    <div className={`animate-rise fixed right-3 z-40 no-print ${raised ? 'bottom-[calc(10rem+env(safe-area-inset-bottom))] lg:bottom-20' : 'bottom-20'}`} key={entry.id}>
       <button
         type="button"
         onClick={onUndo}

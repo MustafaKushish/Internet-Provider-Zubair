@@ -399,6 +399,22 @@ nav.fixed {
 }
 .bell-ring { animation: bell-ring 1s ease-in-out 2; transform-origin: top center; }
 
+/* شريط التنقل السفلي العائم (الهاتف): جزيرة زجاجية مستديرة بدل شريط ملتصق بالحافة */
+nav.mobile-dock { -webkit-backdrop-filter: none; backdrop-filter: none; } /* التمويه على الشريط الداخلي */
+.mobile-dock-bar {
+  background-color: rgb(15 23 42 / 0.72);
+  background-image: linear-gradient(180deg, rgb(255 255 255 / 0.1), rgb(255 255 255 / 0.02));
+  border: 1px solid rgb(255 255 255 / 0.16);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18), 0 18px 40px -12px rgb(0 0 0 / 0.75), 0 0 0 1px rgb(0 0 0 / 0.25);
+}
+.mobile-dock-active {
+  background: linear-gradient(160deg, rgb(34 211 238 / 0.28), rgb(99 102 241 / 0.24));
+  border: 1px solid rgb(165 243 252 / 0.28);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.25), 0 8px 20px -8px rgb(34 211 238 / 0.55);
+}
+
 /* الأزرار الرئيسية: تدرج لامع بنفس التباين (أبيض فوق ألوان داكنة ≥ 5:1) */
 button.bg-cyan-600, button.bg-cyan-700 {
   background-image: linear-gradient(135deg, #0e7490, #1d4ed8);
@@ -424,11 +440,12 @@ button.bg-indigo-600, button.bg-indigo-700 {
     --color-slate-700: #334155;
   }
   .app-aurora { display: none; }
-  header, nav.fixed, .app-overlay, .app-overlay > *, .glass-popover, .glass-toast {
+  header, nav.fixed, .mobile-dock-bar, .app-overlay, .app-overlay > *, .glass-popover, .glass-toast {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
   :root { --glass-bg: #0f172a; --glass-sheen: none; }
+  .mobile-dock-bar { background-color: #0f172a; }
 }
 
 @media (prefers-reduced-motion: reduce) {
