@@ -286,133 +286,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* Grid: Urgent Subscriptions & Top Debtors */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Urgent Subscriptions Card */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <ShieldAlert className="w-5 h-5 text-amber-400" />
-              <h3 className="font-bold text-white text-sm">مشتركون يحتاجون للمتابعة الفورية (منتهي أو ينتهي قريباً)</h3>
-            </div>
-            <span className="text-xs bg-amber-950 text-amber-400 px-2.5 py-0.5 rounded-full border border-amber-800 font-bold">
-              {urgentSubscribers.length} مشترك
-            </span>
-          </div>
-
-          <div className="space-y-2.5">
-            {urgentSubscribers.length === 0 ? (
-              <div className="p-8 text-center text-slate-500">
-                <CheckCircle2 className="w-8 h-8 mx-auto text-emerald-500 mb-2" />
-                <p className="text-xs">رائع! لا يوجد مشتركين منتهين أو قريبين من الانتهاء في اليومين القادمين.</p>
-              </div>
-            ) : (
-              urgentSubscribers.slice(0, 6).map((sub) => {
-                const days = getDaysRemaining(sub.expiryDate);
-                return (
-                  <div key={sub.id} className="p-3 bg-slate-800/60 rounded-xl border border-slate-700/80 flex items-center justify-between gap-3 text-xs">
-                    <div>
-                      <div className="font-bold text-white">{sub.name}</div>
-                      <div className="text-slate-400 text-[11px] mt-0.5">
-                        {sub.planName} • {sub.towerName}
-                      </div>
-                      <div className="mt-1">
-                        {days <= 0 ? (
-                          <span className="text-rose-400 font-bold bg-rose-950/60 px-2 py-0.5 rounded border border-rose-900">
-                            متأخر {formatMonthsAr(monthsLate(sub.expiryDate))} ({sub.expiryDate})
-                          </span>
-                        ) : (
-                          <span className="text-amber-300 font-bold bg-amber-950/60 px-2 py-0.5 rounded border border-amber-900">
-                            ينتهي خلال {days} يوم ({sub.expiryDate})
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <button
-                        onClick={() => onRenew(sub)}
-                        className="bg-cyan-600 hover:bg-cyan-500 text-white px-2.5 py-1.5 rounded-lg font-bold flex items-center gap-1 transition cursor-pointer text-xs"
-                      >
-                        <RefreshCw className="w-3.5 h-3.5" />
-                        <span>تجديد</span>
-                      </button>
-                      <button
-                        onClick={() => onSendWhatsApp(sub, days <= 0 ? 'expired' : 'expiry')}
-                        className="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1.5 rounded-lg font-bold flex items-center gap-1 transition cursor-pointer text-xs"
-                      >
-                        <MessageSquare className="w-3.5 h-3.5" />
-                        <span>واتساب</span>
-                      </button>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-
-        {/* Top Debtors Card */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-rose-400" />
-              <h3 className="font-bold text-white text-sm">أعلى المشتركين المدينين (ديون متأخرة)</h3>
-            </div>
-            <span className="text-xs bg-rose-950 text-rose-400 px-2.5 py-0.5 rounded-full border border-rose-800 font-bold">
-              {topDebtors.length} مدينين
-            </span>
-          </div>
-
-          <div className="space-y-2.5">
-            {topDebtors.length === 0 ? (
-              <div className="p-8 text-center text-slate-500">
-                <CheckCircle2 className="w-8 h-8 mx-auto text-emerald-500 mb-2" />
-                <p className="text-xs">ممتاز! كافة المشتركين مسددين بالكامل ولا توجد أي ديون متأخرة.</p>
-              </div>
-            ) : (
-              topDebtors.map((sub) => {
-                const debt = getRemainingDebt(sub);
-                return (
-                  <div key={sub.id} className="p-3 bg-slate-800/60 rounded-xl border border-slate-700/80 flex items-center justify-between gap-3 text-xs">
-                    <div>
-                      <div className="font-bold text-white">{sub.name}</div>
-                      <div className="text-slate-400 text-[11px] mt-0.5">
-                        هاتف: <span className="font-mono text-slate-300" dir="ltr">{sub.phone}</span> • {sub.towerName}
-                      </div>
-                      <div className="text-rose-400 font-bold mt-1">
-                        المبلغ المطلوب: {formatCurrency(debt, settings.currency)}
-                        {sub.salePrice > 0 && <span className="font-normal text-rose-300/80"> (×{debtInMonths(sub)} {sub.planName})</span>}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      {onOpenDebt && (
-                        <button
-                          onClick={() => onOpenDebt(sub)}
-                          className="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded-lg font-bold transition cursor-pointer text-xs"
-                        >
-                          إدارة الدين
-                        </button>
-                      )}
-                      <button
-                        onClick={() => onSendWhatsApp(sub, 'debt')}
-                        className="bg-rose-600 hover:bg-rose-500 text-white px-3 py-1.5 rounded-lg font-bold flex items-center gap-1 transition cursor-pointer text-xs"
-                      >
-                        <MessageSquare className="w-3.5 h-3.5" />
-                        <span>مطالبة بالدين</span>
-                      </button>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Distribution Cards: Providers & Towers */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* حسب المزود: يظهر فقط عند وجود أكثر من مزود (القوائم الطويلة صارت في الرئيسية والديون والأبراج) */}
+      {Object.keys(providerStats).length > 1 && (
+        <div className="grid grid-cols-1 gap-6">
         {/* By Provider */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
           <div className="flex items-center gap-2 mb-4">
@@ -436,45 +312,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             })}
           </div>
         </div>
-
-        {/* By Tower: count, monthly profit and debts */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
-          <div className="flex items-center justify-between gap-2 mb-4">
-            <div className="flex items-center gap-2">
-              <TowerControl className="w-5 h-5 text-cyan-400" />
-              <h3 className="font-bold text-white text-sm">الأبراج حسب الربح الشهري</h3>
-            </div>
-            {onOpenTowers && (
-              <button type="button" onClick={onOpenTowers} className="text-[11px] text-cyan-400 hover:text-cyan-300 font-bold cursor-pointer">
-                كل الأبراج ←
-              </button>
-            )}
-          </div>
-          {towerRanking.length === 0 ? (
-            <p className="text-xs text-slate-500">لا يوجد مشتركون مربوطون بأبراج بعد.</p>
-          ) : (
-            <div className="space-y-3" style={{ fontVariantNumeric: 'tabular-nums' }}>
-              {towerRanking.slice(0, 8).map((t, idx) => (
-                <div key={t.name} className="space-y-1">
-                  <div className="flex justify-between gap-2 text-xs font-semibold">
-                    <span className={`truncate ${t.name === NO_TOWER_LABEL ? 'text-amber-300' : 'text-slate-200'}`}>
-                      <span className="text-slate-500 ml-1">{idx + 1}.</span>{t.name}
-                      <span className="text-slate-500 font-normal"> • {t.subscribers} مشترك</span>
-                    </span>
-                    <span className="text-emerald-400 whitespace-nowrap">{formatCurrency(t.monthlyProfit, settings.currency)}</span>
-                  </div>
-                  <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
-                    <div className="bg-emerald-500 h-2 rounded-full" style={{ width: `${Math.max(2, Math.round((t.monthlyProfit / maxTowerProfit) * 100))}%` }} />
-                  </div>
-                  {t.debts > 0 && (
-                    <div className="text-[10px] text-rose-400">ديون: {formatCurrency(t.debts, settings.currency)}</div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
         </div>
-      </div>
+      )}
     </div>
   );
 };

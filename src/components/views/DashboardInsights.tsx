@@ -365,8 +365,8 @@ export const DashboardInsights: React.FC<Props> = ({ subscribers, payments, expe
           </ul>
         </Card>
 
-        {/* طرق الدفع */}
-        <Card title="طرق الدفع هذا الشهر" icon={<Wallet className="w-4 h-4 text-cyan-400" />} sub={`${monthPayments.length} وصل`}>
+        {/* طرق الدفع (تُخفى إن لم تكن هناك وصولات) */}
+        {methods.length > 0 && <Card title="طرق الدفع هذا الشهر" icon={<Wallet className="w-4 h-4 text-cyan-400" />} sub={`${monthPayments.length} وصل`}>
           {methods.length === 0 ? <p className="text-xs text-slate-500">لا وصولات هذا الشهر بعد.</p> : (
             <>
               <div className="flex h-4 rounded-full overflow-hidden gap-0.5 bg-slate-800">
@@ -382,10 +382,10 @@ export const DashboardInsights: React.FC<Props> = ({ subscribers, payments, expe
               </ul>
             </>
           )}
-        </Card>
+        </Card>}
 
         {/* الموظفون */}
-        <Card title="تحصيل الموظفين هذا الشهر" icon={<UserCheck className="w-4 h-4 text-cyan-400" />} sub="من قبض كم (حسب الوصولات)">
+        {staff.length > 0 && <Card title="تحصيل الموظفين هذا الشهر" icon={<UserCheck className="w-4 h-4 text-cyan-400" />} sub="من قبض كم (حسب الوصولات)">
           {staff.length === 0 ? <p className="text-xs text-slate-500">لا وصولات هذا الشهر بعد.</p> : (
             <ul className="space-y-2.5 text-xs">
               {staff.map(s => (
@@ -399,10 +399,10 @@ export const DashboardInsights: React.FC<Props> = ({ subscribers, payments, expe
               ))}
             </ul>
           )}
-        </Card>
+        </Card>}
 
-        {/* البلاغات */}
-        <Card title="الدعم الفني" icon={<Wrench className="w-4 h-4 text-cyan-400" />} sub="آخر 30 يوماً" className="lg:col-span-2">
+        {/* البلاغات (تُخفى إن لم يكن هناك بلاغات) */}
+        {(openTickets.length > 0 || recentTickets.length > 0) && <Card title="الدعم الفني" icon={<Wrench className="w-4 h-4 text-cyan-400" />} sub="آخر 30 يوماً" className="lg:col-span-2">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
             <div className="rounded-xl bg-slate-950/60 border border-slate-800 p-3"><div className="text-slate-400">مفتوحة الآن</div><div className={`text-lg font-bold ${openTickets.length ? 'text-amber-300' : 'text-white'}`}>{openTickets.length}</div></div>
             <div className="rounded-xl bg-slate-950/60 border border-slate-800 p-3"><div className="text-slate-400">بلاغات جديدة</div><div className="text-lg font-bold text-white">{recentTickets.length}</div></div>
@@ -415,7 +415,7 @@ export const DashboardInsights: React.FC<Props> = ({ subscribers, payments, expe
               {openByTower.map(([t, n]) => <span key={t} className="px-2 py-0.5 rounded-lg bg-amber-950/40 border border-amber-900 text-amber-200">{t}: {n}</span>)}
             </div>
           )}
-        </Card>
+        </Card>}
       </div>
     </div>
   );

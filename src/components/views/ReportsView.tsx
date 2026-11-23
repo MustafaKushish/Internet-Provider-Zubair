@@ -373,7 +373,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           {/* Overdue Accounts */}
           <div className="bg-slate-950/70 print:bg-slate-50 border border-slate-800 print:border-slate-200 rounded-xl p-4">
             <div className="flex items-center justify-between text-slate-400 print:text-slate-600 text-xs mb-1">
-              <span>الحسابات المتأخرة (Overdue)</span>
+              <span>الحسابات المتأخرة</span>
               <AlertTriangle className="w-4 h-4 text-rose-400" />
             </div>
             <div className="text-xl font-black text-rose-400 print:text-rose-700 font-mono">
