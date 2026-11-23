@@ -96,4 +96,5 @@ UI is **Arabic, RTL**. README, chat replies to the owner: **German**. Commit mes
   every `.app-overlay > *`, `.glass-popover`, `.glass-toast`); don't give dialogs their own border colors/radius. Primary `bg-cyan/emerald/indigo-600|700` buttons get gradients.
 - Color meaning: cyan = brand/primary, rose = expired/danger only, amber = expiring soon or debt, emerald = active/paid.
   Show a status color once per row (pill), keep avatars/secondary buttons neutral. Logout is neutral with a rose icon.
+- Sizes: everything is rem. Type tokens (`--text-xs..2xl`) and tiny `text-[10/11px]` are raised in `index.css` ("مقياس الخط"); touch devices get 44px min tap targets. The user picks the root scale (4 steps, device-local) in «المزيد» (`utils/uiScale.ts`, applied in `main.tsx`). Don't use fixed px sizes for text or controls.
 - Motion: transform/opacity only, honor `prefers-reduced-motion` (already global in `index.css`).
