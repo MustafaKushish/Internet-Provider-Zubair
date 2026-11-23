@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bell, BellOff, ChevronLeft, Download, LogOut, MonitorDown, Server, Settings, ShieldCheck, Smile, Sparkles, TowerControl, Upload, UserCheck, Wrench } from 'lucide-react';
+import { Bell, BellOff, ChevronLeft, Download, LogOut, MonitorDown, Server, Settings, ShieldCheck, Smile, TowerControl, Upload, UserCheck, Wrench } from 'lucide-react';
 import { StaffUser } from '../../types/isp';
 import { canAccessTab } from '../../../shared/access';
 import { TAB_LABEL } from '../nav';
@@ -50,7 +50,6 @@ export const MoreView: React.FC<MoreViewProps> = p => {
       <Group title="العمل اليومي">
         {can('tickets') && <Row icon={Wrench} label={TAB_LABEL.tickets} badge={p.openTickets} onClick={() => p.onOpenTab('tickets')} />}
         {can('towers') && <Row icon={TowerControl} label={TAB_LABEL.towers} onClick={() => p.onOpenTab('towers')} />}
-        {can('advisor') && <Row icon={Sparkles} label={TAB_LABEL.advisor} onClick={() => p.onOpenTab('advisor')} />}
       </Group>
 
       {(can('providers') || can('users') || can('settings') || isOffice) && (
