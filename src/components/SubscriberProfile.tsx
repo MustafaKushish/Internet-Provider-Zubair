@@ -30,6 +30,8 @@ interface SubscriberProfileProps {
   onArchive?: (ids: string[], archive: boolean, reason?: string) => void;
   /** الوضع البسيط: أزرار وخط أكبر، بدون أرشفة */
   simple?: boolean;
+  /** تبديل «لا يرغب بالعروض» */
+  onToggleMarketing?: (sub: Subscriber) => void;
 }
 
 const TICKET_STATUS: Record<string, string> = { open: 'مفتوح', in_progress: 'قيد المتابعة', resolved: 'تم الحل', closed: 'مغلق' };
@@ -42,7 +44,7 @@ export const SubscriberProfile: React.FC<SubscriberProfileProps> = props =>
   props.subscriber ? <ProfileInner {...props} sub={props.subscriber} /> : null;
 
 const ProfileInner: React.FC<SubscriberProfileProps & { sub: Subscriber }> = ({
-  sub, payments, tickets, settings, currentUser, onClose, onRenew, onWhatsApp, onDebt, onEdit, onTicket, onPrintReceipt, onArchive, simple,
+  sub, payments, tickets, settings, currentUser, onClose, onRenew, onWhatsApp, onDebt, onEdit, onTicket, onPrintReceipt, onArchive, simple, onToggleMarketing,
 }) => {
   useEscapeKey(onClose);
   const [showPass, setShowPass] = useState(false);
@@ -160,6 +162,11 @@ const ProfileInner: React.FC<SubscriberProfileProps & { sub: Subscriber }> = ({
             {office && <button type="button" onClick={act(onPrintReceipt)} className={`${btn} bg-slate-800 border border-slate-700 text-slate-200`}><Printer className="w-4 h-4" />وصل</button>}
             <button type="button" onClick={act(onTicket)} className={`${btn} bg-slate-800 border border-slate-700 text-amber-300`}><Wrench className="w-4 h-4" />بلاغ عطل</button>
             <button type="button" onClick={act(onEdit)} className={`${btn} bg-slate-800 border border-slate-700 text-slate-200`}><Edit className="w-4 h-4" />تعديل</button>
+            {office && !simple && onToggleMarketing && (
+              <button type="button" onClick={() => onToggleMarketing(sub)} className={`${btn} bg-slate-800 border border-slate-700 text-slate-200`}>
+                {sub.noMarketing ? 'السماح برسائل العروض' : 'لا يرغب بالعروض'}
+              </button>
+            )}
             {onArchive && !simple && (
               <button type="button" onClick={() => onArchive([sub.id], !sub.archived, sub.archived ? undefined : 'غادر الشبكة')}
                 className={`${btn} bg-slate-800 border border-slate-600 text-slate-300`}>

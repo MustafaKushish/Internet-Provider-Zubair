@@ -27,6 +27,7 @@ import {
   MoreHorizontal,
   Wallet,
   HandCoins,
+  Megaphone,
   Search,
   X as CloseIcon,
   LayoutGrid,
@@ -59,6 +60,7 @@ const TABS: TabDef[] = [
   { id: 'reports', label: 'التقارير المالية والجرد الدوري', short: 'التقارير', icon: BarChart3 },
   { id: 'cash', label: 'الصندوق والمصاريف', short: 'الصندوق', icon: Wallet },
   { id: 'debts', label: 'الديون والمطالبات', short: 'الديون', icon: HandCoins },
+  { id: 'marketing', label: 'العروض والتسويق', short: 'التسويق', icon: Megaphone },
   { id: 'reminders', label: 'تذكيرات الواتساب والديون', short: 'التذكيرات', icon: MessageSquare },
   { id: 'tickets', label: 'البلاغات والدعم الفني', short: 'البلاغات', icon: Wrench },
   { id: 'advisor', label: 'المستشار الذكي', short: 'المستشار', icon: Sparkles, accent: 'indigo' },
@@ -535,7 +537,7 @@ export const Header: React.FC<HeaderProps> = ({
                 onClick={() => setActiveTab(t.id)}
                 aria-current={active ? 'page' : undefined}
                 title={t.label}
-                className={`px-2 sm:px-2.5 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-1.5 whitespace-nowrap transition cursor-pointer relative ${active ? activeCls : idleCls}`}
+                className={`px-2 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-1 whitespace-nowrap transition cursor-pointer relative ${active ? activeCls : idleCls}`}
               >
                 {active && (
                   <m.span

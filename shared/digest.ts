@@ -10,6 +10,7 @@ export interface DigestSubscriber {
   cycleMonths?: number;
   carriedDebt?: number;
   paidAmount?: number;
+  cycleDiscount?: number;
 }
 
 export interface Digest {
@@ -37,7 +38,7 @@ export function computeDigest(subs: DigestSubscriber[], warningDays: number, tod
     const left = dayNum(s.expiryDate) - t;
     if (left >= 0 && left <= warningDays) d.expiring++;
     else if (left < 0 && left >= -2) d.newlyExpired++;
-    const debt = Math.max(0, (s.salePrice || 0) * (s.cycleMonths && s.cycleMonths > 0 ? s.cycleMonths : 1) + (s.carriedDebt || 0) - (s.paidAmount || 0));
+    const debt = Math.max(0, (s.salePrice || 0) * (s.cycleMonths && s.cycleMonths > 0 ? s.cycleMonths : 1) + (s.carriedDebt || 0) - (s.cycleDiscount || 0) - (s.paidAmount || 0));
     if (debt > 0) { d.debtors++; d.debtTotal += debt; }
   }
   return d;

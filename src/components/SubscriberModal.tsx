@@ -13,6 +13,8 @@ interface SubscriberModalProps {
   subscriberToEdit?: Subscriber | null;
   providers: UpstreamProvider[];
   towers: string[];
+  /** للاختيار في «جاء عن طريق» (دعوة الأصدقاء) */
+  subscribers?: Subscriber[];
   currentUser?: StaffUser;
   onOpenManageProviders?: () => void;
 }
@@ -24,6 +26,7 @@ export const SubscriberModal: React.FC<SubscriberModalProps> = ({
   subscriberToEdit,
   providers,
   towers,
+  subscribers = [],
   currentUser,
   onOpenManageProviders,
 }) => {
@@ -45,6 +48,7 @@ export const SubscriberModal: React.FC<SubscriberModalProps> = ({
   const [macAddress, setMacAddress] = useState('');
   const [address, setAddress] = useState('');
   const [notes, setNotes] = useState('');
+  const [referredByName, setReferredByName] = useState('');
 
   // Prepopulate when editing or opening
   useEffect(() => {
@@ -52,6 +56,7 @@ export const SubscriberModal: React.FC<SubscriberModalProps> = ({
       setName(subscriberToEdit.name);
       setPhone(subscriberToEdit.phone);
       setUsername(subscriberToEdit.username);
+      setReferredByName(subscribers.find(s => s.id === subscriberToEdit.referredBy)?.name || '');
       setPassword(subscriberToEdit.password || '');
       setUpstreamProvider(subscriberToEdit.upstreamProvider);
       setPlanName(subscriberToEdit.planName);
@@ -98,6 +103,7 @@ export const SubscriberModal: React.FC<SubscriberModalProps> = ({
       setMacAddress('');
       setAddress('');
       setNotes('');
+      setReferredByName('');
     }
     // يُملأ النموذج عند الفتح فقط؛ تحديثات المزامنة لا تمسح ما يكتبه المستخدم
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -150,6 +156,11 @@ export const SubscriberModal: React.FC<SubscriberModalProps> = ({
     ? getRemainingDebt({ ...subscriberToEdit, salePrice: Number(salePrice) || 0 })
     : Math.max(0, salePrice - paidAmount);
 
+  // «جاء عن طريق»: يُختار من أسماء المشتركين الحاليين (غير المشترك نفسه)
+  const referrer = referredByName.trim()
+    ? subscribers.find(s => s.name.trim() === referredByName.trim() && s.id !== subscriberToEdit?.id)
+    : undefined;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
@@ -173,6 +184,7 @@ export const SubscriberModal: React.FC<SubscriberModalProps> = ({
       address: address.trim(),
       notes: notes.trim(),
       lastPaymentDate: paidAmount > 0 ? (subscriberToEdit?.lastPaymentDate || startDate) : undefined,
+      referredBy: referrer?.id,
     });
 
     onClose();
@@ -546,6 +558,26 @@ export const SubscriberModal: React.FC<SubscriberModalProps> = ({
                 placeholder="مثال: شارع 14، قرب الصيدلية"
                 className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500"
               />
+            </div>
+
+            <div className="sm:col-span-4">
+              <label htmlFor="sub-referred-by" className="block text-xs font-semibold text-slate-300 mb-1">جاء عن طريق (دعوة صديق، اختياري)</label>
+              <input
+                id="sub-referred-by"
+                list="sub-referrer-list"
+                value={referredByName}
+                onChange={(e) => setReferredByName(e.target.value)}
+                placeholder="اكتب اسم المشترك الذي دعاه"
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-cyan-500"
+              />
+              <datalist id="sub-referrer-list">
+                {subscribers.filter(s => s.id !== subscriberToEdit?.id).slice(0, 500).map(s => <option key={s.id} value={s.name} />)}
+              </datalist>
+              {referredByName.trim() && (
+                <p className={`text-xs mt-1 ${referrer ? 'text-emerald-300' : 'text-amber-300'}`}>
+                  {referrer ? `سيحصل ${referrer.name} على مكافأة بعد أن يدفع هذا المشترك.` : 'اختر اسماً من القائمة كما هو مكتوب.'}
+                </p>
+              )}
             </div>
 
             <div className="sm:col-span-4">

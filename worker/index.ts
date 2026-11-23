@@ -9,6 +9,8 @@
 
 import { handleAdvisorChat, advisorStatus } from './advisor';
 import { COLLECTION_RULES, HIDDEN_FROM, OFFICE_ROLES, isRole, type Collection, type Role } from '../shared/access';
+import { remainingDebtOf, verifyCycleDiscount, type Promotion } from '../shared/promotions';
+import { baghdadToday } from '../shared/digest';
 import { PUSH_SCHEMA, digestForDevice, getVapid, isAllowedEndpoint, removePushSubscription, runDailyPush, savePushSubscription, sendTestToUser } from './push';
 
 export interface Env {
@@ -545,10 +547,40 @@ function reducesDebtWithoutPayment(oldJson: string | null, next: any): string | 
   }
   if (!sameCycle) return null;
   if (num(next.carriedDebt) < num(prev.carriedDebt) || num(next.paidAmount) < num(prev.paidAmount)
-    || num(next.cycleMonths || 1) < num(prev.cycleMonths || 1)) {
+    || num(next.cycleMonths || 1) < num(prev.cycleMonths || 1) || num(next.cycleDiscount) > num(prev.cycleDiscount)) {
     return 'تعديل الديون وحذفها مخصص للمدير العام فقط.';
   }
   return null;
+}
+
+/**
+ * تجديد (دورة جديدة) من غير المدير:
+ * - الدين غير المسدد من الدورة السابقة يجب أن يُرحَّل كاملاً (لا يختفي بالتجديد)
+ * - الخصم مسموح فقط إذا طابق بالضبط عرضاً فعالاً في الإعدادات (نفس قواعد التطبيق)
+ */
+async function renewalViolation(db: D1Database, oldJson: string | null, next: any): Promise<string | null> {
+  if (!oldJson || !next) return null;
+  let prev: any;
+  try { prev = JSON.parse(oldJson); } catch { return null; }
+  if ((prev.currentCycleId || '') === (next.currentCycleId || '')) return null;
+  if ((Number(next.carriedDebt) || 0) + 1 < remainingDebtOf(prev)) {
+    return 'لا يمكن إسقاط الدين السابق عند التجديد: يجب ترحيله كاملاً.';
+  }
+  const discount = Number(next.cycleDiscount) || 0;
+  if (discount <= 0) return null;
+  const row = await db.prepare(`SELECT data FROM records WHERE collection = 'settings' AND deleted = 0 LIMIT 1`).first<{ data: string }>();
+  let promos: Promotion[] = [];
+  try { promos = row ? (JSON.parse(row.data).promotions || []) : []; } catch { promos = []; }
+  const promo = promos.find(p => p.id === next.cyclePromotionId);
+  // «موقوف» يخفي العرض من نافذة التجديد فقط؛ لا نرفض تجديداً سُجّل (ربما دون إنترنت) قبل إيقافه
+  const ok = !!promo && verifyCycleDiscount({ ...promo, active: true }, {
+    cycleMonths: Number(next.cycleMonths) || 1,
+    cycleDiscount: discount,
+    salePrice: Number(next.salePrice) || 0,
+    renewedOn: typeof next.renewedOn === 'string' ? next.renewedOn : baghdadToday(),
+    prevExpiry: String(prev.expiryDate || ''),
+  });
+  return ok ? null : 'الخصم لا يطابق عرضاً فعالاً. حدّث الصفحة وحاول ثانية.';
 }
 
 // ---------- سجل العمليات (من غيّر ماذا ومتى) ----------
@@ -643,6 +675,9 @@ async function handlePush(req: Request, db: D1Database, user: UserRow) {
       : null;
     if (!debtViolation && live && !c.deleted && c.collection === 'subscribers' && user.role !== 'admin') {
       debtViolation = await paidIncreaseNotCovered(db, cur!, c.data, batchPayments);
+    }
+    if (!debtViolation && live && !c.deleted && c.collection === 'subscribers' && user.role !== 'admin') {
+      debtViolation = await renewalViolation(db, cur!.data, c.data);
     }
     if (!allowed.includes(user.role) || debtViolation) {
       results.push({

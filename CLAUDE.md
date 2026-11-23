@@ -30,6 +30,10 @@ UI is **Arabic, RTL**. README, chat replies to the owner: **German**. Commit mes
   `wrangler*.jsonc`, VAPID keys auto-created in `meta`, table `push_subs`), `shared/digest.ts` (counts only, no names) and
   `shared/vapid.ts`; `public/sw.js` fetches `/api/push/digest` on `push`; `src/utils/push.ts` subscribes (bell button).
   Only admin/accountant receive pushes. Local test: `wrangler dev --test-scheduled`, trigger `/cdn-cgi/handler/scheduled?cron=...`.
+- Marketing tab `views/MarketingView.tsx` (offers in `settings.promotions`, admin edits; WhatsApp campaigns by segment with
+  daily limit + 7-day cool-down, device-local history; referrals). Pure logic: `utils/marketing.ts` (segments lost/loyal/
+  upgrade/tower, `pendingReferrals`, `referralBoard`, `fillTemplate`). Subscriber fields `referredBy`, `referralRewarded`,
+  `noMarketing` (opt-out, also excluded from campaigns). Renewal dialog shows offers + upsell hint + referral bonus days.
 - `shared/access.ts` — roles, tab access, collection rules (`COLLECTION_RULES`, `HIDDEN_FROM`). Used by UI **and**
   worker; edit only here. Don't import from `src`/`worker` in it.
 - `src/components/views/*View.tsx` — one per tab; `SimpleHomeView` = simple mode home.
@@ -45,7 +49,9 @@ UI is **Arabic, RTL**. README, chat replies to the owner: **German**. Commit mes
 - Deploy: push to `main` → GitHub Action → `wrangler deploy`.
 
 ## Domain rules (don't break)
-- Debt = `salePrice × cycleMonths + carriedDebt − paidAmount`. Payments only via receipts (`PaymentRecord`);
+- Debt = `salePrice × cycleMonths + carriedDebt − cycleDiscount − paidAmount`. Offers: free months go into `cycleMonths`
+  (longer expiry) and their value into `cycleDiscount`; never lower debt any other way. Rules in `shared/promotions.ts`
+  (UI and worker); the worker rejects non-admin renewals whose discount does not match an offer, or that drop old debt. Payments only via receipts (`PaymentRecord`);
   never edit `paidAmount` directly in a form. Partial payments: `handleAddPayment` adds to `paidAmount`.
 - Renewal carries unpaid debt into `carriedDebt`. Only admin may lower debt (`handleAdjustDebt`, logged in `debtLog`);
   the server rejects a `paidAmount` increase not covered by payment records in the same push.

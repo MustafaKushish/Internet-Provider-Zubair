@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useEscapeKey } from './ui/useEscapeKey';
 import { Subscriber } from '../types/isp';
-import { X, RefreshCw, Calendar, DollarSign, CreditCard, Send, CheckCircle2 } from 'lucide-react';
+import { X, RefreshCw, Calendar, DollarSign, CreditCard, Send, CheckCircle2, Gift, Sparkles } from 'lucide-react';
+import { applicablePromotions, isPromotionApplicable, promotionEffect, type Promotion } from '../../shared/promotions';
 import confetti from 'canvas-confetti';
 import { getRemainingDebt } from '../utils/storage';
 import { todayStr, parseLocalDate, addMonthsToDateStr } from '../utils/dates';
@@ -17,8 +18,17 @@ interface QuickRenewModalProps {
     paymentMethod: 'cash' | 'zain_cash' | 'qi_card' | 'transfer';
     sendWhatsAppReceipt: boolean;
     notes: string;
+    promotion?: Promotion | null;
+    bonusDays?: number;
   }) => void;
+  /** العروض المعرّفة في الإعدادات */
+  promotions?: Promotion[];
+  /** مكافأة دعوة الأصدقاء المستحقة لهذا المشترك (تُطبَّق تلقائياً) */
+  referralBonus?: { days: number; names: string[] } | null;
 }
+
+const MONTH_OPTIONS = [1, 2, 3, 6, 12];
+const monthsLabel = (m: number) => (m === 1 ? 'شهر واحد' : m === 2 ? 'شهران' : m <= 10 ? `${m} أشهر` : `${m} شهراً`);
 
 // الغلاف يضمن استدعاء الـ hooks دائماً بنفس الترتيب (قواعد React)، ويعيد ضبط الحقول عند كل فتح
 export const QuickRenewModal: React.FC<QuickRenewModalProps> = (props) =>
@@ -29,6 +39,8 @@ const QuickRenewModalInner: React.FC<QuickRenewModalProps & { subscriber: Subscr
   onClose,
   subscriber,
   onConfirmRenewal,
+  promotions,
+  referralBonus,
 }) => {
   useEscapeKey(onClose);
 
@@ -37,25 +49,51 @@ const QuickRenewModalInner: React.FC<QuickRenewModalProps & { subscriber: Subscr
   // سعر جديد مجدول للباقة يبدأ مع هذا التجديد
   const price = subscriber.pendingPrice?.salePrice ?? subscriber.salePrice;
   const [months, setMonths] = useState<number>(1);
-  const [amountPaid, setAmountPaid] = useState<number>(price + previousDebt);
+  // المبلغ المقترح يشمل أفضل عرض صالح لشهر واحد (إن وُجد)
+  const [amountPaid, setAmountPaid] = useState<number>(() => {
+    const e = applicablePromotions(promotions, { months: 1, salePrice: price, today: todayStr(), expiryDate: subscriber.expiryDate })[0]?.effect;
+    return price * (1 + (e?.freeMonths || 0)) - (e?.discount || 0) + previousDebt;
+  });
+  const [declined, setDeclined] = useState(false); // اختار «بدون عرض» صراحة
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'zain_cash' | 'qi_card' | 'transfer'>('cash');
   const [sendReceipt, setSendReceipt] = useState<boolean>(true);
   const [notes, setNotes] = useState<string>('تجديد اشتراك دورة جديدة');
 
+  // العروض: الصالحة لهذه المدة، و«تلميح» بعرض يتحقق بمدة أطول
+  const today = todayStr();
+  const ctxFor = (m: number) => ({ months: m, salePrice: price, today, expiryDate: subscriber.expiryDate });
+  const offers = applicablePromotions(promotions, ctxFor(months));
+  const [promoId, setPromoId] = useState<string | null>(() => applicablePromotions(promotions, ctxFor(1))[0]?.promo.id ?? null);
+  const selected = offers.find(o => o.promo.id === promoId) || null;
+  const effect = selected?.effect ?? { freeMonths: 0, discount: 0 };
+  const nudge = (promotions || [])
+    .filter(p => p.minMonths > months && MONTH_OPTIONS.includes(p.minMonths) && isPromotionApplicable(p, ctxFor(p.minMonths)))
+    .sort((a, b) => a.minMonths - b.minMonths)[0];
+  const bonusDays = referralBonus?.days || 0;
+
+  // نفس معادلة الدين: الأشهر المجانية داخلة في المدة وقيمتها تُطرح، فيبقى المطلوب = سعر الأشهر المدفوعة
+  const dueFor = (m: number, e: { freeMonths: number; discount: number }) => price * (m + e.freeMonths) - e.discount + previousDebt;
+
   // Calculate new proposed expiry date
   const computeNewExpiry = () => {
     // If expired, start from today. If still active, extend from current expiry date.
-    const today = todayStr();
     const base = parseLocalDate(subscriber.expiryDate) > parseLocalDate(today) ? subscriber.expiryDate : today;
-    return addMonthsToDateStr(base, months);
+    const d = parseLocalDate(addMonthsToDateStr(base, months + effect.freeMonths));
+    d.setDate(d.getDate() + bonusDays);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
 
-  const handleMonthsChange = (m: number) => {
+  const choose = (m: number, id: string | null, explicit = false) => {
+    if (explicit) setDeclined(id === null);
+    const list = applicablePromotions(promotions, ctxFor(m));
+    const keep = list.find(o => o.promo.id === id) || null;
     setMonths(m);
-    setAmountPaid(price * m + previousDebt);
+    setPromoId(keep?.promo.id ?? null);
+    setAmountPaid(dueFor(m, keep ? promotionEffect(keep.promo, ctxFor(m)) : { freeMonths: 0, discount: 0 }));
   };
+  const handleMonthsChange = (m: number) => choose(m, declined ? null : (promoId ?? applicablePromotions(promotions, ctxFor(m))[0]?.promo.id ?? null));
 
-  const expectedTotal = price * months + previousDebt;
+  const expectedTotal = dueFor(months, effect);
   const remainingDebt = Math.max(0, expectedTotal - amountPaid);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -77,7 +115,9 @@ const QuickRenewModalInner: React.FC<QuickRenewModalProps & { subscriber: Subscr
       amountPaid: Number(amountPaid) || 0,
       paymentMethod,
       sendWhatsAppReceipt: sendReceipt,
-      notes,
+      notes: selected ? `${notes} • عرض: ${selected.promo.name}` : notes,
+      promotion: selected?.promo ?? null,
+      bonusDays,
     });
 
     onClose();
@@ -120,8 +160,8 @@ const QuickRenewModalInner: React.FC<QuickRenewModalProps & { subscriber: Subscr
             <label className="block text-xs font-semibold text-slate-300 mb-2">
               مدة التجديد المطلوبة
             </label>
-            <div className="grid grid-cols-3 gap-2">
-              {[1, 2, 3].map((m) => (
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+              {MONTH_OPTIONS.map((m) => (
                 <button
                   type="button"
                   key={m}
@@ -132,12 +172,48 @@ const QuickRenewModalInner: React.FC<QuickRenewModalProps & { subscriber: Subscr
                       : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-750'
                   }`}
                 >
-                  <span>{m === 1 ? 'شهر واحد' : m === 2 ? 'شهران' : '3 أشهر'}</span>
+                  <span>{monthsLabel(m)}</span>
                   <span className="text-[10px] opacity-80">{(price * m).toLocaleString()} د.ع</span>
                 </button>
               ))}
             </div>
           </div>
+
+          {/* العروض */}
+          {(offers.length > 0 || nudge) && (
+            <div className="space-y-2">
+              <span className="block text-sm font-semibold text-slate-200 flex items-center gap-1.5"><Gift className="w-4 h-4 text-emerald-300" /> العروض</span>
+              {offers.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {offers.map(o => (
+                    <button key={o.promo.id} type="button" onClick={() => choose(months, o.promo.id, true)} aria-pressed={promoId === o.promo.id}
+                      className={`min-h-11 px-3 py-1.5 rounded-xl border-2 text-sm font-semibold cursor-pointer text-right ${promoId === o.promo.id ? 'bg-emerald-500/15 border-emerald-400 text-emerald-100' : 'bg-slate-800 border-slate-700 text-slate-200'}`}>
+                      {o.promo.name}
+                      <span className="block text-xs font-normal opacity-80">{o.effect.freeMonths ? `+${monthsLabel(o.effect.freeMonths)} مجاناً` : `توفير ${o.effect.discount.toLocaleString()} د.ع`}</span>
+                    </button>
+                  ))}
+                  <button type="button" onClick={() => choose(months, null, true)} aria-pressed={promoId === null}
+                    className={`min-h-11 px-3 rounded-xl border-2 text-sm cursor-pointer ${promoId === null ? 'bg-white/10 border-slate-300 text-white' : 'bg-slate-800 border-slate-700 text-slate-400'}`}>
+                    بدون عرض
+                  </button>
+                </div>
+              )}
+              {nudge && (
+                <button type="button" onClick={() => choose(nudge.minMonths, nudge.id, true)}
+                  className="w-full min-h-11 rounded-xl border border-dashed border-emerald-600/70 bg-emerald-950/30 text-emerald-200 text-sm px-3 py-2 flex items-center gap-2 cursor-pointer text-right">
+                  <Sparkles className="w-4 h-4 flex-shrink-0" />
+                  جدّد {monthsLabel(nudge.minMonths)} واحصل على «{nudge.name}»
+                </button>
+              )}
+            </div>
+          )}
+
+          {bonusDays > 0 && (
+            <div className="bg-emerald-950/30 border border-emerald-800/60 rounded-xl p-3 text-sm text-emerald-100 flex items-start gap-2">
+              <Gift className="w-4 h-4 text-emerald-300 mt-0.5 flex-shrink-0" />
+              <span>مكافأة دعوة الأصدقاء: <b>+{bonusDays} يوماً</b> مجاناً (عن: {referralBonus!.names.join('، ')}) — تُضاف تلقائياً.</span>
+            </div>
+          )}
 
           {previousDebt > 0 && (
             <div className="bg-amber-950/40 border border-amber-800/70 rounded-xl p-3 text-xs text-amber-200 flex items-center justify-between">
@@ -147,7 +223,7 @@ const QuickRenewModalInner: React.FC<QuickRenewModalProps & { subscriber: Subscr
           )}
 
           <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-3 text-xs text-slate-300 flex items-center justify-between">
-            <span>إجمالي المستحق الآن:</span>
+            <span>إجمالي المستحق الآن:{effect.discount > 0 && <span className="block text-emerald-300">بعد توفير {effect.discount.toLocaleString()} د.ع</span>}</span>
             <span className="font-bold text-white">{expectedTotal.toLocaleString()} د.ع</span>
           </div>
 

@@ -98,12 +98,14 @@ const AdvisorView = React.lazy(() => import('./components/views/AdvisorView').th
 import { NO_TOWER_LABEL, normTower } from './utils/towers';
 import { withRemainingDebt } from './utils/debt';
 import { splitImportDuplicates } from './utils/importDedupe';
-import { applyDebtAdjustment, buildPayment, buildRenewal, reversePayment } from './utils/ledger';
+import { applyDebtAdjustment, buildPayment, buildRenewal, reversePayment, type RenewalInput } from './utils/ledger';
+import { pendingReferrals } from './utils/marketing';
 import { DebtModal } from './components/DebtModal';
 import { appConfirm, notify } from './components/ui/Dialogs';
 
 // الأقسام تُحمَّل عند فتحها فقط (تسريع فتح المنظومة)، وتُحمَّل مسبقاً في وقت الفراغ
 const viewLoaders = {
+  MarketingView: () => import('./components/views/MarketingView').then(m => ({ default: m.MarketingView })),
   DebtsView: () => import('./components/views/DebtsView').then(m => ({ default: m.DebtsView })),
   SubscribersView: () => import('./components/views/SubscribersView').then(m => ({ default: m.SubscribersView })),
   DashboardView: () => import('./components/views/DashboardView').then(m => ({ default: m.DashboardView })),
@@ -117,6 +119,7 @@ const viewLoaders = {
 };
 const SubscribersView = React.lazy(viewLoaders.SubscribersView);
 const DebtsView = React.lazy(viewLoaders.DebtsView);
+const MarketingView = React.lazy(viewLoaders.MarketingView);
 const DashboardView = React.lazy(viewLoaders.DashboardView);
 const RemindersView = React.lazy(viewLoaders.RemindersView);
 const TicketsView = React.lazy(viewLoaders.TicketsView);
@@ -603,20 +606,16 @@ export default function App() {
 
   const handleConfirmRenewal = (
     subId: string,
-    renewalData: {
-      durationMonths: number;
-      amountPaid: number;
-      paymentMethod: 'cash' | 'zain_cash' | 'qi_card' | 'transfer';
-      sendWhatsAppReceipt: boolean;
-      notes: string;
-    }
+    renewalData: RenewalInput & { sendWhatsAppReceipt: boolean }
   ) => {
     const sub = subscribers.find(s => s.id === subId);
     if (!sub) return;
     beginUndo(`تجديد اشتراك ${sub.name}`);
     const { updatedSub, payment } = buildRenewal(sub, payments, renewalData, ledgerCtx());
     setPayments(prev => [payment, ...prev]);
-    setSubscribers(prev => prev.map(s => s.id === subId ? updatedSub : s));
+    // مكافأة دعوة الأصدقاء طُبّقت في هذا التجديد: نعلّم المدعوين حتى لا تُمنح مرتين
+    const rewardedIds = new Set(payment.bonusDays ? pendingReferrals(sub, subscribers).map(s => s.id) : []);
+    setSubscribers(prev => prev.map(s => s.id === subId ? updatedSub : rewardedIds.has(s.id) ? { ...s, referralRewarded: true } : s));
 
     if (renewalData.sendWhatsAppReceipt) {
       setTimeout(() => {
@@ -1159,6 +1158,12 @@ export default function App() {
         onPrintReceipt={(sub) => { setSubscriberForReceipt(sub); setReceiptCustomAmount(undefined); setIsReceiptModalOpen(true); }}
         onArchive={currentUser.role === 'admin' ? handleArchive : undefined}
         simple={simpleMode}
+        onToggleMarketing={(sub) => {
+          if (currentUser.role === 'technician') return;
+          beginUndo(sub.noMarketing ? `السماح بالعروض لـ ${sub.name}` : `إيقاف العروض لـ ${sub.name}`);
+          setSubscribers(prev => prev.map(s => s.id === sub.id ? { ...s, noMarketing: !s.noMarketing } : s));
+          notify(sub.noMarketing ? `${sub.name} سيستقبل رسائل العروض.` : `${sub.name} لن تصله رسائل العروض.`, 'success');
+        }}
       />
 
       {/* Main Content Area */}
@@ -1334,6 +1339,21 @@ export default function App() {
               setWhatsAppDefaultTab(defaultTab);
               setIsWhatsAppModalOpen(true);
             }}
+          />
+        )}
+
+        {safeActiveTab === 'marketing' && (
+          <MarketingView
+            subscribers={activeSubscribers}
+            payments={payments}
+            providers={providers}
+            settings={settings}
+            currentUser={currentUser}
+            onSaveSettings={(patch) => {
+              if (currentUser.role !== 'admin') { notify('تعديل العروض والإعدادات للمدير العام فقط.', 'error'); return; }
+              setSettings(prev => ({ ...prev, ...patch }));
+            }}
+            onOpenProfile={(sub) => setProfileSubscriberId(sub.id)}
           />
         )}
 
@@ -1553,6 +1573,7 @@ export default function App() {
         }}
         onSave={handleSaveSubscriber}
         subscriberToEdit={subscriberToEdit}
+        subscribers={activeSubscribers}
         providers={providers}
         towers={towers}
         currentUser={currentUser}
@@ -1570,6 +1591,13 @@ export default function App() {
         }}
         subscriber={subscriberToRenew}
         onConfirmRenewal={handleConfirmRenewal}
+        promotions={settings.promotions}
+        referralBonus={(() => {
+          if (!subscriberToRenew) return null;
+          const pend = pendingReferrals(subscriberToRenew, subscribers);
+          const days = (settings.referralRewardDays ?? 10) * pend.length;
+          return days > 0 ? { days, names: pend.map(s => s.name) } : null;
+        })()}
       />
 
       <WhatsAppReminderModal

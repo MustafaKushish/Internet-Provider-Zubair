@@ -33,6 +33,12 @@ export interface Subscriber {
   notes?: string;
   createdAt: string;
   lastPaymentDate?: string;
+  cycleDiscount?: number;  // خصم عرض في الدورة الحالية (يُطرح من المستحق؛ الأشهر المجانية داخلة في cycleMonths)
+  cyclePromotionId?: string;
+  renewedOn?: string;      // تاريخ آخر تجديد (للتحقق من العرض على الخادم)
+  referredBy?: string;     // معرّف المشترك الذي دعاه (دعوة الأصدقاء)
+  referralRewarded?: boolean; // هل حصل الداعي على مكافأته عن هذا المشترك
+  noMarketing?: boolean;   // لا يرغب برسائل العروض
   promiseDate?: string;    // وعد المشترك بالتسديد في هذا التاريخ (صفحة الديون)
   promiseSetAt?: string;   // تاريخ تسجيل الوعد: أي دفعة بعده تعني أنه وفى
   cycleMonths?: number;    // عدد أشهر الدورة الحالية (افتراضياً 1)
@@ -87,6 +93,11 @@ export interface PaymentRecord {
   towerName?: string;      // البرج وقت الدفع
   cycleId?: string;        // الدورة التي يتبع لها الوصل
   lateDays?: number;       // عند التجديد: كم يوماً كان الاشتراك منتهياً (لحساب المسترجعين)
+  promotionId?: string;    // العرض المطبَّق على هذا التجديد
+  promotionName?: string;
+  discount?: number;       // قيمة الخصم/الأشهر المجانية بالدينار
+  freeMonths?: number;
+  bonusDays?: number;      // أيام مكافأة دعوة الأصدقاء
 }
 
 export interface SupportTicket {
@@ -158,7 +169,13 @@ export interface SystemSettings {
   advisorProvider?: 'auto' | 'gemini' | 'workers' | 'claude'; // محرك المستشار الذكي
   monthlyTarget?: number;  // هدف التحصيل الشهري (لوحة المؤشرات)
   advisorNotes?: string;   // «معلومات عملي» للمستشار: كلف، منافسون، سعة الأبراج، أهداف (بدون بيانات شخصية)
+  promotions?: Promotion[];      // العروض (يديرها المدير)
+  referralRewardDays?: number;   // أيام مجانية للداعي عن كل مشترك جديد يدفع
+  marketingDailyLimit?: number;  // حد رسائل العروض يومياً (حماية رقم الواتساب)
 }
+
+import type { Promotion } from '../../shared/promotions';
+export type { Promotion } from '../../shared/promotions';
 
 export type ReportPeriod = 'this_month' | 'last_month' | 'this_quarter' | 'last_quarter' | 'this_year' | 'custom';
 

@@ -15,7 +15,10 @@ export const ReminderQueue: React.FC<{
   onSend: (s: Subscriber) => void;
   onSkip: () => void;
   onClose: () => void;
-}> = ({ queue, index, settings, typeFor, messageFor, onSend, onSkip, onClose }) => {
+  /** شارة مخصصة (حملات التسويق) بدل شارة الانتهاء/الدين */
+  badgeFor?: (s: Subscriber) => string;
+  title?: string;
+}> = ({ queue, index, settings, typeFor, messageFor, onSend, onSkip, onClose, badgeFor, title = 'الإرسال المتتالي' }) => {
   useEscapeKey(onClose);
   const sub = queue[index];
   const done = !sub;
@@ -24,11 +27,11 @@ export const ReminderQueue: React.FC<{
   const debt = sub ? getRemainingDebt(sub) : 0;
   return (
     <div className="app-overlay fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-sm" onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-label="الإرسال المتتالي" onClick={e => e.stopPropagation()}
+      <div role="dialog" aria-modal="true" aria-label={title} onClick={e => e.stopPropagation()}
         className="w-full sm:max-w-lg bg-slate-900 border border-slate-700 rounded-t-3xl sm:rounded-2xl p-5 space-y-3 shadow-2xl"
         style={{ paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom))' }}>
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-white">الإرسال المتتالي</h3>
+          <h3 className="text-sm font-bold text-white">{title}</h3>
           <span className="text-xs text-slate-400">{Math.min(index + 1, queue.length)} / {queue.length}</span>
         </div>
         <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
@@ -48,9 +51,10 @@ export const ReminderQueue: React.FC<{
                 <div className="font-bold text-white">{sub.name}</div>
                 <div className="text-[11px] text-slate-400 font-mono" dir="ltr">{sub.phone}</div>
               </div>
+              {badgeFor ? <span className="text-xs font-semibold px-2 py-0.5 rounded-full border bg-cyan-950 border-cyan-800 text-cyan-200">{badgeFor(sub)}</span> :
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${type === 'expired' ? 'bg-rose-950 border-rose-800 text-rose-300' : type === 'debt' ? 'bg-indigo-950 border-indigo-800 text-indigo-300' : 'bg-amber-950 border-amber-800 text-amber-300'}`}>
                 {type === 'expired' ? `متأخر ${formatMonthsAr(monthsLate(sub.expiryDate))}` : type === 'debt' ? `دين ${formatCurrency(debt, settings.currency)}` : `ينتهي خلال ${getDaysRemaining(sub.expiryDate)} يوم`}
-              </span>
+              </span>}
             </div>
             <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-slate-300 bg-slate-950 border border-slate-800 rounded-xl p-3 max-h-48 overflow-y-auto">{message}</pre>
             <div className="flex gap-2">

@@ -1,5 +1,6 @@
 import { PaymentRecord, Subscriber } from '../types/isp';
-import { addMonthsToDateStr, diffDays, parseLocalDate, todayStr, uid } from './dates';
+import { addMonthsToDateStr, diffDays, parseLocalDate, toLocalDateStr, todayStr, uid } from './dates';
+import { isPromotionApplicable, promotionEffect, type Promotion } from '../../shared/promotions';
 import { withRemainingDebt } from './debt';
 import { getRemainingDebt, nextReceiptNumber, refreshSubscriberStatus } from './storage';
 
@@ -21,7 +22,15 @@ export interface RenewalInput {
   amountPaid: number;
   paymentMethod: PaymentMethod;
   notes: string;
+  promotion?: Promotion | null; // عرض مختار (يُتجاهل إن لم يكن صالحاً لهذا التجديد)
+  bonusDays?: number;           // مكافأة دعوة الأصدقاء: أيام مجانية تُضاف لتاريخ الانتهاء
 }
+
+const addDays = (date: string, days: number): string => {
+  const d = parseLocalDate(date);
+  d.setDate(d.getDate() + days);
+  return toLocalDateStr(d);
+};
 
 export interface LedgerResult {
   updatedSub: Subscriber;
@@ -36,13 +45,20 @@ export function buildRenewal(sub: Subscriber, payments: PaymentRecord[], input: 
 
   // الاشتراك ما زال سارياً: نمدّد من تاريخ الانتهاء، وإلا من اليوم — بأشهر تقويمية
   const baseDate = parseLocalDate(sub.expiryDate) > parseLocalDate(today) ? sub.expiryDate : today;
-  const newExpiry = addMonthsToDateStr(baseDate, months);
   const previousDebt = getRemainingDebt(sub);
   const cycleId = uid('cycle');
 
-  const { pendingPrice, archived: _a, archivedAt: _b, archivedBy: _c, archiveReason: _d, ...base } = sub;
+  const { pendingPrice, archived: _a, archivedAt: _b, archivedBy: _c, archiveReason: _d, cycleDiscount: _e, cyclePromotionId: _f, ...base } = sub;
   const newSale = pendingPrice?.salePrice ?? sub.salePrice;
   const newCost = pendingPrice?.costPrice ?? sub.costPrice;
+
+  // العرض: الأشهر المجانية تمدّد الاشتراك، وقيمتها (أو الخصم) تُطرح من مستحق الدورة
+  const promo = input.promotion && isPromotionApplicable(input.promotion, { months, salePrice: newSale, today, expiryDate: sub.expiryDate })
+    ? input.promotion : null;
+  const effect = promo ? promotionEffect(promo, { months, salePrice: newSale, today, expiryDate: sub.expiryDate }) : { freeMonths: 0, discount: 0 };
+  const bonusDays = Math.max(0, Math.round(input.bonusDays || 0));
+  const totalMonths = months + effect.freeMonths;
+  const newExpiry = addDays(addMonthsToDateStr(baseDate, totalMonths), bonusDays);
   const updatedSub = refreshSubscriberStatus({
     ...base,
     salePrice: newSale,
@@ -50,8 +66,10 @@ export function buildRenewal(sub: Subscriber, payments: PaymentRecord[], input: 
     startDate: baseDate,
     expiryDate: newExpiry,
     paidAmount: amountPaid,
-    cycleMonths: months,
+    cycleMonths: totalMonths,
     carriedDebt: previousDebt,
+    ...(effect.discount > 0 && promo ? { cycleDiscount: effect.discount, cyclePromotionId: promo.id } : {}),
+    renewedOn: today,
     currentCycleId: cycleId,
     status: sub.status === 'suspended' ? 'active' : sub.status,
     lastPaymentDate: amountPaid > 0 ? today : sub.lastPaymentDate,
@@ -66,12 +84,14 @@ export function buildRenewal(sub: Subscriber, payments: PaymentRecord[], input: 
     date: today,
     paymentMethod: input.paymentMethod,
     paymentType: 'renewal',
-    cycleMonths: months,
+    cycleMonths: totalMonths,
     lateDays: Math.max(0, diffDays(sub.expiryDate, today)) || undefined,
     notes: input.notes,
+    ...(promo ? { promotionId: promo.id, promotionName: promo.name, discount: effect.discount, freeMonths: effect.freeMonths || undefined } : {}),
+    ...(bonusDays ? { bonusDays } : {}),
     collectedBy: ctx.collectedBy,
     remainingBalanceAfter: getRemainingDebt(updatedSub),
-    costAmount: newCost * months,
+    costAmount: newCost * totalMonths, // المزود يُدفع له عن الأشهر المجانية أيضاً
     provider: sub.upstreamProvider,
     towerName: sub.towerName,
     cycleId,

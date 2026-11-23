@@ -135,6 +135,25 @@ Der Windows-Installer ist eine Electron-Hülle (`desktop/`) um dieselbe Adresse.
   **nächsten Verlängerung** (laufende Periode und Schulden bleiben unverändert), zeigt den Mehrumsatz und liefert einen
   fertigen WhatsApp-Ankündigungstext.
 
+## Angebote und Marketing („العروض والتسويق“, Admin und Buchhalter)
+
+- **Angebote:** Der Admin legt Angebote an (oder tippt eine Vorlage an): Gratis-Monate („3 Monate + 1 gratis“), Rabatt in
+  Dinar oder in Prozent, mit Mindestlaufzeit, Zeitraum und optional „nur bei Verlängerung vor Ablauf“. Gratis-Monate
+  verlängern das Ablaufdatum, der Kunde zahlt nur die bezahlten Monate. Pro Angebot zeigt die App Nutzungen, Einnahmen und
+  was es gekostet hat.
+- **Im Verlängerungsfenster** erscheinen passende Angebote zum Antippen (das beste ist vorgewählt, „بدون عرض“ geht immer),
+  dazu ein Tipp wie „جدّد 3 أشهر واحصل على …“. Neue Laufzeiten 6 und 12 Monate. Die Quittung nennt das Angebot.
+- **Sicherheit:** Der Server nimmt von Buchhaltern nur Rabatte an, die genau einem Angebot entsprechen, und lehnt
+  Verlängerungen ab, die alte Schulden verschwinden lassen würden. Der Admin ist davon ausgenommen.
+- **WhatsApp-Kampagnen:** Zielgruppen „Verlorene zurückholen“ (über 30 Tage abgelaufen), „Treue Kunden“ (6+ Monate im Jahr,
+  keine Schulden), „Upgrade“ (zuverlässige Zahler mit höherem Paket) und „Nachricht an einen Turm“ (Wartung, Störung).
+  Text mit Platzhaltern wie {الاسم} und {العرض}, Vorschau, Versand einzeln nacheinander. Tageslimit (Standard 30) schützt die
+  Nummer, dieselbe Kampagne geht frühestens nach 7 Tagen wieder an denselben Kunden. Bei „Verlorene“ zählt die App, wer
+  danach wieder verlängert hat. Der Versandverlauf wird nur auf dem jeweiligen Gerät gespeichert.
+- **Werbe-Sperre:** Im Kundenprofil „لا يرغب بالعروض“: dieser Kunde bekommt keine Werbung mehr (Turm-Nachrichten schon).
+- **Kunden werben Kunden:** Beim neuen Kunden „جاء عن طريق“ wählen. Hat der Neue bezahlt, bekommt der Werber bei seiner
+  nächsten Verlängerung automatisch Gratis-Tage (Standard 10 pro Freund). Rangliste der besten Werber.
+
 ## Schuldenseite („الديون والمطالبات“, Admin und Buchhalter)
 
 - **Oben:** Gesamtschuld, Zahl der Schuldner, in 30 Tagen bezahlte Schulden und Schulden mit 3+ Monaten Rückstand.

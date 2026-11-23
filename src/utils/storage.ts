@@ -72,12 +72,13 @@ export function calculateSubscriptionStatus(expiryDate: string, warningDays: num
 }
 
 /** المبلغ المستحق في الدورة الحالية = سعر البيع × عدد الأشهر + الدين المُرحَّل */
-export function getAmountDue(s: Pick<Subscriber, 'salePrice' | 'cycleMonths' | 'carriedDebt'>): number {
-  return (s.salePrice || 0) * (s.cycleMonths && s.cycleMonths > 0 ? s.cycleMonths : 1) + (s.carriedDebt || 0);
+export function getAmountDue(s: Pick<Subscriber, 'salePrice' | 'cycleMonths' | 'carriedDebt'> & { cycleDiscount?: number }): number {
+  // خصم العرض (أو قيمة الأشهر المجانية) يُطرح من مستحق الدورة
+  return Math.max(0, (s.salePrice || 0) * (s.cycleMonths && s.cycleMonths > 0 ? s.cycleMonths : 1) + (s.carriedDebt || 0) - (s.cycleDiscount || 0));
 }
 
 /** المتبقي بذمة المشترك */
-export function getRemainingDebt(s: Pick<Subscriber, 'salePrice' | 'cycleMonths' | 'carriedDebt' | 'paidAmount'>): number {
+export function getRemainingDebt(s: Pick<Subscriber, 'salePrice' | 'cycleMonths' | 'carriedDebt' | 'paidAmount'> & { cycleDiscount?: number }): number {
   return Math.max(0, getAmountDue(s) - (s.paidAmount || 0));
 }
 
