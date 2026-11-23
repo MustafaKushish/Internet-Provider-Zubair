@@ -39,6 +39,7 @@ export interface Subscriber {
   referredBy?: string;     // معرّف المشترك الذي دعاه (دعوة الأصدقاء)
   referralRewarded?: boolean; // هل حصل الداعي على مكافأته عن هذا المشترك
   noMarketing?: boolean;   // لا يرغب برسائل العروض
+  switchedFrom?: string;   // انتقل إلينا من شبكة أخرى (اسمها إن عُرف، أو «شبكة أخرى»)
   promiseDate?: string;    // وعد المشترك بالتسديد في هذا التاريخ (صفحة الديون)
   promiseSetAt?: string;   // تاريخ تسجيل الوعد: أي دفعة بعده تعني أنه وفى
   cycleMonths?: number;    // عدد أشهر الدورة الحالية (افتراضياً 1)
@@ -188,6 +189,7 @@ export interface PlanItem {
   promotionId?: string;      // العرض الذي أنشأته الخطة تلقائياً لهذا البند
   segment?: 'lost' | 'loyal' | 'upgrade' | 'tower'; // للحملات: الفئة المستهدفة
   skipped?: boolean;         // قرّر المدير عدم تنفيذه
+  templateKey?: string;      // من الخطة الجاهزة (يمنع إضافتها مرتين)
   createdAt: string;
 }
 export type { Promotion } from '../../shared/promotions';

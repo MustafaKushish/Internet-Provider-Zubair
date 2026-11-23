@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { BookOpen, CalendarDays, ChevronDown, ClipboardList, Gift, HeartHandshake, Megaphone, Pencil, Plus, Rocket, Send, Trash2, TowerControl, Trophy, UserX, Users } from 'lucide-react';
+import { BookOpen, CalendarDays, Target, ChevronDown, ClipboardList, Gift, HeartHandshake, Megaphone, Pencil, Plus, Rocket, Send, Trash2, TowerControl, Trophy, UserX, Users } from 'lucide-react';
 import { PaymentRecord, PlanItem, StaffUser, Subscriber, SystemSettings, UpstreamProvider } from '../../types/isp';
-import { ACTION_IDEAS, KIND_LABEL, STATUS_LABEL, buildPlanItem, daysBetween, groupPlan, ideaById, planAlertCount, planResults, planStatus, upcomingOccasions, validatePlanInput, type ActionIdea, type SegmentKey } from '../../utils/marketingPlan';
+import { ACTION_IDEAS, KIND_LABEL, STATUS_LABEL, YEAR_PLAN_GOALS, buildPlanItem, daysBetween, groupPlan, ideaById, missingYearPlan, planAlertCount, planResults, planStatus, upcomingOccasions, validatePlanInput, type ActionIdea, type SegmentKey } from '../../utils/marketingPlan';
 import { describePromotion, isPromotionApplicable, type PromoKind, type Promotion } from '../../../shared/promotions';
 import { fillTemplate, higherPlan, referralBoard, segmentMembers, type SegmentId } from '../../utils/marketing';
 import { formatCurrency, generateWhatsAppLink } from '../../utils/storage';
@@ -44,6 +44,7 @@ const QUICK_PROMOS: Array<Omit<Promotion, 'id' | 'active'>> = [
   { name: '6 أشهر + شهرين مجاناً', kind: 'free_months', minMonths: 6, value: 2 },
   { name: 'خصم 10% لستة أشهر', kind: 'discount_percent', minMonths: 6, value: 10 },
   { name: 'تجديد مبكر: خصم 5,000', kind: 'discount_amount', minMonths: 1, value: 5000, earlyOnly: true },
+  { name: 'عرض نهاية السنة للجدد والمنتقلين', kind: 'new_price', minMonths: 1, value: 1, planPrices: [{ planName: 'Economy', price: 25000 }, { planName: 'Economy+', price: 35000 }] },
 ];
 
 function readJson<T>(key: string, fallback: T): T {
@@ -123,6 +124,21 @@ const PlanTab: React.FC<MarketingViewProps & { onOpenOffers: () => void; onOpenC
 
   const patchPlan = (next: PlanItem[], msg: string) => { onSaveSettings({ marketingPlan: next }); notify(msg, 'success'); };
 
+  // الخطة الجاهزة: من تشرين الأول نقترح السنة القادمة (تبدأ بعرض ديسمبر)
+  const planYear = Number(today.slice(0, 4)) + (Number(today.slice(5, 7)) >= 10 ? 1 : 0);
+  const missing = useMemo(() => missingYearPlan(planYear, plan, today), [planYear, plan, today]);
+  const [showYear, setShowYear] = useState(false);
+  const addYearPlan = async () => {
+    const offers = missing.filter(e => e.promotion).length;
+    if (!(await appConfirm(`إضافة ${missing.length} بنداً إلى الخطة، منها ${offers} عروض تُفعَّل تلقائياً في مواعيدها فقط؟\nيمكنك تعديل أي بند أو إلغاؤه لاحقاً.`, { confirmLabel: 'أضف الخطة' }))) return;
+    onSaveSettings({
+      marketingPlan: [...plan, ...missing.map(e => e.item)],
+      promotions: [...promos, ...missing.flatMap(e => (e.promotion ? [e.promotion] : []))],
+    });
+    setShowYear(false);
+    notify(`تمت إضافة خطة ${planYear}.`, 'success');
+  };
+
   return (
     <div className="space-y-6">
       <p className="text-sm text-slate-400">اقرأ الأفكار، اختر ما يناسبك وحدّد موعده، وسيذكّرك التطبيق قبل البدء. الخطة يضعها المدير ويراها المكتب.</p>
@@ -134,6 +150,37 @@ const PlanTab: React.FC<MarketingViewProps & { onOpenOffers: () => void; onOpenC
             {soon.map(i => <li key={i.id}>{i.title}: بعد {daysBetween(today, i.startDate)} {daysBetween(today, i.startDate) === 1 ? 'يوم' : 'أيام'} (<span dir="ltr">{i.startDate}</span>)</li>)}
           </ul>
         </div>
+      )}
+
+      {/* الخطة الجاهزة للسنة */}
+      {(missing.length > 0 || showYear) && (
+        <section aria-label={`خطة جاهزة لسنة ${planYear}`} className="bg-cyan-500/10 border border-cyan-500/40 rounded-2xl p-4 space-y-3">
+          <h3 className="text-lg font-semibold text-white flex items-center gap-2"><Target className="w-5 h-5 text-cyan-300" /> خطة جاهزة لسنة {planYear}: كسب مشتركين وزيادة الدخل</h3>
+          <p className="text-sm text-slate-300">تبدأ بعرض نهاية السنة في ديسمبر للجدد والمنتقلين (Economy بـ 25,000 وEconomy+ بـ 35,000 للشهر الأول)، ثم تثبيتهم واسترجاع المنقطعين، وعروض رمضان والصيف وبداية الدراسة، ومراجعة كل ربع سنة.</p>
+          <div>
+            <p className="text-sm font-semibold text-cyan-100">الأهداف:</p>
+            <ul className="text-sm text-slate-200 list-disc pr-5 space-y-0.5">{YEAR_PLAN_GOALS.map(g => <li key={g}>{g}</li>)}</ul>
+          </div>
+          <button type="button" onClick={() => setShowYear(v => !v)} aria-expanded={showYear} className="text-sm text-cyan-200 underline cursor-pointer">
+            {showYear ? 'أخفِ البنود' : `اقرأ البنود (${missing.length})`}
+          </button>
+          {showYear && (
+            <ol className="space-y-1.5 text-sm">
+              {missing.map(e => (
+                <li key={e.item.templateKey} className="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2">
+                  <span className="font-semibold text-white">{e.item.title}</span>
+                  <span className="text-slate-400"> • <span dir="ltr">{e.item.startDate}</span>{e.item.endDate && e.item.endDate !== e.item.startDate ? <> ← <span dir="ltr">{e.item.endDate}</span></> : null}</span>
+                  {e.promotion && <span className="text-emerald-300"> • عرض</span>}
+                  {e.item.note && <span className="block text-xs text-slate-400 mt-0.5">{e.item.note}</span>}
+                </li>
+              ))}
+              {missing.length === 0 && <li className="text-slate-300">كل بنود الخطة مضافة.</li>}
+            </ol>
+          )}
+          {isAdmin ? (
+            missing.length > 0 && <button type="button" onClick={addYearPlan} className="w-full sm:w-auto min-h-12 px-5 rounded-xl bg-cyan-600 text-white font-semibold cursor-pointer flex items-center justify-center gap-2"><Plus className="w-5 h-5" /> أضف الخطة كاملة</button>
+          ) : <p className="text-xs text-slate-400">المدير العام يضيف الخطة.</p>}
+        </section>
       )}
 
       {/* المناسبات القادمة */}
@@ -336,7 +383,7 @@ function promoStatus(p: Promotion, today: string): { text: string; cls: string }
   return { text: 'فعّال', cls: 'bg-emerald-500/15 text-emerald-200' };
 }
 
-const OffersTab: React.FC<MarketingViewProps> = ({ settings, payments, currentUser, onSaveSettings }) => {
+const OffersTab: React.FC<MarketingViewProps> = ({ settings, payments, providers, currentUser, onSaveSettings }) => {
   const isAdmin = currentUser.role === 'admin';
   const promos = settings.promotions || [];
   const today = todayStr();
@@ -410,6 +457,7 @@ const OffersTab: React.FC<MarketingViewProps> = ({ settings, payments, currentUs
       {editing && (
         <PromoEditor
           initial={editing}
+          providers={providers}
           onClose={() => setEditing(null)}
           onSave={p => {
             const exists = promos.some(x => x.id === p.id);
@@ -422,16 +470,27 @@ const OffersTab: React.FC<MarketingViewProps> = ({ settings, payments, currentUs
   );
 };
 
-const PromoEditor: React.FC<{ initial: Promotion; onClose: () => void; onSave: (p: Promotion) => void }> = ({ initial, onClose, onSave }) => {
+const PromoEditor: React.FC<{ initial: Promotion; providers: UpstreamProvider[]; onClose: () => void; onSave: (p: Promotion) => void }> = ({ initial, providers, onClose, onSave }) => {
   useEscapeKey(onClose);
   const [p, setP] = useState<Promotion>(initial);
   const set = <K extends keyof Promotion>(k: K, v: Promotion[K]) => setP(prev => ({ ...prev, [k]: v }));
+  const isNew = p.kind === 'new_price';
+  // الباقات المعروفة (بالاسم، مع سعرها العادي) لعرض المشتركين الجدد
+  const plans = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const pr of providers) for (const pl of pr.plans) if (!m.has(pl.name)) m.set(pl.name, pl.defaultSalePrice);
+    for (const r of p.planPrices || []) if (!m.has(r.planName)) m.set(r.planName, 0);
+    return [...m.entries()].map(([name, sale]) => ({ name, sale }));
+  }, [providers, p.planPrices]);
+  const priceOf = (name: string) => p.planPrices?.find(r => r.planName === name)?.price;
+  const setPrice = (name: string, price: number) => set('planPrices', [...(p.planPrices || []).filter(r => r.planName !== name), ...(price > 0 ? [{ planName: name, price }] : [])]);
   const valueLabel = p.kind === 'free_months' ? 'عدد الأشهر المجانية' : p.kind === 'discount_amount' ? 'قيمة الخصم (دينار)' : 'نسبة الخصم (%)';
-  const valid = p.name.trim() && p.value > 0 && (!p.endDate || !p.startDate || p.endDate >= p.startDate) && (p.kind !== 'discount_percent' || p.value <= 100);
+  const valid = p.name.trim() && (isNew ? (p.planPrices || []).some(r => r.price > 0) : p.value > 0) && (!p.endDate || !p.startDate || p.endDate >= p.startDate) && (p.kind !== 'discount_percent' || p.value <= 100);
   const kinds: Array<{ id: PromoKind; label: string }> = [
     { id: 'free_months', label: 'أشهر مجانية' },
     { id: 'discount_amount', label: 'خصم بالدينار' },
     { id: 'discount_percent', label: 'خصم بالنسبة' },
+    { id: 'new_price', label: 'سعر للجدد' },
   ];
   return (
     <div className="app-overlay fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-sm" onClick={onClose}>
@@ -448,14 +507,27 @@ const PromoEditor: React.FC<{ initial: Promotion; onClose: () => void; onSave: (
         </label>
         <div>
           <span className="block text-sm font-semibold text-slate-300 mb-1">نوع العرض</span>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {kinds.map(k => (
-              <button key={k.id} type="button" onClick={() => set('kind', k.id)} aria-pressed={p.kind === k.id}
+              <button key={k.id} type="button" onClick={() => setP(prev => ({ ...prev, kind: k.id, ...(k.id === 'new_price' ? { value: 1, minMonths: 1, earlyOnly: false } : {}) }))} aria-pressed={p.kind === k.id}
                 className={`min-h-12 rounded-xl border-2 text-sm font-semibold cursor-pointer ${p.kind === k.id ? 'bg-cyan-500/15 border-cyan-500 text-cyan-100' : 'bg-slate-950 border-slate-700 text-slate-300'}`}>{k.label}</button>
             ))}
           </div>
         </div>
+        {isNew && (
+          <div className="space-y-2">
+            <p className="text-sm font-semibold text-slate-300">سعر الشهر الأول للمشترك الجديد (اترك الحقل فارغاً للباقات غير المشمولة)</p>
+            {plans.map(pl => (
+              <label key={pl.name} className="flex items-center gap-3">
+                <span className="flex-1 text-sm text-slate-200">{pl.name}{pl.sale ? <span className="text-slate-400"> (عادةً {pl.sale.toLocaleString('en-US')})</span> : null}</span>
+                <input type="number" inputMode="numeric" min={0} step={250} value={priceOf(pl.name) || ''} onChange={e => setPrice(pl.name, Number(e.target.value))} aria-label={`سعر ${pl.name} للجدد`}
+                  className="w-32 h-11 bg-slate-950 border border-slate-700 rounded-xl px-3 text-white font-mono focus:outline-none focus:border-cyan-500" />
+              </label>
+            ))}
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-3">
+          {!isNew && <>
           <label className="block">
             <span className="block text-sm font-semibold text-slate-300 mb-1">أقل مدة تجديد</span>
             <select value={p.minMonths} onChange={e => set('minMonths', Number(e.target.value))} className="w-full h-12 bg-slate-950 border border-slate-700 rounded-xl px-3 text-white">
@@ -467,6 +539,7 @@ const PromoEditor: React.FC<{ initial: Promotion; onClose: () => void; onSave: (
             <input type="number" inputMode="numeric" min={1} max={p.kind === 'discount_percent' ? 100 : undefined} value={p.value || ''} onChange={e => set('value', Number(e.target.value))}
               className="w-full h-12 bg-slate-950 border border-slate-700 rounded-xl px-3 text-white font-mono focus:outline-none focus:border-cyan-500" />
           </label>
+          </>}
           <label className="block">
             <span className="block text-sm font-semibold text-slate-300 mb-1">يبدأ</span>
             <input type="date" value={p.startDate || ''} onChange={e => set('startDate', e.target.value || undefined)} className="w-full h-12 bg-slate-950 border border-slate-700 rounded-xl px-3 text-white" />
@@ -476,11 +549,12 @@ const PromoEditor: React.FC<{ initial: Promotion; onClose: () => void; onSave: (
             <input type="date" value={p.endDate || ''} onChange={e => set('endDate', e.target.value || undefined)} className="w-full h-12 bg-slate-950 border border-slate-700 rounded-xl px-3 text-white" />
           </label>
         </div>
-        <label className="flex items-center gap-3 cursor-pointer">
+        {!isNew && <label className="flex items-center gap-3 cursor-pointer">
           <input type="checkbox" checked={!!p.earlyOnly} onChange={e => set('earlyOnly', e.target.checked)} className="w-5 h-5 accent-cyan-500" />
           <span className="text-sm text-slate-200">فقط لمن يجدد قبل انتهاء اشتراكه (تشجيع التجديد المبكر)</span>
-        </label>
+        </label>}
         <p className="text-sm text-emerald-200 bg-emerald-950/30 border border-emerald-900/60 rounded-xl px-3 py-2">{p.value > 0 ? describePromotion(p) : 'أدخل قيمة العرض'}</p>
+        {isNew && <p className="text-xs text-slate-400">يظهر عند «إضافة مشترك» فقط، لا في التجديد.</p>}
         <button type="button" disabled={!valid} onClick={() => onSave({ ...p, name: p.name.trim(), id: p.id || uid('promo'), createdAt: p.createdAt || new Date().toISOString() })}
           className="w-full min-h-12 rounded-xl bg-cyan-600 text-white font-semibold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
           حفظ العرض
@@ -517,7 +591,11 @@ const CampaignsTab: React.FC<MarketingViewProps & { initialSegment?: SegmentId }
 
   // أفضل عرض فعّال اليوم (يُذكر في رسائل الاسترجاع والشكر)
   const bestOffer = (settings.promotions || []).find(p => isPromotionApplicable(p, { months: Math.max(1, p.minMonths), salePrice: 40000, today, expiryDate: today }));
-  const offerLine = bestOffer ? `🎁 عرض خاص: ${bestOffer.name} (${describePromotion(bestOffer)})` : '';
+  // للأوفياء: عرض المشتركين الجدد ليخبروا أصدقاءهم وجيرانهم
+  const newOffer = segment === 'loyal' ? (settings.promotions || []).find(p => p.kind === 'new_price' && p.active && !(p.startDate && today < p.startDate) && !(p.endDate && today > p.endDate)) : undefined;
+  const offerLine = newOffer
+    ? `🎁 لأصدقائك وجيرانك: ${describePromotion(newOffer)}`
+    : bestOffer ? `🎁 عرض خاص: ${bestOffer.name} (${describePromotion(bestOffer)})` : '';
   const messageFor = (s: Subscriber) => fillTemplate(template, {
     'الاسم': s.name.split(' ')[0] || s.name,
     'الشبكة': settings.ispName,

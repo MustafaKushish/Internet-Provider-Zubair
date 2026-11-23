@@ -144,6 +144,16 @@ Der Windows-Installer ist eine Electron-Hülle (`desktop/`) um dieselbe Adresse.
   und zeigt danach Nutzungen, Einnahmen und Kosten. Bei Kampagnen öffnet „افتح الحملة“ direkt die richtige Zielgruppe.
   Punkte, die in den nächsten 3 Tagen beginnen, erscheinen als Erinnerung und als Zahl am Menüpunkt „التسويق“.
   Den Plan bearbeitet der Admin, der Buchhalter kann ihn lesen.
+- **Fertiger Jahresplan („خطة جاهزة لسنة …“):** Ab Oktober bietet die Planung den Plan fürs nächste Jahr an (Ziele +
+  rund 20 Punkte). Er beginnt mit der Dezember-Aktion für Neukunden und Wechsler, danach: Januar 3+1 und Rückholaktion,
+  Ramadan 3+1 und Grüße, nach Eid Rückholaktion, April Frühverlängerung, Sommer 6+2 und Upgrade, Schulbeginn Neukunden-Angebot
+  und Upgrade, November Frühverlängerung, Dezember wieder Neukunden, „Freunde werben“ ganzjährig, Quartals-Rückblicke.
+  „أضف الخطة كاملة“ fügt nur fehlende Punkte hinzu (keine Doppelten). Die Angebote gelten jeweils nur in ihrem Zeitraum.
+- **Neukunden-Preis („سعر للجدد“):** Angebot mit eigenem Preis pro Paket für den ersten Monat (z. B. Economy 25.000,
+  Economy+ 35.000). Es erscheint nur beim Anlegen eines Kunden, nicht bei der Verlängerung; ab dem zweiten Monat gilt der
+  normale Preis. Der Rabatt steht als `cycleDiscount` beim Kunden und auf der ersten Quittung. Hinweis, wenn der Preis keinen
+  Gewinn lässt. Häkchen „انتقل إلينا من شبكة أخرى“ (+ Name der alten Firma) speichert Wechsler (`switchedFrom`), sichtbar
+  im Profil. Der Server prüft bei Buchhaltern, dass der Rabatt genau zum Angebot passt.
 - **Angebote:** Der Admin legt Angebote an (oder tippt eine Vorlage an): Gratis-Monate („3 Monate + 1 gratis“), Rabatt in
   Dinar oder in Prozent, mit Mindestlaufzeit, Zeitraum und optional „nur bei Verlängerung vor Ablauf“. Gratis-Monate
   verlängern das Ablaufdatum, der Kunde zahlt nur die bezahlten Monate. Pro Angebot zeigt die App Nutzungen, Einnahmen und

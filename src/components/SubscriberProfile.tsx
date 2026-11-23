@@ -133,6 +133,7 @@ const ProfileInner: React.FC<SubscriberProfileProps & { sub: Subscriber }> = ({
               <div className="text-xs text-slate-400 flex flex-wrap items-center gap-x-2 gap-y-1 mt-0.5">
                 <span>{sub.planName} • {sub.upstreamProvider}</span>
                 <span className="flex items-center gap-1"><TowerControl className="w-3 h-3" />{normTower(sub.towerName) || NO_TOWER_LABEL}</span>
+                {sub.switchedFrom && <span>انتقل إلينا من: {sub.switchedFrom}</span>}
               </div>
               <div className="mt-1.5 flex flex-wrap gap-1.5 text-[10px] font-bold">
                 {sub.archived && <span className="px-2 py-0.5 rounded-full bg-slate-700 border border-slate-500 text-white">مؤرشف (غادر){sub.archivedAt ? ` • ${sub.archivedAt.slice(0, 10)}` : ''}</span>}

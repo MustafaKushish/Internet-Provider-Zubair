@@ -9,7 +9,7 @@
 
 import { handleAdvisorChat, advisorStatus } from './advisor';
 import { COLLECTION_RULES, HIDDEN_FROM, OFFICE_ROLES, isRole, type Collection, type Role } from '../shared/access';
-import { remainingDebtOf, verifyCycleDiscount, type Promotion } from '../shared/promotions';
+import { remainingDebtOf, verifyCycleDiscount, verifyNewCustomerDiscount, type Promotion } from '../shared/promotions';
 import { baghdadToday } from '../shared/digest';
 import { PUSH_SCHEMA, digestForDevice, getVapid, isAllowedEndpoint, removePushSubscription, runDailyPush, savePushSubscription, sendTestToUser } from './push';
 
@@ -583,6 +583,22 @@ async function renewalViolation(db: D1Database, oldJson: string | null, next: an
   return ok ? null : 'الخصم لا يطابق عرضاً فعالاً. حدّث الصفحة وحاول ثانية.';
 }
 
+async function loadPromotions(db: D1Database): Promise<Promotion[]> {
+  const row = await db.prepare(`SELECT data FROM records WHERE collection = 'settings' AND deleted = 0 LIMIT 1`).first<{ data: string }>();
+  try { return row ? (JSON.parse(row.data).promotions || []) : []; } catch { return []; }
+}
+
+async function newCustomerViolation(db: D1Database, next: any): Promise<string | null> {
+  const promo = (await loadPromotions(db)).find(p => p.id === next.cyclePromotionId);
+  const ok = !!promo && verifyNewCustomerDiscount(promo, {
+    planName: String(next.planName || ''),
+    salePrice: Number(next.salePrice) || 0,
+    cycleDiscount: Number(next.cycleDiscount) || 0,
+    today: typeof next.renewedOn === 'string' ? next.renewedOn : baghdadToday(),
+  });
+  return ok ? null : 'خصم المشترك الجديد لا يطابق عرضاً للمشتركين الجدد. حدّث الصفحة وحاول ثانية.';
+}
+
 // ---------- سجل العمليات (من غيّر ماذا ومتى) ----------
 const AUDIT_KEEP_DAYS = 365;
 // حقول تُسجل قيمتها القديمة والجديدة؛ غيرها يُسجل اسمه فقط (وكلمات المرور لا تُسجل قيمتها أبداً)
@@ -678,6 +694,10 @@ async function handlePush(req: Request, db: D1Database, user: UserRow) {
     }
     if (!debtViolation && live && !c.deleted && c.collection === 'subscribers' && user.role !== 'admin') {
       debtViolation = await renewalViolation(db, cur!.data, c.data);
+    }
+    // مشترك جديد بخصم (عرض المشتركين الجدد): يجب أن يطابق عرضاً معرّفاً
+    if (!debtViolation && !live && !c.deleted && c.collection === 'subscribers' && user.role !== 'admin' && (Number(c.data?.cycleDiscount) || 0) > 0) {
+      debtViolation = await newCustomerViolation(db, c.data);
     }
     if (!allowed.includes(user.role) || debtViolation) {
       results.push({

@@ -563,6 +563,11 @@ export default function App() {
         cycleMonths: 1,
         carriedDebt: 0,
         currentCycleId: cycleId,
+        // حقول التسويق: «جاء عن طريق»، «انتقل من شبكة أخرى»، وعرض المشتركين الجدد (خصم الشهر الأول)
+        ...(subData.referredBy ? { referredBy: subData.referredBy } : {}),
+        ...(subData.switchedFrom ? { switchedFrom: subData.switchedFrom } : {}),
+        ...(subData.cycleDiscount && subData.cycleDiscount > 0 && subData.cyclePromotionId
+          ? { cycleDiscount: subData.cycleDiscount, cyclePromotionId: subData.cyclePromotionId, renewedOn: today } : {}),
       };
       const newSub = refreshSubscriberStatus(draft, warn);
       setSubscribers(prev => [newSub, ...prev]);
@@ -579,7 +584,8 @@ export default function App() {
           paymentMethod: 'cash',
           paymentType: 'initial',
           cycleMonths: 1,
-          notes: 'دفعة الاشتراك الأولي',
+          notes: newSub.cycleDiscount ? `دفعة الاشتراك الأولي • عرض: ${settings.promotions?.find(p => p.id === newSub.cyclePromotionId)?.name || ''}` : 'دفعة الاشتراك الأولي',
+          ...(newSub.cycleDiscount ? { promotionId: newSub.cyclePromotionId, promotionName: settings.promotions?.find(p => p.id === newSub.cyclePromotionId)?.name, discount: newSub.cycleDiscount } : {}),
           collectedBy: currentUser.name || settings.agentName,
           remainingBalanceAfter: getRemainingDebt(newSub),
           costAmount: newSub.costPrice,
@@ -1576,6 +1582,7 @@ export default function App() {
         onSave={handleSaveSubscriber}
         subscriberToEdit={subscriberToEdit}
         subscribers={activeSubscribers}
+        promotions={settings.promotions}
         providers={providers}
         towers={towers}
         currentUser={currentUser}

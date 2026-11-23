@@ -21,7 +21,7 @@ export interface ActionIdea {
   effect: string;      // الأثر المتوقع
   effort: 'سهل' | 'متوسط';
   defaultDays: number; // مدة مقترحة (0 = دائم)
-  offer?: Pick<Promotion, 'kind' | 'minMonths' | 'value' | 'earlyOnly'>;
+  offer?: Pick<Promotion, 'kind' | 'minMonths' | 'value' | 'earlyOnly' | 'planPrices'>;
   segment?: SegmentKey;
 }
 
@@ -59,6 +59,14 @@ export const ACTION_IDEAS: ActionIdea[] = [
     whenToUse: 'إذا كنت تفضّل الخصم على الأشهر المجانية.',
     howInApp: 'يُنشأ عرض بنسبة 10% يُحسب على أشهر التجديد ويُقرَّب لأقرب 250 د.ع.',
     effect: 'تحصيل مقدّم أعلى مقابل خصم محدود.',
+  },
+  {
+    id: 'new-customers', title: 'عرض المشتركين الجدد والمنتقلين', kind: 'offer', effort: 'سهل', defaultDays: 31,
+    offer: { kind: 'new_price', minMonths: 1, value: 1, planPrices: [{ planName: 'Economy', price: 25000 }, { planName: 'Economy+', price: 35000 }] },
+    goal: 'كسب مشتركين جدد، خاصة من يريد الانتقال إلينا من شبكة أخرى.',
+    whenToUse: 'نهاية السنة، بداية العام الدراسي، أو عندما تريد ملء برج فيه مكان فارغ.',
+    howInApp: 'عند «إضافة مشترك» يظهر العرض تلقائياً: الشهر الأول بسعر خاص (Economy بـ 25,000 وEconomy+ بـ 35,000). اختر «انتقل إلينا من شبكة أخرى» لتعرف لاحقاً كم كسبت من المنافسين.',
+    effect: 'مشتركون جدد بسرعة. الربح يأتي من الشهر الثاني فصاعداً، لذلك تابع تجديدهم بعد الشهر الأول.',
   },
   {
     id: 'winback', title: 'حملة استرجاع المنقطعين', kind: 'campaign', segment: 'lost', effort: 'متوسط', defaultDays: 14,
@@ -137,7 +145,7 @@ export function upcomingOccasions(today: string, horizonDays = 400): Occasion[] 
 
   const year = Number(today.slice(0, 4));
   for (let y = year - 1; y <= year + 2; y++) {
-    push({ id: `school-${y}`, name: 'بداية العام الدراسي', start: `${y}-09-20`, end: `${y}-10-05`, approx: true, leadDays: 7, suggested: ['upgrade', 'early-renewal'] });
+    push({ id: `school-${y}`, name: 'بداية العام الدراسي', start: `${y}-09-20`, end: `${y}-10-05`, approx: true, leadDays: 7, suggested: ['new-customers', 'upgrade', 'early-renewal'] });
   }
   return out.sort((a, b) => a.start.localeCompare(b.start));
 }
@@ -178,7 +186,7 @@ export function buildPlanItem(idea: ActionIdea | null, input: NewPlanInput, now:
   const title = input.title.trim() || idea?.title || 'بند في الخطة';
   let promotion: Promotion | undefined;
   if (idea?.offer && input.createOffer) {
-    promotion = { id: uid('promo'), name: title, active: true, startDate: input.startDate, endDate: input.endDate, createdAt, ...idea.offer };
+    promotion = { id: uid('promo'), name: title, active: true, startDate: input.startDate, endDate: input.endDate, createdAt, ...idea.offer, ...(idea.offer.planPrices ? { planPrices: idea.offer.planPrices.map(r => ({ ...r })) } : {}) };
   }
   const item: PlanItem = {
     id: uid('plan'), ideaId: idea?.id || 'custom', title, startDate: input.startDate,
@@ -207,6 +215,85 @@ export function planResults(item: PlanItem, payments: PaymentRecord[]): { uses: 
 
 export function daysBetween(from: string, to: string): number {
   return Math.round((parseDay(to).getTime() - parseDay(from).getTime()) / 86400000);
+}
+
+// ---------------- الخطة السنوية الجاهزة ----------------
+
+export const YEAR_PLAN_GOALS = [
+  '50 مشتركاً جديداً أو منتقلاً من شبكة أخرى خلال السنة (عرض الجدد في ديسمبر وبداية الدراسة + ادعُ صديقاً).',
+  'استرجاع ثلث المنقطعين (حملات بعد العطل والأعياد مع عرض 3+1).',
+  '8 من كل 10 مشتركين يجدّدون في وقتهم (التجديد المبكر في نيسان وتشرين الثاني).',
+  'تحصيل مقدّم أكبر: 3+1 في الشتاء ورمضان، و6+2 في الصيف.',
+];
+
+export interface YearPlanEntry { item: PlanItem; promotion?: Promotion }
+
+/**
+ * خطة سنة كاملة لكسب المشتركين وزيادة الدخل: تبدأ بعرض نهاية السنة السابقة (ديسمبر) وتنتهي بديسمبر السنة نفسها.
+ * المناسبات الهجرية تُحسب تلقائياً (تقريبية). كل بند له templateKey حتى لا يُضاف مرتين.
+ */
+export function buildYearPlan(year: number, now: Date = new Date()): YearPlanEntry[] {
+  const prev = year - 1;
+  const out: YearPlanEntry[] = [];
+  const add = (key: string, ideaId: string, title: string, start: string, end?: string, note?: string, createOffer = true) => {
+    const idea = ideaId === 'custom' ? null : ideaById(ideaId)!;
+    const { item, promotion } = buildPlanItem(idea, { title, startDate: start, endDate: end, note, createOffer }, now);
+    out.push({ item: { ...item, templateKey: `y${year}-${key}` }, promotion });
+  };
+  const newNote = 'Economy بـ 25,000 يساوي سعر الجملة تقريباً (بلا ربح في الشهر الأول)، وEconomy+ بـ 35,000 يترك ربحاً. الربح الحقيقي من التجديد بعد الشهر الأول: اتصل بهم قبل انتهاء الشهر.';
+
+  // ديسمبر (نهاية السنة السابقة): كسب الجدد والمنتقلين
+  add('flyers', 'custom', 'منشورات وإعلان في الحي والفيسبوك: عرض نهاية السنة', `${prev}-11-25`, `${prev}-12-05`, 'وزّع المنشورات قرب الأبراج التي فيها مكان، واكتب السعرين بوضوح.');
+  add('dec-new', 'new-customers', `عرض نهاية السنة ${prev}: للجدد والمنتقلين`, `${prev}-12-01`, `${prev}-12-31`, newNote);
+  add('dec-share', 'loyalty', 'اطلب من الأوفياء إخبار جيرانهم بعرض نهاية السنة', `${prev}-12-01`, `${prev}-12-10`, 'ذكّرهم أن «ادعُ صديقاً» يعطيهم أياماً مجانية.');
+  add('referral', 'referral', 'ادعُ صديقاً طوال السنة', `${prev}-12-01`, undefined, 'سجّل «جاء عن طريق» لكل مشترك جديد.');
+
+  // كانون الثاني: من جاء في ديسمبر يجدّد، والمنقطعون يعودون
+  add('jan-31', 'free-3-1', 'عرض العودة والتثبيت: 3 أشهر + شهر مجاناً', `${year}-01-05`, `${year}-01-31`, 'اعرضه خاصة على مشتركي ديسمبر الجدد عند أول تجديد.');
+  add('jan-winback', 'winback', 'استرجاع المنقطعين بعد العطلة', `${year}-01-05`, `${year}-01-25`);
+
+  // رمضان والأعياد (هجري تقريبي)
+  const occ = upcomingOccasions(`${year}-01-01`, 366).filter(o => o.start.startsWith(String(year)));
+  const ramadan = occ.find(o => o.name === 'شهر رمضان');
+  const fitr = occ.find(o => o.name === 'عيد الفطر');
+  const adha = occ.find(o => o.name === 'عيد الأضحى');
+  const approx = (n: string) => `${n}: التاريخ تقريبي وقد يختلف يوماً حسب رؤية الهلال.`;
+  if (ramadan) {
+    const offerStart = addDays(ramadan.start, -7) > `${year}-01-31` ? addDays(ramadan.start, -7) : `${year}-02-01`;
+    add('ram-31', 'free-3-1', 'عرض رمضان: 3 أشهر + شهر مجاناً', offerStart, ramadan.end, approx('رمضان'));
+    add('ram-greet', 'loyalty', 'تهنئة رمضان للعملاء الأوفياء', addDays(ramadan.start, -2), addDays(ramadan.start, 5), approx('رمضان'));
+  }
+  if (fitr) {
+    add('fitr-greet', 'loyalty', 'تهنئة عيد الفطر', addDays(fitr.start, -2), fitr.end, approx('عيد الفطر'));
+    add('fitr-winback', 'winback', 'استرجاع المنقطعين بعد عيد الفطر', addDays(fitr.end, 3), addDays(fitr.end, 17));
+  }
+  add('apr-early', 'early-renewal', 'تجديد مبكر في الربيع: خصم 5,000', `${year}-04-01`, `${year}-04-30`);
+  if (adha) add('adha-greet', 'loyalty', 'تهنئة عيد الأضحى', addDays(adha.start, -3), adha.end, approx('عيد الأضحى'));
+
+  // الصيف: البيت مليء والإنترنت يُستعمل أكثر
+  add('summer-62', 'free-6-2', 'عرض الصيف: 6 أشهر + شهرين مجاناً', `${year}-06-01`, `${year}-07-15`);
+  add('jun-upgrade', 'upgrade', 'ترقية الباقة لعطلة الصيف', `${year}-06-10`, `${year}-06-24`);
+
+  // بداية الدراسة
+  add('school-new', 'new-customers', 'عرض بداية الدراسة: للجدد والمنتقلين', `${year}-09-15`, `${year}-10-15`, newNote);
+  add('school-upgrade', 'upgrade', 'ترقية الباقة لبداية الدراسة', `${year}-09-15`, `${year}-09-30`);
+
+  // نهاية السنة
+  add('nov-early', 'early-renewal', 'تجديد مبكر قبل الشتاء: خصم 5,000', `${year}-11-01`, `${year}-11-30`);
+  add('dec-new', 'new-customers', `عرض نهاية السنة ${year}: للجدد والمنتقلين`, `${year}-12-01`, `${year}-12-31`, newNote);
+
+  // مراجعة كل ربع سنة
+  const review = 'كم مشتركاً جديداً ومنتقلاً؟ كم عاد من المنقطعين؟ هل نزلت الديون؟ أي عرض نجح (تبويب العروض يعرض الاستعمال والدخل)؟';
+  for (const [k, d] of [['q1', `${year}-03-31`], ['q2', `${year}-06-30`], ['q3', `${year}-09-30`], ['q4', `${year}-12-28`]] as const) {
+    add(`review-${k}`, 'custom', `مراجعة الربع ${({ q1: 'الأول', q2: 'الثاني', q3: 'الثالث', q4: 'الرابع' })[k]}`, d, d, review);
+  }
+  return out.sort((a, b) => a.item.startDate.localeCompare(b.item.startDate));
+}
+
+/** البنود الناقصة فقط (لم تُضف من قبل). البنود المنتهية تُترك. */
+export function missingYearPlan(year: number, existing: PlanItem[] | undefined, today: string, now: Date = new Date()): YearPlanEntry[] {
+  const have = new Set((existing || []).map(i => i.templateKey).filter(Boolean));
+  return buildYearPlan(year, now).filter(e => !have.has(e.item.templateKey) && (e.item.endDate || e.item.startDate) >= today);
 }
 
 export { toLocalDateStr };
