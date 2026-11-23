@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Gift, HeartHandshake, Megaphone, Pencil, Plus, Rocket, Send, Trash2, TowerControl, Trophy, UserX, Users } from 'lucide-react';
-import { PaymentRecord, StaffUser, Subscriber, SystemSettings, UpstreamProvider } from '../../types/isp';
+import { BookOpen, CalendarDays, Target, ChevronDown, ClipboardList, Gift, HeartHandshake, Megaphone, Pencil, Plus, Rocket, Send, Trash2, TowerControl, Trophy, UserX, Users } from 'lucide-react';
+import { PaymentRecord, PlanItem, StaffUser, Subscriber, SystemSettings, UpstreamProvider } from '../../types/isp';
+import { ACTION_IDEAS, KIND_LABEL, STATUS_LABEL, YEAR_PLAN_GOALS, buildPlanItem, daysBetween, groupPlan, ideaById, missingYearPlan, planAlertCount, planResults, planStatus, upcomingOccasions, validatePlanInput, type ActionIdea, type SegmentKey } from '../../utils/marketingPlan';
 import { describePromotion, isPromotionApplicable, type PromoKind, type Promotion } from '../../../shared/promotions';
 import { fillTemplate, higherPlan, referralBoard, segmentMembers, type SegmentId } from '../../utils/marketing';
 import { formatCurrency, generateWhatsAppLink } from '../../utils/storage';
@@ -16,7 +17,7 @@ import { useEscapeKey } from '../ui/useEscapeKey';
  * ودعوة الأصدقاء. المدير وحده يعدّل العروض والإعدادات (الإعدادات على الخادم للمدير فقط).
  */
 
-type Tab = 'offers' | 'campaigns' | 'referrals';
+type Tab = 'plan' | 'offers' | 'campaigns' | 'referrals';
 
 const SENT_KEY = 'sas_plus_campaign_sent_v1';      // { segment: { subId: date } } — على هذا الجهاز
 const TPL_KEY = 'sas_plus_campaign_tpl_v1';
@@ -43,6 +44,7 @@ const QUICK_PROMOS: Array<Omit<Promotion, 'id' | 'active'>> = [
   { name: '6 أشهر + شهرين مجاناً', kind: 'free_months', minMonths: 6, value: 2 },
   { name: 'خصم 10% لستة أشهر', kind: 'discount_percent', minMonths: 6, value: 10 },
   { name: 'تجديد مبكر: خصم 5,000', kind: 'discount_amount', minMonths: 1, value: 5000, earlyOnly: true },
+  { name: 'عرض نهاية السنة للجدد والمنتقلين', kind: 'new_price', minMonths: 1, value: 1, planPrices: [{ planName: 'Economy', price: 25000 }, { planName: 'Economy+', price: 35000 }] },
 ];
 
 function readJson<T>(key: string, fallback: T): T {
@@ -60,8 +62,10 @@ interface MarketingViewProps {
 }
 
 export const MarketingView: React.FC<MarketingViewProps> = props => {
-  const [tab, setTab] = useState<Tab>('offers');
+  const [tab, setTab] = useState<Tab>('plan');
+  const [focusSegment, setFocusSegment] = useState<SegmentId | undefined>(undefined);
   const tabs: Array<{ id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }> = [
+    { id: 'plan', label: 'التخطيط', icon: ClipboardList },
     { id: 'offers', label: 'العروض', icon: Gift },
     { id: 'campaigns', label: 'حملات واتساب', icon: Megaphone },
     { id: 'referrals', label: 'ادعُ صديقاً', icon: Users },
@@ -72,7 +76,7 @@ export const MarketingView: React.FC<MarketingViewProps> = props => {
         <h2 className="text-xl font-semibold text-white">العروض والتسويق</h2>
         <p className="text-sm text-slate-400">عروض تُطبَّق عند التجديد، رسائل واتساب لكل فئة، ومكافأة لمن يدعو أصدقاءه.</p>
       </div>
-      <div className="grid grid-cols-3 gap-2" role="group" aria-label="أقسام التسويق">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" role="group" aria-label="أقسام التسويق">
         {tabs.map(t => {
           const Icon = t.icon;
           return (
@@ -83,9 +87,289 @@ export const MarketingView: React.FC<MarketingViewProps> = props => {
           );
         })}
       </div>
+      {tab === 'plan' && <PlanTab {...props} onOpenOffers={() => setTab('offers')} onOpenCampaign={seg => { setFocusSegment(seg); setTab('campaigns'); }} />}
       {tab === 'offers' && <OffersTab {...props} />}
-      {tab === 'campaigns' && <CampaignsTab {...props} />}
+      {tab === 'campaigns' && <CampaignsTab {...props} initialSegment={focusSegment} />}
       {tab === 'referrals' && <ReferralsTab {...props} />}
+    </div>
+  );
+};
+
+// ---------------- التخطيط ----------------
+
+interface PlanDraft { idea: ActionIdea | null; title: string; start: string; end?: string; note?: string }
+
+const addDaysStr = (date: string, n: number) => { const d = new Date(`${date}T12:00:00`); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+
+const PlanTab: React.FC<MarketingViewProps & { onOpenOffers: () => void; onOpenCampaign: (s: SegmentKey) => void }> = ({ settings, payments, currentUser, onSaveSettings, onOpenOffers, onOpenCampaign }) => {
+  const isAdmin = currentUser.role === 'admin';
+  const today = todayStr();
+  const plan = settings.marketingPlan || [];
+  const promos = settings.promotions || [];
+  const groups = useMemo(() => groupPlan(plan, today), [plan, today]);
+  const occasions = useMemo(() => upcomingOccasions(today).slice(0, 4), [today]);
+  const soon = plan.filter(i => !i.skipped && i.startDate > today && i.startDate <= addDaysStr(today, 3));
+  const [draft, setDraft] = useState<PlanDraft | null>(null);
+  const [openIdea, setOpenIdea] = useState<string | null>(null);
+  const money = (n: number) => formatCurrency(Math.round(n), settings.currency);
+
+  const startFromIdea = (idea: ActionIdea, over: Partial<PlanDraft> = {}) => {
+    const start = over.start || today;
+    setDraft({ idea, title: over.title || idea.title, start, end: over.end ?? (idea.defaultDays > 0 ? addDaysStr(start, idea.defaultDays) : undefined), note: over.note });
+  };
+  const fromOccasion = (idea: ActionIdea, o: ReturnType<typeof upcomingOccasions>[number]) => {
+    const start = addDaysStr(o.start, -o.leadDays) > today ? addDaysStr(o.start, -o.leadDays) : today;
+    startFromIdea(idea, { start, end: o.end, title: `${idea.title} — ${o.name}`, note: o.approx ? `${o.name}: التاريخ تقريبي وقد يختلف يوماً حسب رؤية الهلال.` : undefined });
+  };
+
+  const patchPlan = (next: PlanItem[], msg: string) => { onSaveSettings({ marketingPlan: next }); notify(msg, 'success'); };
+
+  // الخطة الجاهزة: من تشرين الأول نقترح السنة القادمة (تبدأ بعرض ديسمبر)
+  const planYear = Number(today.slice(0, 4)) + (Number(today.slice(5, 7)) >= 10 ? 1 : 0);
+  const missing = useMemo(() => missingYearPlan(planYear, plan, today), [planYear, plan, today]);
+  const [showYear, setShowYear] = useState(false);
+  const addYearPlan = async () => {
+    const offers = missing.filter(e => e.promotion).length;
+    if (!(await appConfirm(`إضافة ${missing.length} بنداً إلى الخطة، منها ${offers} عروض تُفعَّل تلقائياً في مواعيدها فقط؟\nيمكنك تعديل أي بند أو إلغاؤه لاحقاً.`, { confirmLabel: 'أضف الخطة' }))) return;
+    onSaveSettings({
+      marketingPlan: [...plan, ...missing.map(e => e.item)],
+      promotions: [...promos, ...missing.flatMap(e => (e.promotion ? [e.promotion] : []))],
+    });
+    setShowYear(false);
+    notify(`تمت إضافة خطة ${planYear}.`, 'success');
+  };
+
+  return (
+    <div className="space-y-6">
+      <p className="text-sm text-slate-400">اقرأ الأفكار، اختر ما يناسبك وحدّد موعده، وسيذكّرك التطبيق قبل البدء. الخطة يضعها المدير ويراها المكتب.</p>
+
+      {soon.length > 0 && (
+        <div role="status" className="bg-amber-950/40 border border-amber-700 rounded-2xl px-4 py-3 text-amber-100">
+          <p className="font-semibold">تذكير: تبدأ قريباً</p>
+          <ul className="text-sm mt-1 space-y-0.5">
+            {soon.map(i => <li key={i.id}>{i.title}: بعد {daysBetween(today, i.startDate)} {daysBetween(today, i.startDate) === 1 ? 'يوم' : 'أيام'} (<span dir="ltr">{i.startDate}</span>)</li>)}
+          </ul>
+        </div>
+      )}
+
+      {/* الخطة الجاهزة للسنة */}
+      {(missing.length > 0 || showYear) && (
+        <section aria-label={`خطة جاهزة لسنة ${planYear}`} className="bg-cyan-500/10 border border-cyan-500/40 rounded-2xl p-4 space-y-3">
+          <h3 className="text-lg font-semibold text-white flex items-center gap-2"><Target className="w-5 h-5 text-cyan-300" /> خطة جاهزة لسنة {planYear}: كسب مشتركين وزيادة الدخل</h3>
+          <p className="text-sm text-slate-300">تبدأ بعرض نهاية السنة في ديسمبر للجدد والمنتقلين (Economy بـ 25,000 وEconomy+ بـ 35,000 للشهر الأول)، ثم تثبيتهم واسترجاع المنقطعين، وعروض رمضان والصيف وبداية الدراسة، ومراجعة كل ربع سنة.</p>
+          <div>
+            <p className="text-sm font-semibold text-cyan-100">الأهداف:</p>
+            <ul className="text-sm text-slate-200 list-disc pr-5 space-y-0.5">{YEAR_PLAN_GOALS.map(g => <li key={g}>{g}</li>)}</ul>
+          </div>
+          <button type="button" onClick={() => setShowYear(v => !v)} aria-expanded={showYear} className="text-sm text-cyan-200 underline cursor-pointer">
+            {showYear ? 'أخفِ البنود' : `اقرأ البنود (${missing.length})`}
+          </button>
+          {showYear && (
+            <ol className="space-y-1.5 text-sm">
+              {missing.map(e => (
+                <li key={e.item.templateKey} className="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2">
+                  <span className="font-semibold text-white">{e.item.title}</span>
+                  <span className="text-slate-400"> • <span dir="ltr">{e.item.startDate}</span>{e.item.endDate && e.item.endDate !== e.item.startDate ? <> ← <span dir="ltr">{e.item.endDate}</span></> : null}</span>
+                  {e.promotion && <span className="text-emerald-300"> • عرض</span>}
+                  {e.item.note && <span className="block text-xs text-slate-400 mt-0.5">{e.item.note}</span>}
+                </li>
+              ))}
+              {missing.length === 0 && <li className="text-slate-300">كل بنود الخطة مضافة.</li>}
+            </ol>
+          )}
+          {isAdmin ? (
+            missing.length > 0 && <button type="button" onClick={addYearPlan} className="w-full sm:w-auto min-h-12 px-5 rounded-xl bg-cyan-600 text-white font-semibold cursor-pointer flex items-center justify-center gap-2"><Plus className="w-5 h-5" /> أضف الخطة كاملة</button>
+          ) : <p className="text-xs text-slate-400">المدير العام يضيف الخطة.</p>}
+        </section>
+      )}
+
+      {/* المناسبات القادمة */}
+      <section className="space-y-3" aria-label="المناسبات القادمة">
+        <h3 className="text-lg font-semibold text-white flex items-center gap-2"><CalendarDays className="w-5 h-5 text-cyan-300" /> المناسبات القادمة</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {occasions.map(o => {
+            const left = daysBetween(today, o.start);
+            return (
+              <div key={o.id} className="bg-slate-900 border border-slate-700 rounded-2xl p-4 space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-lg font-semibold text-white">{o.name}</p>
+                  <span className="text-sm px-3 py-1 rounded-full bg-cyan-500/15 text-cyan-200 whitespace-nowrap">{left > 0 ? `بعد ${left} يوماً` : 'الآن'}</span>
+                </div>
+                <p className="text-sm text-slate-300">من <span dir="ltr">{o.start}</span> إلى <span dir="ltr">{o.end}</span>{o.approx ? ' (تقريبي)' : ''}</p>
+                {isAdmin ? (
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {o.suggested.map(id => {
+                      const idea = ideaById(id)!;
+                      return <button key={id} type="button" onClick={() => fromOccasion(idea, o)} className="min-h-11 px-3 rounded-xl bg-slate-800 border border-slate-700 text-sm text-slate-100 hover:bg-slate-700 cursor-pointer text-right">+ {idea.title}</button>;
+                    })}
+                  </div>
+                ) : <p className="text-xs text-slate-400">اقتراحات: {o.suggested.map(id => ideaById(id)!.title).join(' • ')}</p>}
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* خطتي */}
+      <section className="space-y-3" aria-label="خطتي">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-lg font-semibold text-white flex items-center gap-2"><ClipboardList className="w-5 h-5 text-cyan-300" /> خطتي ({plan.filter(i => !i.skipped).length})</h3>
+          {isAdmin && <button type="button" onClick={() => setDraft({ idea: null, title: '', start: today })} className="min-h-11 px-4 rounded-xl bg-slate-800 border border-slate-700 text-sm text-white cursor-pointer flex items-center gap-1.5"><Plus className="w-4 h-4" /> بند خاص</button>}
+        </div>
+        {plan.length === 0 ? (
+          <div className="py-10 px-4 text-center bg-slate-900 border border-slate-700 rounded-2xl space-y-2">
+            <ClipboardList className="w-12 h-12 text-slate-500 mx-auto" />
+            <p className="text-lg text-white">خطتك فارغة.</p>
+            <p className="text-sm text-slate-400">{isAdmin ? 'اختر فكرة من المكتبة بالأسفل أو من المناسبات القادمة بالأعلى.' : 'المدير العام يضع خطة التسويق.'}</p>
+          </div>
+        ) : (
+          (['running', 'upcoming', 'done', 'skipped'] as const).filter(k => groups[k].length > 0).map(k => (
+            <div key={k} className="space-y-2">
+              <p className="text-sm font-semibold text-slate-300">{STATUS_LABEL[k]} ({groups[k].length})</p>
+              <ul className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {groups[k].map(it => {
+                  const status = planStatus(it, today);
+                  const promo = promos.find(p => p.id === it.promotionId);
+                  const res = planResults(it, payments);
+                  const left = status === 'upcoming' ? daysBetween(today, it.startDate) : it.endDate ? daysBetween(today, it.endDate) : null;
+                  return (
+                    <li key={it.id} className={`bg-slate-900 border rounded-2xl p-4 space-y-2 ${status === 'running' ? 'border-emerald-600/70' : 'border-slate-700'} ${status === 'skipped' || status === 'done' ? 'opacity-80' : ''}`}>
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-lg font-semibold text-white">{it.title}</p>
+                        <span className={`text-sm px-3 py-1 rounded-full whitespace-nowrap ${status === 'running' ? 'bg-emerald-500/15 text-emerald-200' : status === 'upcoming' ? 'bg-amber-500/15 text-amber-200' : 'bg-white/10 text-slate-300'}`}>{STATUS_LABEL[status]}</span>
+                      </div>
+                      <p className="text-sm text-slate-300">من <span dir="ltr">{it.startDate}</span>{it.endDate ? <> إلى <span dir="ltr">{it.endDate}</span></> : ' (بدون نهاية)'}
+                        {left !== null && status === 'upcoming' && ` • يبدأ بعد ${left} ${left === 1 ? 'يوم' : 'أيام'}`}
+                        {left !== null && status === 'running' && it.endDate && ` • ينتهي بعد ${left} ${left === 1 ? 'يوم' : 'أيام'}`}</p>
+                      {it.note && <p className="text-sm text-slate-400">{it.note}</p>}
+                      {it.promotionId && (
+                        <p className="text-sm text-emerald-200">{promo ? `العرض مرتبط ${promo.active ? 'وفعّال في هذه الفترة' : '(موقوف حالياً)'}` : 'العرض المرتبط حُذف من تبويب العروض.'}</p>
+                      )}
+                      {res && res.uses > 0 && (
+                        <div className="grid grid-cols-3 gap-2 text-center">
+                          <div className="bg-slate-950/50 rounded-xl p-2"><p className="text-xs text-slate-400">استُخدم</p><p className="font-semibold text-white tabular-nums">{res.uses}</p></div>
+                          <div className="bg-slate-950/50 rounded-xl p-2"><p className="text-xs text-slate-400">دخل منه</p><p className="font-semibold text-emerald-300 tabular-nums text-sm">{money(res.revenue)}</p></div>
+                          <div className="bg-slate-950/50 rounded-xl p-2"><p className="text-xs text-slate-400">كلّفنا</p><p className="font-semibold text-amber-200 tabular-nums text-sm">{money(res.cost)}</p></div>
+                        </div>
+                      )}
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {it.segment && status !== 'skipped' && <button type="button" onClick={() => onOpenCampaign(it.segment!)} className="min-h-11 px-3 rounded-xl bg-emerald-700 text-white text-sm font-semibold cursor-pointer flex items-center gap-1.5"><Send className="w-4 h-4" /> افتح الحملة</button>}
+                        {it.promotionId && <button type="button" onClick={onOpenOffers} className="min-h-11 px-3 rounded-xl bg-slate-800 border border-slate-700 text-sm text-white cursor-pointer">العرض</button>}
+                        {isAdmin && <button type="button" onClick={() => patchPlan(plan.map(x => (x.id === it.id ? { ...x, skipped: !x.skipped } : x)), it.skipped ? 'أُعيد البند إلى الخطة.' : 'أُلغي البند.')} className="min-h-11 px-3 rounded-xl bg-slate-800 border border-slate-700 text-sm text-slate-200 cursor-pointer">{it.skipped ? 'استعادة' : 'إلغاء البند'}</button>}
+                        {isAdmin && <button type="button" onClick={async () => { if (await appConfirm(`حذف «${it.title}» من الخطة؟${it.promotionId ? '\nالعرض المرتبط يبقى في تبويب العروض.' : ''}`, { confirmLabel: 'حذف البند' })) patchPlan(plan.filter(x => x.id !== it.id), 'تم حذف البند.'); }} className="min-h-11 px-3 rounded-xl bg-slate-800 border border-slate-700 text-sm text-rose-200 cursor-pointer flex items-center gap-1.5"><Trash2 className="w-4 h-4" /> حذف</button>}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))
+        )}
+      </section>
+
+      {/* مكتبة الأفكار (للقراءة) */}
+      <section className="space-y-3" aria-label="مكتبة الأفكار">
+        <h3 className="text-lg font-semibold text-white flex items-center gap-2"><BookOpen className="w-5 h-5 text-cyan-300" /> مكتبة الأفكار</h3>
+        <ul className="space-y-2">
+          {ACTION_IDEAS.map(idea => {
+            const open = openIdea === idea.id;
+            return (
+              <li key={idea.id} className="bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden">
+                <button type="button" onClick={() => setOpenIdea(open ? null : idea.id)} aria-expanded={open} className="w-full min-h-14 px-4 py-3 flex items-center justify-between gap-3 text-right cursor-pointer">
+                  <span className="min-w-0">
+                    <span className="block text-base font-semibold text-white">{idea.title}</span>
+                    <span className="block text-sm text-slate-400">{idea.goal}</span>
+                  </span>
+                  <span className="flex items-center gap-2 flex-shrink-0">
+                    <span className="hidden sm:inline text-xs px-2 py-1 rounded-full bg-white/10 text-slate-200">{KIND_LABEL[idea.kind]}</span>
+                    <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+                  </span>
+                </button>
+                {open && (
+                  <div className="px-4 pb-4 space-y-3 border-t border-slate-800 pt-3 text-base leading-relaxed">
+                    {([['متى تستعملها', idea.whenToUse], ['ماذا يفعل التطبيق', idea.howInApp], ['الأثر المتوقع', idea.effect]] as const).map(([label, text]) => (
+                      <div key={label}><p className="text-sm font-semibold text-cyan-200">{label}</p><p className="text-slate-200">{text}</p></div>
+                    ))}
+                    <p className="text-sm text-slate-400">{KIND_LABEL[idea.kind]} • الجهد: {idea.effort} • {idea.defaultDays > 0 ? `مدة مقترحة: ${idea.defaultDays} يوماً` : 'يعمل بشكل دائم'}</p>
+                    {isAdmin && <button type="button" onClick={() => startFromIdea(idea)} className="min-h-12 px-5 rounded-xl bg-cyan-600 text-white font-semibold cursor-pointer flex items-center gap-2"><Plus className="w-5 h-5" /> أضف إلى خطتي</button>}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+
+      {draft && (
+        <PlanDialog
+          draft={draft}
+          onClose={() => setDraft(null)}
+          onSave={input => {
+            const { item, promotion } = buildPlanItem(draft.idea, input);
+            onSaveSettings({ marketingPlan: [...plan, item], ...(promotion ? { promotions: [...promos, promotion] } : {}) });
+            notify(promotion ? 'أُضيف البند، وأُنشئ العرض وسيظهر في نافذة التجديد خلال الفترة.' : 'أُضيف البند إلى خطتك.', 'success');
+            setDraft(null);
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+const PlanDialog: React.FC<{ draft: PlanDraft; onClose: () => void; onSave: (i: { title: string; startDate: string; endDate?: string; note?: string; createOffer?: boolean }) => void }> = ({ draft, onClose, onSave }) => {
+  useEscapeKey(onClose);
+  const [title, setTitle] = useState(draft.title);
+  const [start, setStart] = useState(draft.start);
+  const [end, setEnd] = useState(draft.end || '');
+  const [note, setNote] = useState(draft.note || '');
+  const [createOffer, setCreateOffer] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const idea = draft.idea;
+  const submit = () => {
+    const input = { title, startDate: start, endDate: end || undefined, note, createOffer: !!idea?.offer && createOffer };
+    const err = validatePlanInput(input);
+    if (err) { setError(err); return; }
+    onSave(input);
+  };
+  return (
+    <div className="app-overlay fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-sm" onClick={onClose}>
+      <div role="dialog" aria-modal="true" aria-label="بند في الخطة" onClick={e => e.stopPropagation()}
+        className="w-full sm:max-w-lg max-h-[92vh] overflow-y-auto bg-slate-900 border border-slate-700 rounded-t-3xl sm:rounded-2xl p-5 space-y-4 text-base"
+        style={{ paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom))' }}>
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-lg font-semibold text-white">{idea ? 'أضف إلى الخطة' : 'بند خاص'}</h3>
+          <BackButton onClick={onClose} />
+        </div>
+        {idea && <p className="text-sm text-slate-400">{idea.goal}</p>}
+        <label className="block">
+          <span className="block text-sm font-semibold text-slate-300 mb-1">اسم البند</span>
+          <input value={title} onChange={e => { setTitle(e.target.value); setError(null); }} className="w-full h-12 bg-slate-950 border border-slate-700 rounded-xl px-3 text-white focus:outline-none focus:border-cyan-500" />
+        </label>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block">
+            <span className="block text-sm font-semibold text-slate-300 mb-1">يبدأ</span>
+            <input type="date" value={start} onChange={e => { setStart(e.target.value); setError(null); }} className="w-full h-12 bg-slate-950 border border-slate-700 rounded-xl px-3 text-white" />
+          </label>
+          <label className="block">
+            <span className="block text-sm font-semibold text-slate-300 mb-1">ينتهي (اختياري)</span>
+            <input type="date" value={end} onChange={e => { setEnd(e.target.value); setError(null); }} className="w-full h-12 bg-slate-950 border border-slate-700 rounded-xl px-3 text-white" />
+          </label>
+        </div>
+        <label className="block">
+          <span className="block text-sm font-semibold text-slate-300 mb-1">ملاحظة (اختياري)</span>
+          <textarea value={note} onChange={e => setNote(e.target.value)} rows={2} className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white focus:outline-none focus:border-cyan-500" />
+        </label>
+        {idea?.offer && (
+          <label className="flex items-start gap-3 cursor-pointer bg-emerald-950/30 border border-emerald-900/60 rounded-xl p-3">
+            <input type="checkbox" checked={createOffer} onChange={e => setCreateOffer(e.target.checked)} className="w-5 h-5 mt-0.5 accent-emerald-500 flex-shrink-0" />
+            <span className="text-sm text-emerald-100">أنشئ العرض تلقائياً وفعّله خلال هذه الفترة فقط
+              <span className="block text-xs text-emerald-200/70">يظهر في نافذة التجديد من تاريخ البدء، ويختفي بعد الانتهاء.</span></span>
+          </label>
+        )}
+        {idea?.segment && <p className="text-sm text-slate-300 bg-slate-800/60 rounded-xl p-3">هذه حملة: عند الموعد اضغط «افتح الحملة» في بند الخطة لإرسال الرسائل بالدور.</p>}
+        {error && <p role="alert" className="text-sm text-rose-200 bg-rose-950/50 border border-rose-800 rounded-xl px-3 py-2">{error}</p>}
+        <button type="button" onClick={submit} className="w-full min-h-12 rounded-xl bg-cyan-600 text-white font-semibold cursor-pointer">حفظ في الخطة</button>
+      </div>
     </div>
   );
 };
@@ -99,7 +383,7 @@ function promoStatus(p: Promotion, today: string): { text: string; cls: string }
   return { text: 'فعّال', cls: 'bg-emerald-500/15 text-emerald-200' };
 }
 
-const OffersTab: React.FC<MarketingViewProps> = ({ settings, payments, currentUser, onSaveSettings }) => {
+const OffersTab: React.FC<MarketingViewProps> = ({ settings, payments, providers, currentUser, onSaveSettings }) => {
   const isAdmin = currentUser.role === 'admin';
   const promos = settings.promotions || [];
   const today = todayStr();
@@ -173,6 +457,7 @@ const OffersTab: React.FC<MarketingViewProps> = ({ settings, payments, currentUs
       {editing && (
         <PromoEditor
           initial={editing}
+          providers={providers}
           onClose={() => setEditing(null)}
           onSave={p => {
             const exists = promos.some(x => x.id === p.id);
@@ -185,16 +470,27 @@ const OffersTab: React.FC<MarketingViewProps> = ({ settings, payments, currentUs
   );
 };
 
-const PromoEditor: React.FC<{ initial: Promotion; onClose: () => void; onSave: (p: Promotion) => void }> = ({ initial, onClose, onSave }) => {
+const PromoEditor: React.FC<{ initial: Promotion; providers: UpstreamProvider[]; onClose: () => void; onSave: (p: Promotion) => void }> = ({ initial, providers, onClose, onSave }) => {
   useEscapeKey(onClose);
   const [p, setP] = useState<Promotion>(initial);
   const set = <K extends keyof Promotion>(k: K, v: Promotion[K]) => setP(prev => ({ ...prev, [k]: v }));
+  const isNew = p.kind === 'new_price';
+  // الباقات المعروفة (بالاسم، مع سعرها العادي) لعرض المشتركين الجدد
+  const plans = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const pr of providers) for (const pl of pr.plans) if (!m.has(pl.name)) m.set(pl.name, pl.defaultSalePrice);
+    for (const r of p.planPrices || []) if (!m.has(r.planName)) m.set(r.planName, 0);
+    return [...m.entries()].map(([name, sale]) => ({ name, sale }));
+  }, [providers, p.planPrices]);
+  const priceOf = (name: string) => p.planPrices?.find(r => r.planName === name)?.price;
+  const setPrice = (name: string, price: number) => set('planPrices', [...(p.planPrices || []).filter(r => r.planName !== name), ...(price > 0 ? [{ planName: name, price }] : [])]);
   const valueLabel = p.kind === 'free_months' ? 'عدد الأشهر المجانية' : p.kind === 'discount_amount' ? 'قيمة الخصم (دينار)' : 'نسبة الخصم (%)';
-  const valid = p.name.trim() && p.value > 0 && (!p.endDate || !p.startDate || p.endDate >= p.startDate) && (p.kind !== 'discount_percent' || p.value <= 100);
+  const valid = p.name.trim() && (isNew ? (p.planPrices || []).some(r => r.price > 0) : p.value > 0) && (!p.endDate || !p.startDate || p.endDate >= p.startDate) && (p.kind !== 'discount_percent' || p.value <= 100);
   const kinds: Array<{ id: PromoKind; label: string }> = [
     { id: 'free_months', label: 'أشهر مجانية' },
     { id: 'discount_amount', label: 'خصم بالدينار' },
     { id: 'discount_percent', label: 'خصم بالنسبة' },
+    { id: 'new_price', label: 'سعر للجدد' },
   ];
   return (
     <div className="app-overlay fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-sm" onClick={onClose}>
@@ -211,14 +507,27 @@ const PromoEditor: React.FC<{ initial: Promotion; onClose: () => void; onSave: (
         </label>
         <div>
           <span className="block text-sm font-semibold text-slate-300 mb-1">نوع العرض</span>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {kinds.map(k => (
-              <button key={k.id} type="button" onClick={() => set('kind', k.id)} aria-pressed={p.kind === k.id}
+              <button key={k.id} type="button" onClick={() => setP(prev => ({ ...prev, kind: k.id, ...(k.id === 'new_price' ? { value: 1, minMonths: 1, earlyOnly: false } : {}) }))} aria-pressed={p.kind === k.id}
                 className={`min-h-12 rounded-xl border-2 text-sm font-semibold cursor-pointer ${p.kind === k.id ? 'bg-cyan-500/15 border-cyan-500 text-cyan-100' : 'bg-slate-950 border-slate-700 text-slate-300'}`}>{k.label}</button>
             ))}
           </div>
         </div>
+        {isNew && (
+          <div className="space-y-2">
+            <p className="text-sm font-semibold text-slate-300">سعر الشهر الأول للمشترك الجديد (اترك الحقل فارغاً للباقات غير المشمولة)</p>
+            {plans.map(pl => (
+              <label key={pl.name} className="flex items-center gap-3">
+                <span className="flex-1 text-sm text-slate-200">{pl.name}{pl.sale ? <span className="text-slate-400"> (عادةً {pl.sale.toLocaleString('en-US')})</span> : null}</span>
+                <input type="number" inputMode="numeric" min={0} step={250} value={priceOf(pl.name) || ''} onChange={e => setPrice(pl.name, Number(e.target.value))} aria-label={`سعر ${pl.name} للجدد`}
+                  className="w-32 h-11 bg-slate-950 border border-slate-700 rounded-xl px-3 text-white font-mono focus:outline-none focus:border-cyan-500" />
+              </label>
+            ))}
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-3">
+          {!isNew && <>
           <label className="block">
             <span className="block text-sm font-semibold text-slate-300 mb-1">أقل مدة تجديد</span>
             <select value={p.minMonths} onChange={e => set('minMonths', Number(e.target.value))} className="w-full h-12 bg-slate-950 border border-slate-700 rounded-xl px-3 text-white">
@@ -230,6 +539,7 @@ const PromoEditor: React.FC<{ initial: Promotion; onClose: () => void; onSave: (
             <input type="number" inputMode="numeric" min={1} max={p.kind === 'discount_percent' ? 100 : undefined} value={p.value || ''} onChange={e => set('value', Number(e.target.value))}
               className="w-full h-12 bg-slate-950 border border-slate-700 rounded-xl px-3 text-white font-mono focus:outline-none focus:border-cyan-500" />
           </label>
+          </>}
           <label className="block">
             <span className="block text-sm font-semibold text-slate-300 mb-1">يبدأ</span>
             <input type="date" value={p.startDate || ''} onChange={e => set('startDate', e.target.value || undefined)} className="w-full h-12 bg-slate-950 border border-slate-700 rounded-xl px-3 text-white" />
@@ -239,11 +549,12 @@ const PromoEditor: React.FC<{ initial: Promotion; onClose: () => void; onSave: (
             <input type="date" value={p.endDate || ''} onChange={e => set('endDate', e.target.value || undefined)} className="w-full h-12 bg-slate-950 border border-slate-700 rounded-xl px-3 text-white" />
           </label>
         </div>
-        <label className="flex items-center gap-3 cursor-pointer">
+        {!isNew && <label className="flex items-center gap-3 cursor-pointer">
           <input type="checkbox" checked={!!p.earlyOnly} onChange={e => set('earlyOnly', e.target.checked)} className="w-5 h-5 accent-cyan-500" />
           <span className="text-sm text-slate-200">فقط لمن يجدد قبل انتهاء اشتراكه (تشجيع التجديد المبكر)</span>
-        </label>
+        </label>}
         <p className="text-sm text-emerald-200 bg-emerald-950/30 border border-emerald-900/60 rounded-xl px-3 py-2">{p.value > 0 ? describePromotion(p) : 'أدخل قيمة العرض'}</p>
+        {isNew && <p className="text-xs text-slate-400">يظهر عند «إضافة مشترك» فقط، لا في التجديد.</p>}
         <button type="button" disabled={!valid} onClick={() => onSave({ ...p, name: p.name.trim(), id: p.id || uid('promo'), createdAt: p.createdAt || new Date().toISOString() })}
           className="w-full min-h-12 rounded-xl bg-cyan-600 text-white font-semibold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
           حفظ العرض
@@ -255,10 +566,10 @@ const PromoEditor: React.FC<{ initial: Promotion; onClose: () => void; onSave: (
 
 // ---------------- حملات واتساب ----------------
 
-const CampaignsTab: React.FC<MarketingViewProps> = ({ subscribers, payments, providers, settings, currentUser, onSaveSettings, onOpenProfile }) => {
+const CampaignsTab: React.FC<MarketingViewProps & { initialSegment?: SegmentId }> = ({ subscribers, payments, providers, settings, currentUser, onSaveSettings, onOpenProfile, initialSegment }) => {
   const isAdmin = currentUser.role === 'admin';
   const today = todayStr();
-  const [segment, setSegment] = useState<SegmentId>('lost');
+  const [segment, setSegment] = useState<SegmentId>(initialSegment ?? 'lost');
   const [tower, setTower] = useState('all');
   const [sent, setSent] = useState<Record<string, Record<string, string>>>(() => readJson(SENT_KEY, {}));
   const [templates, setTemplates] = useState<Record<string, string>>(() => readJson(TPL_KEY, {}));
@@ -280,7 +591,11 @@ const CampaignsTab: React.FC<MarketingViewProps> = ({ subscribers, payments, pro
 
   // أفضل عرض فعّال اليوم (يُذكر في رسائل الاسترجاع والشكر)
   const bestOffer = (settings.promotions || []).find(p => isPromotionApplicable(p, { months: Math.max(1, p.minMonths), salePrice: 40000, today, expiryDate: today }));
-  const offerLine = bestOffer ? `🎁 عرض خاص: ${bestOffer.name} (${describePromotion(bestOffer)})` : '';
+  // للأوفياء: عرض المشتركين الجدد ليخبروا أصدقاءهم وجيرانهم
+  const newOffer = segment === 'loyal' ? (settings.promotions || []).find(p => p.kind === 'new_price' && p.active && !(p.startDate && today < p.startDate) && !(p.endDate && today > p.endDate)) : undefined;
+  const offerLine = newOffer
+    ? `🎁 لأصدقائك وجيرانك: ${describePromotion(newOffer)}`
+    : bestOffer ? `🎁 عرض خاص: ${bestOffer.name} (${describePromotion(bestOffer)})` : '';
   const messageFor = (s: Subscriber) => fillTemplate(template, {
     'الاسم': s.name.split(' ')[0] || s.name,
     'الشبكة': settings.ispName,

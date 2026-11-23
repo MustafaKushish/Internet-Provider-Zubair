@@ -34,6 +34,14 @@ UI is **Arabic, RTL**. README, chat replies to the owner: **German**. Commit mes
   daily limit + 7-day cool-down, device-local history; referrals). Pure logic: `utils/marketing.ts` (segments lost/loyal/
   upgrade/tower, `pendingReferrals`, `referralBoard`, `fillTemplate`). Subscriber fields `referredBy`, `referralRewarded`,
   `noMarketing` (opt-out, also excluded from campaigns). Renewal dialog shows offers + upsell hint + referral bonus days.
+- Marketing plan (first tab «التخطيط»): `utils/marketingPlan.ts` = readable idea library (`ACTION_IDEAS`, Arabic texts),
+  `upcomingOccasions` (Ramadan/Eids via `Intl` islamic-umalqura, approximate; school start fixed), plan items in
+  `settings.marketingPlan` (admin edits). Adding an offer idea can create a dated, linked promotion. Header badge =
+  `planAlertCount` (items starting within 3 days).
+- Year plan: `buildYearPlan(year)` / `missingYearPlan` (items carry `templateKey`, starts with December of the previous year).
+  Offer kind `new_price` (`planPrices`, first month only, new subscribers only, never at renewal): `newCustomerDiscount`/
+  `bestNewCustomerOffer` in `shared/promotions.ts`; `SubscriberModal` stores `cycleDiscount`+`cyclePromotionId`; worker
+  `newCustomerViolation` checks non-admin creates. Subscriber field `switchedFrom` = came from a competitor.
 - `shared/access.ts` — roles, tab access, collection rules (`COLLECTION_RULES`, `HIDDEN_FROM`). Used by UI **and**
   worker; edit only here. Don't import from `src`/`worker` in it.
 - `src/components/views/*View.tsx` — one per tab; `SimpleHomeView` = simple mode home.

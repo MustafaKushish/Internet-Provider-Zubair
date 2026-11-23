@@ -5,6 +5,7 @@ import { getRemainingDebt } from '../utils/storage';
 import { Subscriber, UpstreamProvider, StaffUser } from '../types/isp';
 import { X, Key, Eye, EyeOff, Sparkles, Calendar, DollarSign, TowerControl, Phone, User, ShieldCheck, Wrench } from 'lucide-react';
 import { BackButton } from './ui/BackButton';
+import { bestNewCustomerOffer, type Promotion } from '../../shared/promotions';
 
 interface SubscriberModalProps {
   isOpen: boolean;
@@ -15,6 +16,8 @@ interface SubscriberModalProps {
   towers: string[];
   /** للاختيار في «جاء عن طريق» (دعوة الأصدقاء) */
   subscribers?: Subscriber[];
+  /** عروض المشتركين الجدد والمنتقلين (سعر خاص للشهر الأول) */
+  promotions?: Promotion[];
   currentUser?: StaffUser;
   onOpenManageProviders?: () => void;
 }
@@ -27,6 +30,7 @@ export const SubscriberModal: React.FC<SubscriberModalProps> = ({
   providers,
   towers,
   subscribers = [],
+  promotions = [],
   currentUser,
   onOpenManageProviders,
 }) => {
@@ -49,6 +53,9 @@ export const SubscriberModal: React.FC<SubscriberModalProps> = ({
   const [address, setAddress] = useState('');
   const [notes, setNotes] = useState('');
   const [referredByName, setReferredByName] = useState('');
+  const [switched, setSwitched] = useState(false);
+  const [switchedFrom, setSwitchedFrom] = useState('');
+  const [applyOffer, setApplyOffer] = useState(true);
 
   // Prepopulate when editing or opening
   useEffect(() => {
@@ -70,6 +77,8 @@ export const SubscriberModal: React.FC<SubscriberModalProps> = ({
       setMacAddress(subscriberToEdit.macAddress || '');
       setAddress(subscriberToEdit.address || '');
       setNotes(subscriberToEdit.notes || '');
+      setSwitched(!!subscriberToEdit.switchedFrom);
+      setSwitchedFrom(subscriberToEdit.switchedFrom && subscriberToEdit.switchedFrom !== 'شبكة أخرى' ? subscriberToEdit.switchedFrom : '');
     } else {
       // Default new subscriber
       setName('');
@@ -104,6 +113,9 @@ export const SubscriberModal: React.FC<SubscriberModalProps> = ({
       setAddress('');
       setNotes('');
       setReferredByName('');
+      setSwitched(false);
+      setSwitchedFrom('');
+      setApplyOffer(true);
     }
     // يُملأ النموذج عند الفتح فقط؛ تحديثات المزامنة لا تمسح ما يكتبه المستخدم
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -150,11 +162,21 @@ export const SubscriberModal: React.FC<SubscriberModalProps> = ({
     setExpiryDate(addMonthsToDateStr(startDate || todayStr(), months));
   };
 
-  const netProfit = salePrice - costPrice;
+  // عرض المشتركين الجدد والمنتقلين: سعر خاص للشهر الأول (للتسجيل الجديد فقط، الخصم يُحفظ في cycleDiscount)
+  const offer = subscriberToEdit ? null : bestNewCustomerOffer(promotions, { planName, salePrice: Number(salePrice) || 0, today: todayStr() });
+  const discount = offer && applyOffer ? offer.discount : 0;
+  // المبلغ المسدد يتبع السعر بعد العرض عند تغيير الباقة أو تفعيل/إلغاء العرض
+  useEffect(() => {
+    if (!isOpen || subscriberToEdit) return;
+    setPaidAmount(Math.max(0, (Number(salePrice) || 0) - discount));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [discount, salePrice, isOpen]);
+
+  const netProfit = salePrice - discount - costPrice;
   // عند التعديل نعرض المتبقي الفعلي للدورة (يشمل الأشهر المتعددة والدين المرحّل)
   const remainingDebt = subscriberToEdit
     ? getRemainingDebt({ ...subscriberToEdit, salePrice: Number(salePrice) || 0 })
-    : Math.max(0, salePrice - paidAmount);
+    : Math.max(0, salePrice - discount - paidAmount);
 
   // «جاء عن طريق»: يُختار من أسماء المشتركين الحاليين (غير المشترك نفسه)
   const referrer = referredByName.trim()
@@ -185,6 +207,8 @@ export const SubscriberModal: React.FC<SubscriberModalProps> = ({
       notes: notes.trim(),
       lastPaymentDate: paidAmount > 0 ? (subscriberToEdit?.lastPaymentDate || startDate) : undefined,
       referredBy: referrer?.id,
+      switchedFrom: switched ? (switchedFrom.trim() || 'شبكة أخرى') : undefined,
+      ...(offer && discount > 0 ? { cycleDiscount: discount, cyclePromotionId: offer.promo.id } : {}),
     });
 
     onClose();
@@ -451,6 +475,23 @@ export const SubscriberModal: React.FC<SubscriberModalProps> = ({
                     </span>
                   )}
                 </div>
+
+                {offer && (
+                  <div role="group" aria-label="عرض المشتركين الجدد" className="w-full rounded-xl border border-cyan-500/40 bg-cyan-500/10 p-3 text-sm">
+                    <label className="flex items-start gap-2 cursor-pointer">
+                      <input type="checkbox" checked={applyOffer} onChange={e => setApplyOffer(e.target.checked)} className="mt-1 h-4 w-4 accent-cyan-500" />
+                      <span>
+                        <span className="font-bold text-cyan-200">طبّق العرض: {offer.promo.name}</span>
+                        <span className="block text-slate-300 mt-0.5">
+                          الشهر الأول بـ {offer.price.toLocaleString()} د.ع بدل {Number(salePrice).toLocaleString()} (توفير {offer.discount.toLocaleString()} د.ع). من الشهر الثاني يعود السعر العادي.
+                        </span>
+                        {offer.price <= costPrice && (
+                          <span className="block text-amber-300 mt-0.5">تنبيه: سعر العرض لا يترك ربحاً في الشهر الأول (الكلفة {costPrice.toLocaleString()} د.ع).</span>
+                        )}
+                      </span>
+                    </label>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -577,6 +618,25 @@ export const SubscriberModal: React.FC<SubscriberModalProps> = ({
                 <p className={`text-xs mt-1 ${referrer ? 'text-emerald-300' : 'text-amber-300'}`}>
                   {referrer ? `سيحصل ${referrer.name} على مكافأة بعد أن يدفع هذا المشترك.` : 'اختر اسماً من القائمة كما هو مكتوب.'}
                 </p>
+              )}
+            </div>
+
+            <div className="sm:col-span-4">
+              <label className="flex items-center gap-2 text-sm text-slate-200 cursor-pointer">
+                <input type="checkbox" checked={switched} onChange={e => setSwitched(e.target.checked)} className="h-4 w-4 accent-cyan-500" />
+                انتقل إلينا من شبكة أخرى
+              </label>
+              {switched && (
+                <div className="mt-2">
+                  <label htmlFor="sub-switched-from" className="block text-xs font-semibold text-slate-300 mb-1">اسم الشبكة السابقة (اختياري)</label>
+                  <input
+                    id="sub-switched-from"
+                    value={switchedFrom}
+                    onChange={(e) => setSwitchedFrom(e.target.value)}
+                    placeholder="مثلاً: شبكة الحي"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
               )}
             </div>
 

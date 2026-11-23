@@ -39,6 +39,7 @@ export interface Subscriber {
   referredBy?: string;     // معرّف المشترك الذي دعاه (دعوة الأصدقاء)
   referralRewarded?: boolean; // هل حصل الداعي على مكافأته عن هذا المشترك
   noMarketing?: boolean;   // لا يرغب برسائل العروض
+  switchedFrom?: string;   // انتقل إلينا من شبكة أخرى (اسمها إن عُرف، أو «شبكة أخرى»)
   promiseDate?: string;    // وعد المشترك بالتسديد في هذا التاريخ (صفحة الديون)
   promiseSetAt?: string;   // تاريخ تسجيل الوعد: أي دفعة بعده تعني أنه وفى
   cycleMonths?: number;    // عدد أشهر الدورة الحالية (افتراضياً 1)
@@ -170,11 +171,27 @@ export interface SystemSettings {
   monthlyTarget?: number;  // هدف التحصيل الشهري (لوحة المؤشرات)
   advisorNotes?: string;   // «معلومات عملي» للمستشار: كلف، منافسون، سعة الأبراج، أهداف (بدون بيانات شخصية)
   promotions?: Promotion[];      // العروض (يديرها المدير)
+  marketingPlan?: PlanItem[];    // خطة التسويق (يديرها المدير، يقرؤها المكتب)
   referralRewardDays?: number;   // أيام مجانية للداعي عن كل مشترك جديد يدفع
   marketingDailyLimit?: number;  // حد رسائل العروض يومياً (حماية رقم الواتساب)
 }
 
 import type { Promotion } from '../../shared/promotions';
+
+/** بند في خطة التسويق: فكرة من المكتبة (أو مخصصة) بتاريخ بدء وانتهاء */
+export interface PlanItem {
+  id: string;
+  ideaId: string;            // معرّف الفكرة في المكتبة، أو 'custom'
+  title: string;
+  startDate: string;         // YYYY-MM-DD
+  endDate?: string;
+  note?: string;
+  promotionId?: string;      // العرض الذي أنشأته الخطة تلقائياً لهذا البند
+  segment?: 'lost' | 'loyal' | 'upgrade' | 'tower'; // للحملات: الفئة المستهدفة
+  skipped?: boolean;         // قرّر المدير عدم تنفيذه
+  templateKey?: string;      // من الخطة الجاهزة (يمنع إضافتها مرتين)
+  createdAt: string;
+}
 export type { Promotion } from '../../shared/promotions';
 
 export type ReportPeriod = 'this_month' | 'last_month' | 'this_quarter' | 'last_quarter' | 'this_year' | 'custom';
