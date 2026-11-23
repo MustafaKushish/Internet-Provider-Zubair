@@ -3,6 +3,9 @@
 ISP manager for شبكة أولاد كشيش (Basra, Zubair): subscribers, renewals, debts, towers, cash.
 UI is **Arabic, RTL**. README, chat replies to the owner: **German**. Commit messages: English.
 
+## Workflow
+- After every finished piece of work: commit, push and open (or update) the pull request right away, without asking. Don't offer to watch it.
+
 ## Save tokens
 - Never read `package-lock.json`, `dist/`, `dist-preview/`, `.wrangler/`, `node_modules/`.
 - `src/App.tsx` (~1600 lines) and the views are big: `grep -n` first, then read only the needed line range.
