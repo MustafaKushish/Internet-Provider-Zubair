@@ -1,8 +1,10 @@
 import React from 'react';
-import { Bell, BellOff, LayoutGrid, LogOut, Plus, Search, Wifi, ChevronRight } from 'lucide-react';
+import { LayoutGrid, LogOut, Plus, Search, Wifi, ChevronRight } from 'lucide-react';
 import { LazyMotion, MotionConfig } from 'motion/react';
 import * as m from 'motion/react-m';
 import { StaffUser } from '../types/isp';
+import { NotificationBell } from './NotificationBell';
+import type { AlertGroup } from '../utils/alerts';
 import { NAV_GROUPS, TAB_LABEL, firstTab, groupOf, tabsFor, visibleGroups, type NavGroup } from './nav';
 
 export { TAB_ORDER } from './nav';
@@ -27,6 +29,8 @@ interface HeaderProps {
   onLogout: () => void;
   notificationsOn: boolean;
   onBell: () => void;
+  /** تنبيهات «الآن» في نافذة الجرس */
+  alerts: AlertGroup[];
   /** الوضع البسيط: رأس صغير بدون أقسام */
   simpleMode?: boolean;
   onToggleSimpleMode?: () => void;
@@ -46,6 +50,7 @@ export const Header: React.FC<HeaderProps> = ({
   onLogout,
   notificationsOn,
   onBell,
+  alerts,
   simpleMode,
   onToggleSimpleMode,
   planAlerts = 0,
@@ -58,16 +63,7 @@ export const Header: React.FC<HeaderProps> = ({
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   const bellBtn = (big = false) => (
-    <button
-      type="button"
-      onClick={onBell}
-      aria-label={notificationsOn ? 'الإشعارات مفعلة: فحص التنبيهات الآن' : 'تفعيل الإشعارات'}
-      title={notificationsOn ? 'الإشعارات مفعلة' : 'تفعيل الإشعارات'}
-      className={`${big ? 'h-12 px-3 sm:px-4 gap-2 text-base font-semibold' : 'w-11 h-11 justify-center'} rounded-xl bg-slate-800 border border-slate-700 text-slate-100 flex items-center cursor-pointer hover:bg-slate-700`}
-    >
-      {notificationsOn ? <Bell className="w-5 h-5 text-emerald-300" /> : <BellOff className="w-5 h-5 text-amber-300" />}
-      {big && (notificationsOn ? 'الإشعارات' : 'فعّل الإشعارات')}
-    </button>
+    <NotificationBell alerts={alerts} onOpenTab={setActiveTab} deviceOn={notificationsOn} onEnableDevice={onBell} big={big} />
   );
 
   if (simpleMode) {

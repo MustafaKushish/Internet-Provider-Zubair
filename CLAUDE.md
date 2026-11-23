@@ -34,7 +34,9 @@ UI is **Arabic, RTL**. README, chat replies to the owner: **German**. Commit mes
   + 60 min idle lock. Background notifications = Web Push without a payload: `worker/push.ts` (daily cron in
   `wrangler*.jsonc`, VAPID keys auto-created in `meta`, table `push_subs`), `shared/digest.ts` (counts only, no names) and
   `shared/vapid.ts`; `public/sw.js` fetches `/api/push/digest` on `push`; `src/utils/push.ts` subscribes (bell button).
-  Only admin/accountant receive pushes. Local test: `wrangler dev --test-scheduled`, trigger `/cdn-cgi/handler/scheduled?cron=...`.
+  Only admin/accountant receive pushes. Bell = `components/NotificationBell.tsx` (popover portaled to body): grouped
+  «now» alerts from pure `utils/alerts.ts` (one line per kind, not per subscriber) + log of every `notify()` in
+  `utils/notificationCenter.ts` (device-local, merges repeats) + device-push row. Toasts: max 2, no duplicates. Local test: `wrangler dev --test-scheduled`, trigger `/cdn-cgi/handler/scheduled?cron=...`.
 - Marketing tab `views/MarketingView.tsx` (offers in `settings.promotions`, admin edits; WhatsApp campaigns by segment with
   daily limit + 7-day cool-down, device-local history; referrals). Pure logic: `utils/marketing.ts` (segments lost/loyal/
   upgrade/tower, `pendingReferrals`, `referralBoard`, `fillTemplate`). Subscriber fields `referredBy`, `referralRewarded`,
@@ -87,7 +89,8 @@ UI is **Arabic, RTL**. README, chat replies to the owner: **German**. Commit mes
 - Glass design lives in `src/index.css` ("التصميم الزجاجي"): Tailwind `slate-900/800/700` are redefined as translucent, so
   `bg-slate-900` = glass card, `bg-slate-800` = glass chip/button, `border-slate-700` = soft white border. Don't use
   `text-slate-700..900` outside `.bg-white` paper (it would be translucent). `bg-slate-950` stays opaque (inputs, page).
-  Blur only on header, bottom nav and dialogs (performance). Primary `bg-cyan/emerald/indigo-600|700` buttons get gradients.
+  Blur only on header, bottom nav and dialogs (performance). One glass surface for all windows (`--glass-*` vars:
+  every `.app-overlay > *`, `.glass-popover`, `.glass-toast`); don't give dialogs their own border colors/radius. Primary `bg-cyan/emerald/indigo-600|700` buttons get gradients.
 - Color meaning: cyan = brand/primary, rose = expired/danger only, amber = expiring soon or debt, emerald = active/paid.
   Show a status color once per row (pill), keep avatars/secondary buttons neutral. Logout is neutral with a rose icon.
 - Motion: transform/opacity only, honor `prefers-reduced-motion` (already global in `index.css`).

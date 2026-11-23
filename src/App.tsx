@@ -102,6 +102,7 @@ import { splitImportDuplicates } from './utils/importDedupe';
 import { applyDebtAdjustment, buildPayment, buildRenewal, reversePayment, type RenewalInput } from './utils/ledger';
 import { pendingReferrals } from './utils/marketing';
 import { planAlertCount } from './utils/marketingPlan';
+import { buildAlerts } from './utils/alerts';
 import { DebtModal } from './components/DebtModal';
 import { appConfirm, notify } from './components/ui/Dialogs';
 
@@ -1082,6 +1083,13 @@ export default function App() {
 
   // الجرس وتثبيت التطبيق (الرأس وصفحة «المزيد»)
   const device = useDeviceActions(currentUser, () => checkAndTriggerExpiryNotifications(subscribers, settings, true));
+  // نافذة الجرس: تنبيهات مجمّعة حسب ما يحق للمستخدم رؤيته
+  const bellAlerts = React.useMemo(() => buildAlerts(subscribers, tickets, {
+    today: todayStr(),
+    warningDays: settings.warningDaysBeforeExpiry || 3,
+    showMoney: currentUser.role !== 'technician',
+    planItems: settings.marketingPlan,
+  }).filter(a => canAccessTab(currentUser.role, a.tab)), [subscribers, tickets, settings.warningDaysBeforeExpiry, settings.marketingPlan, currentUser.role]);
   const openWhatsApp = (sub: Subscriber, tab?: 'debt' | 'expired' | 'expiry') => {
     setSubscriberForWhatsApp(sub);
     setWhatsAppDefaultTab(tab || (getRemainingDebt(sub) > 0 ? 'debt' : getDaysRemaining(sub.expiryDate) < 0 ? 'expired' : 'expiry'));
@@ -1129,6 +1137,7 @@ export default function App() {
         }}
         notificationsOn={device.permission === 'granted'}
         onBell={() => { void device.enableNotifications(); }}
+        alerts={bellAlerts}
         onOpenLoginModal={() => setIsLoginModalOpen(true)}
         onOpenSearch={() => setIsQuickSearchOpen(true)}
         onLogout={handleLogout}
