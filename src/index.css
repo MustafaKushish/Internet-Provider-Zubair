@@ -333,13 +333,43 @@ nav.fixed {
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
 }
-.app-overlay > [class*='bg-slate-900'] {
-  background-color: rgb(15 23 42 / 0.74);
-  border-color: rgb(255 255 255 / 0.16);
-  -webkit-backdrop-filter: blur(28px) saturate(170%);
-  backdrop-filter: blur(28px) saturate(170%);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.12), 0 30px 70px -20px rgb(0 0 0 / 0.7);
+/*
+ * سطح زجاجي واحد لكل النوافذ: الحوارات، نافذة الجرس، الإشعارات اللحظية.
+ * (كل نافذة = أول عنصر داخل .app-overlay، فلا حاجة لتعديل كل مكوّن)
+ */
+:root {
+  --glass-bg: rgb(15 23 42 / 0.74);
+  --glass-border: rgb(255 255 255 / 0.16);
+  --glass-blur: blur(28px) saturate(170%);
+  --glass-shadow: inset 0 1px 0 rgb(255 255 255 / 0.12), 0 30px 70px -20px rgb(0 0 0 / 0.7);
+  --glass-sheen: linear-gradient(160deg, rgb(255 255 255 / 0.08), transparent 45%);
 }
+.app-overlay.app-overlay > *, /* مكررة لتغلب قاعدة البطاقات أعلاه */
+.glass-popover,
+.glass-toast {
+  background-color: var(--glass-bg);
+  background-image: var(--glass-sheen);
+  border: 1px solid var(--glass-border);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-shadow);
+}
+/* شريط عنوان النافذة: نفس الشكل في كل الحوارات */
+.app-overlay > * > div:first-child[class*='border-b'] {
+  background-color: rgb(255 255 255 / 0.04);
+  background-image: none;
+  border-color: rgb(255 255 255 / 0.1);
+}
+.glass-toast-error { --glass-bg: rgb(76 5 25 / 0.78); --glass-border: rgb(251 113 133 / 0.35); }
+.popover-enter { animation: pop-in 0.2s var(--ease-out-expo) both; transform-origin: top left; }
+@keyframes bell-ring {
+  0%, 100% { transform: rotate(0); }
+  15% { transform: rotate(14deg); }
+  30% { transform: rotate(-12deg); }
+  45% { transform: rotate(8deg); }
+  60% { transform: rotate(-5deg); }
+}
+.bell-ring { animation: bell-ring 1s ease-in-out 2; transform-origin: top center; }
 
 /* الأزرار الرئيسية: تدرج لامع بنفس التباين (أبيض فوق ألوان داكنة ≥ 5:1) */
 button.bg-cyan-600, button.bg-cyan-700 {
@@ -366,11 +396,11 @@ button.bg-indigo-600, button.bg-indigo-700 {
     --color-slate-700: #334155;
   }
   .app-aurora { display: none; }
-  header, nav.fixed, .app-overlay, .app-overlay > [class*='bg-slate-900'] {
+  header, nav.fixed, .app-overlay, .app-overlay > *, .glass-popover, .glass-toast {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
-  .app-overlay > [class*='bg-slate-900'] { background-color: #0f172a; }
+  :root { --glass-bg: #0f172a; --glass-sheen: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

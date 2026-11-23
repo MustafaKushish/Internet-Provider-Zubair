@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Info, X } from 'lucide-react';
 import { registerBackClose } from './backStack';
+import { logNotice } from '../../utils/notificationCenter';
 
 /**
  * نوافذ تأكيد وتنبيهات داخل المنظومة بدلاً من confirm() و alert() الخاصة بالمتصفح
@@ -51,15 +52,18 @@ export function appConfirm(
   });
 }
 
+/** إشعار قصير يظهر لحظياً ويُحفظ في نافذة الجرس */
 export function notify(message: string, tone: Tone = 'info'): void {
+  logNotice(message, tone);
   if (pushToast) pushToast({ id: ++seq, message, tone });
 }
 
+// زجاج موحّد؛ اللون في الأيقونة والشريط فقط
 const TOAST_STYLE: Record<Tone, string> = {
-  info: 'border-cyan-800 bg-cyan-950/95 text-cyan-100',
-  success: 'border-emerald-800 bg-emerald-950/95 text-emerald-100',
-  error: 'border-rose-800 bg-rose-950/95 text-rose-100',
-  warning: 'border-amber-800 bg-amber-950/95 text-amber-100',
+  info: 'glass-toast text-slate-100',
+  success: 'glass-toast text-slate-100',
+  error: 'glass-toast glass-toast-error text-rose-50',
+  warning: 'glass-toast text-slate-100',
 };
 
 const TOAST_BAR: Record<Tone, string> = {
@@ -90,8 +94,9 @@ export const DialogHost: React.FC = () => {
   useEffect(() => {
     pushConfirm = r => setQueue(q => [...q, r]);
     pushToast = t => {
-      const ms = Math.min(9000, 3500 + t.message.length * 40);
-      setToasts(list => [...list.slice(-3), { ...t, ms }]);
+      const ms = Math.min(8000, 3000 + t.message.length * 35);
+      // بلا فوضى: نفس الرسالة لا تتكرر، وأقصى حد إشعاران ظاهران (الكل محفوظ في الجرس)
+      setToasts(list => [...list.filter(x => x.message !== t.message).slice(-1), { ...t, ms }]);
       setTimeout(() => dismissToast(t.id), ms);
     };
     return () => {
@@ -171,7 +176,7 @@ export const DialogHost: React.FC = () => {
             <div
               key={t.id}
               role="status"
-              className={`relative overflow-hidden flex items-start gap-2 rounded-xl border px-3 py-2.5 text-xs shadow-2xl shadow-black/40 backdrop-blur-md ${TOAST_STYLE[t.tone]} ${t.leaving ? 'toast-leave' : 'toast-enter'}`}
+              className={`relative overflow-hidden flex items-start gap-2 rounded-2xl px-3.5 py-3 text-sm ${TOAST_STYLE[t.tone]} ${t.leaving ? 'toast-leave' : 'toast-enter'}`}
             >
               {TOAST_ICON[t.tone]}
               <span className="min-w-0 flex-1 whitespace-pre-line leading-relaxed">{t.message}</span>
