@@ -13,6 +13,11 @@ UI is **Arabic, RTL**. README, chat replies to the owner: **German**. Commit mes
   `sas_plus_subscribers_kashish_v1`).
 
 ## Layout
+- Navigation: 5 sections in `src/components/nav.ts` (`NAV_GROUPS`: الرئيسية, المشتركون, المال = debts/cash/reports/dashboard,
+  التسويق = marketing/reminders, المزيد = more page + tickets/towers/advisor/providers/users/settings). Pages (tabs) are unchanged and
+  keep their access rules; a new page needs an entry in a group, `TAB_LABEL` and `TAB_ACCESS`. `SubNav` (in Header) shows the pages
+  of the active section. Start page = `HomeView` (3 numbers + one "today" list from pure `utils/today.ts`); `MoreView` holds device
+  and account actions (simple mode, bell, install, Excel, switch user, logout) via `hooks/useDeviceActions`.
 - `src/App.tsx` — app state, thin handlers (set state + notify), tab routing, simple mode, modals. Views are
   `React.lazy` (`viewLoaders`, preloaded when idle) and receive data + callbacks as props.
 - `src/utils/ledger.ts` — **pure money functions** (`buildRenewal`, `buildPayment`, `applyDebtAdjustment`,

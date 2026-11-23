@@ -135,6 +135,16 @@ Der Windows-Installer ist eine Electron-Hülle (`desktop/`) um dieselbe Adresse.
   **nächsten Verlängerung** (laufende Periode und Schulden bleiben unverändert), zeigt den Mehrumsatz und liefert einen
   fertigen WhatsApp-Ankündigungstext.
 
+## Aufbau der App: 5 Bereiche
+
+- **الرئيسية (Heute):** Startseite mit 3 Zahlen (heute kassiert, laufen diese Woche ab, Schulden) und einer Liste
+  „ما يجب فعله اليوم“: kürzlich abgelaufen → „جدّد“, läuft in 3 Tagen ab → „ذكّره“, Schulden → „طالِب“, offene Meldungen → „افتح“.
+  Techniker sehen keine Geldzahlen.
+- **المشتركون**, **المال** (Schulden, Kasse, Berichte, Kennzahlen als Umschalter), **التسويق** (Plan/Angebote und
+  Verlängerungs-Erinnerungen), **المزيد** (Meldungen, Türme, KI-Berater, Anbieter, Benutzer, Einstellungen, Excel, einfacher
+  Modus, Benachrichtigungen, App installieren, Benutzer wechseln, Abmelden).
+- Kopfzeile: Logo, die 5 Bereiche (am Handy unten), Suche, Glocke, „+ مشترك“, Konto. Alle früheren Seiten sind noch da.
+
 ## Angebote und Marketing („العروض والتسويق“, Admin und Buchhalter)
 
 - **Planung („التخطيط“, erster Reiter):** Eine Bibliothek fertiger Marketing-Ideen zum Lesen (Ziel, wann sinnvoll, was die
