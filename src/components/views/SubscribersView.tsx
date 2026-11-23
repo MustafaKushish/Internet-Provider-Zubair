@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { appConfirm, copyText } from '../ui/Dialogs';
+import { useEscapeKey } from '../ui/useEscapeKey';
+import { BackButton } from '../ui/BackButton';
 import { NO_TOWER_LABEL, normTower } from '../../utils/towers';
 import { matchesSubscriber } from '../../utils/search';
 import { debtInMonths, formatMonthsAr, monthsLate } from '../../utils/debt';
@@ -28,6 +30,7 @@ import {
   TowerControl,
   Server,
   MoreHorizontal,
+  UserRound,
   Archive
 } from 'lucide-react';
 
@@ -102,7 +105,8 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState<number>(PAGE_SIZE);
   const [filtersOpen, setFiltersOpen] = useState(false);   // الهاتف: الفلاتر الإضافية مطوية
-  const [moreActionsFor, setMoreActionsFor] = useState<string | null>(null);
+  // قائمة «⋯»: كل العمليات الثانوية في قائمة واحدة بدل 7 أيقونات في كل سطر
+  const [menuFor, setMenuFor] = useState<string | null>(null);
   const [bulkTower, setBulkTower] = useState('');
 
   // فتح القائمة على برج محدد عند الطلب من تبويب الأبراج
@@ -191,47 +195,26 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
         </>
       );
     }
-    const showAll = !mobile || moreActionsFor === sub.id;
     return (
       <>
         <button onClick={() => onRenew(sub)} title="تجديد الاشتراك فوراً"
           className={`bg-cyan-600 hover:bg-cyan-500 text-white ${pad} rounded-lg transition shadow-md shadow-cyan-600/20 cursor-pointer flex items-center gap-1`}>
           <RefreshCw className={ic} />{label('تجديد')}
         </button>
-        <button onClick={() => onSendWhatsApp(sub, remainingDebt > 0 ? 'debt' : days <= 0 ? 'expired' : 'expiry')} title="إرسال تذكير أو إشعار واتساب"
-          className={`bg-emerald-600 hover:bg-emerald-500 text-white ${pad} rounded-lg transition shadow-md shadow-emerald-600/20 cursor-pointer flex items-center gap-1`}>
+        <button onClick={() => onSendWhatsApp(sub, remainingDebt > 0 ? 'debt' : days <= 0 ? 'expired' : 'expiry')} title="واتساب: تذكير أو إشعار" aria-label="واتساب"
+          className={`${ghost} text-emerald-300`}>
           <MessageSquare className={ic} />{label('واتساب')}
         </button>
-        <button onClick={() => onViewPaymentHistory(sub)} title="عرض سجل المدفوعات والوصولات السابقة"
-          className={`bg-indigo-600/30 hover:bg-indigo-600 text-indigo-300 hover:text-white ${pad} rounded-lg border border-indigo-500/40 transition cursor-pointer flex items-center gap-1`}>
-          <History className={ic} />
+        <button onClick={() => setMenuFor(sub.id)} title="المزيد من العمليات" aria-label={`المزيد من العمليات لـ ${sub.name}`} className={ghost}>
+          <MoreHorizontal className={ic} />
         </button>
-        <button onClick={() => onEdit(sub)} title="تعديل بيانات المشترك والاشتراك" className={ghost}>
-          <Edit className={ic} />
-        </button>
-        {!showAll && (
-          <button onClick={() => setMoreActionsFor(sub.id)} title="المزيد من العمليات" aria-label="المزيد من العمليات" className={ghost}>
-            <MoreHorizontal className={ic} />
-          </button>
-        )}
-        {showAll && (
-          <button onClick={() => onPrintReceipt(sub)} title="طباعة وصل قبض" className={ghost}>
-            <Printer className={ic} />{label('وصل')}
-          </button>
-        )}
-        {showAll && (
-          <button onClick={() => onAddTicketForSubscriber(sub)} title="تسجيل بلاغ عطل لهذا المشترك" className={`${ghost} hover:text-amber-300`}>
-            <Wrench className={ic} />{label('بلاغ')}
-          </button>
-        )}
-        {showAll && currentUser?.role === 'admin' && (
-          <button onClick={() => onDelete(sub.id)} title="حذف المشترك (صلاحية المدير فقط)" className={`${ghost} hover:bg-rose-900/60 hover:text-rose-300 text-slate-400`}>
-            <Trash2 className={ic} />
-          </button>
-        )}
       </>
     );
   };
+
+  // اسم المزود يُكرَّر في كل سطر بلا فائدة إذا كان هناك مزود واحد فقط
+  const multiProvider = useMemo(() => new Set(subscribers.map(x => x.upstreamProvider)).size > 1, [subscribers]);
+  const menuSub = menuFor ? subscribers.find(s => s.id === menuFor) || null : null;
 
   return (
     <div className="space-y-4">
@@ -334,9 +317,9 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
                 className="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1 text-slate-200 focus:outline-none focus:border-cyan-500 font-semibold"
               >
                 <option value="all">كافة الحالات</option>
-                <option value="paid">مسدد بالكامل (Paid)</option>
-                <option value="pending">قيد الدفع / جزئي (Pending)</option>
-                <option value="overdue">متأخر ومستحق (Overdue)</option>
+                <option value="paid">مسدد بالكامل</option>
+                <option value="pending">دفع جزئي</option>
+                <option value="overdue">متأخر ومستحق</option>
               </select>
             </div>
 
@@ -724,10 +707,7 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
                       {/* Provider & Plan */}
                       <td className="py-3 px-3">
                         <div className="font-semibold text-slate-200">{sub.planName}</div>
-                        <div className="text-[11px] text-slate-400 mt-0.5">{sub.upstreamProvider}</div>
-                        <div className="text-[10px] text-slate-500 mt-0.5">
-                          كلفة المزود: {formatCurrency(sub.costPrice, settings.currency)}
-                        </div>
+                        {multiProvider && <div className="text-[11px] text-slate-400 mt-0.5">{sub.upstreamProvider}</div>}
                       </td>
 
                       {/* Columns 4 & 5: Conditional on Role (Technical vs Financial) */}
@@ -769,12 +749,12 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
                             {sub.paymentStatus === 'paid' ? (
                               <span className="inline-flex items-center gap-1 bg-emerald-950/60 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-800/60 font-semibold text-[11px]">
                                 <CheckCircle2 className="w-3 h-3" />
-                                <span>مدفوع (خالص)</span>
+                                <span>مدفوع</span>
                               </span>
                             ) : sub.paymentStatus === 'pending' ? (
                               <div>
                                 <span className="inline-flex items-center gap-1 bg-amber-950/60 text-amber-300 px-2 py-0.5 rounded-full border border-amber-800/60 font-semibold text-[11px]">
-                                  <span>قيد الدفع (جزئي)</span>
+                                  <span>دفع جزئي</span>
                                 </span>
                                 <button type="button" onClick={() => onOpenDebt?.(sub)} title="إدارة الدين"
                                   className="block text-right text-[11px] text-rose-400 font-bold mt-1 hover:underline cursor-pointer">
@@ -786,7 +766,7 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
                               <div>
                                 <span className="inline-flex items-center gap-1 bg-rose-950/70 text-rose-300 px-2 py-0.5 rounded-full border border-rose-800/70 font-semibold text-[11px]">
                                   <XCircle className="w-3 h-3" />
-                                  <span>متأخر (Overdue)</span>
+                                  <span>متأخر</span>
                                 </span>
                                 <button type="button" onClick={() => onOpenDebt?.(sub)} title="إدارة الدين"
                                   className="block text-right text-[11px] text-rose-400 font-bold mt-1 hover:underline cursor-pointer">
@@ -864,6 +844,21 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
           </div>
         </div>
       )}
+      {menuSub && (
+        <RowMenu
+          sub={menuSub}
+          debt={getRemainingDebt(menuSub)}
+          isAdmin={currentUser?.role === 'admin'}
+          onClose={() => setMenuFor(null)}
+          onProfile={() => onOpenProfile?.(menuSub)}
+          onHistory={() => onViewPaymentHistory(menuSub)}
+          onEdit={() => onEdit(menuSub)}
+          onReceipt={() => onPrintReceipt(menuSub)}
+          onTicket={() => onAddTicketForSubscriber(menuSub)}
+          onDebt={() => onOpenDebt?.(menuSub)}
+          onDelete={() => onDelete(menuSub.id)}
+        />
+      )}
     </div>
   );
 };
@@ -873,4 +868,43 @@ const ExpiryChip: React.FC<{ days: number; expiryDate: string }> = ({ days, expi
   if (days > 3) return <span className="flex-shrink-0 text-[10px] font-semibold text-emerald-300 bg-emerald-950/60 border border-emerald-800/60 px-2 py-0.5 rounded-full">متبقي {days} يوم</span>;
   if (days >= 0) return <span className="flex-shrink-0 text-[10px] font-bold text-amber-300 bg-amber-950/70 border border-amber-800 px-2 py-0.5 rounded-full">{days === 0 ? 'ينتهي اليوم' : `متبقي ${days} يوم`}</span>;
   return <span className="flex-shrink-0 text-[10px] font-bold text-rose-300 bg-rose-950/70 border border-rose-800 px-2 py-0.5 rounded-full">متأخر {formatMonthsAr(monthsLate(expiryDate))}</span>;
+};
+
+/** قائمة عمليات المشترك: تنزلق من أسفل الهاتف وتتوسط الشاشة في الحاسوب */
+const RowMenu: React.FC<{
+  sub: Subscriber; debt: number; isAdmin: boolean; onClose: () => void;
+  onProfile: () => void; onHistory: () => void; onEdit: () => void; onReceipt: () => void; onTicket: () => void; onDebt: () => void; onDelete: () => void;
+}> = ({ sub, debt, isAdmin, onClose, onProfile, onHistory, onEdit, onReceipt, onTicket, onDebt, onDelete }) => {
+  useEscapeKey(onClose);
+  const item = (Icon: React.ComponentType<{ className?: string }>, text: string, fn: () => void, tone = 'text-cyan-300') => (
+    <button key={text} type="button" onClick={() => { onClose(); fn(); }}
+      className="w-full min-h-12 flex items-center gap-3 px-3 rounded-xl text-base text-slate-100 hover:bg-white/5 cursor-pointer text-right">
+      <span className={`w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center flex-shrink-0 ${tone}`}><Icon className="w-5 h-5" /></span>
+      {text}
+    </button>
+  );
+  return (
+    <div className="app-overlay fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-950/70 backdrop-blur-sm no-print" onClick={onClose}>
+      <div role="dialog" aria-modal="true" aria-label={`عمليات ${sub.name}`} onClick={e => e.stopPropagation()}
+        className="w-full sm:max-w-sm bg-slate-900 border border-slate-700 rounded-t-3xl sm:rounded-2xl p-4 shadow-2xl"
+        style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}>
+        <div className="flex items-center justify-between gap-3 mb-2">
+          <div className="min-w-0">
+            <h3 className="text-lg font-bold text-white truncate">{sub.name}</h3>
+            <p className="text-sm text-slate-400 truncate">{sub.planName}</p>
+          </div>
+          <BackButton onClick={onClose} />
+        </div>
+        <div className="space-y-0.5">
+          {item(UserRound, 'ملف المشترك والسجل', onProfile)}
+          {debt > 0 && item(AlertCircle, 'إدارة الدين', onDebt, 'text-amber-300')}
+          {item(History, 'سجل الدفعات والوصولات', onHistory)}
+          {item(Edit, 'تعديل البيانات', onEdit)}
+          {item(Printer, 'طباعة وصل', onReceipt)}
+          {item(Wrench, 'تسجيل بلاغ عطل', onTicket, 'text-amber-300')}
+          {isAdmin && item(Trash2, 'حذف المشترك', onDelete, 'text-rose-300')}
+        </div>
+      </div>
+    </div>
+  );
 };

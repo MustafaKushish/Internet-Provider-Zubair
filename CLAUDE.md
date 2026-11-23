@@ -50,6 +50,9 @@ UI is **Arabic, RTL**. README, chat replies to the owner: **German**. Commit mes
 - `shared/access.ts` — roles, tab access, collection rules (`COLLECTION_RULES`, `HIDDEN_FROM`). Used by UI **and**
   worker; edit only here. Don't import from `src`/`worker` in it.
 - `src/components/views/*View.tsx` — one per tab; `SimpleHomeView` = simple mode home.
+- Subscriber rows: only «تجديد», WhatsApp and «⋯» (`RowMenu` in `SubscribersView`: profile, debt, history, edit, receipt, ticket, delete). Keep new
+  per-subscriber actions in that menu. Dashboard: no lists that exist elsewhere (urgent → Home, debtors → Debts, towers → Towers); empty cards are hidden.
+- Labels are Arabic only (no «(Overdue)»/«(Paid)» in the UI).
 - `src/components/*Modal.tsx`, `SubscriberProfile.tsx`, `QuickSearch.tsx`, `Header.tsx` (tabs, mobile bottom nav).
 - `src/components/ui/` — `Dialogs.tsx` (`appConfirm`, `notify` instead of confirm/alert), `overlayExit.ts`, `CountUp`, `ViewLoader`,
   `BackButton` ("رجوع" in every dialog header), `backStack.ts` + `useEscapeKey` (Escape / phone back closes the top dialog;

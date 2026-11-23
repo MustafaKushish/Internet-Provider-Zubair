@@ -151,7 +151,7 @@ ${settings.ispName} - ${settings.contactPhone}`;
                   ? 'bg-amber-950 text-amber-300 border border-amber-800'
                   : 'bg-rose-950 text-rose-300 border border-rose-800'
               }`}>
-                {subscriber.paymentStatus === 'paid' ? 'مدفوع' : subscriber.paymentStatus === 'pending' ? 'قيد الدفع' : 'متأخر (Overdue)'}
+                {subscriber.paymentStatus === 'paid' ? 'مدفوع' : subscriber.paymentStatus === 'pending' ? 'قيد الدفع' : 'متأخر'}
               </span>
             </div>
           </div>
