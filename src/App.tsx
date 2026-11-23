@@ -61,7 +61,8 @@ import {
 } from './data/initialData';
 
 // Components & Modals
-import { Header, TAB_ORDER } from './components/Header';
+import { Header, SubNav, TAB_ORDER } from './components/Header';
+import { useDeviceActions } from './hooks/useDeviceActions';
 import { canAccessTab } from '../shared/access';
 import { ViewLoader } from './components/ui/ViewLoader';
 import { pushTabHistory, setTabBackHandler } from './components/ui/backStack';
@@ -106,6 +107,8 @@ import { appConfirm, notify } from './components/ui/Dialogs';
 
 // الأقسام تُحمَّل عند فتحها فقط (تسريع فتح المنظومة)، وتُحمَّل مسبقاً في وقت الفراغ
 const viewLoaders = {
+  HomeView: () => import('./components/views/HomeView').then(m => ({ default: m.HomeView })),
+  MoreView: () => import('./components/views/MoreView').then(m => ({ default: m.MoreView })),
   MarketingView: () => import('./components/views/MarketingView').then(m => ({ default: m.MarketingView })),
   DebtsView: () => import('./components/views/DebtsView').then(m => ({ default: m.DebtsView })),
   SubscribersView: () => import('./components/views/SubscribersView').then(m => ({ default: m.SubscribersView })),
@@ -118,6 +121,8 @@ const viewLoaders = {
   SettingsView: () => import('./components/views/SettingsView').then(m => ({ default: m.SettingsView })),
   AuditLogView: () => import('./components/views/AuditLogView').then(m => ({ default: m.AuditLogView })),
 };
+const HomeView = React.lazy(viewLoaders.HomeView);
+const MoreView = React.lazy(viewLoaders.MoreView);
 const SubscribersView = React.lazy(viewLoaders.SubscribersView);
 const DebtsView = React.lazy(viewLoaders.DebtsView);
 const MarketingView = React.lazy(viewLoaders.MarketingView);
@@ -164,12 +169,12 @@ export default function App() {
 
   useEffect(preloadViews, []);
 
-  const [activeTab, setActiveTabRaw] = useState<string>('subscribers');
+  const [activeTab, setActiveTabRaw] = useState<string>('home');
   // اتجاه حركة دخول القسم: من جهة التبويب الجديد في شريط التنقل (من اليمين لليسار)
   const [viewDir, setViewDir] = useState<1 | -1>(1);
   // لا يمكن فتح تبويب غير مسموح لدور المستخدم الحالي
   const showTab = (tab: string) => {
-    const next = canAccessTab(currentUser.role, tab) ? tab : 'subscribers';
+    const next = canAccessTab(currentUser.role, tab) ? tab : 'home';
     setViewDir(TAB_ORDER.indexOf(next) >= TAB_ORDER.indexOf(activeTab) ? 1 : -1);
     setActiveTabRaw(next);
     return next;
@@ -184,7 +189,7 @@ export default function App() {
     return () => setTabBackHandler(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const safeActiveTab = canAccessTab(currentUser.role, activeTab) ? activeTab : 'subscribers';
+  const safeActiveTab = canAccessTab(currentUser.role, activeTab) ? activeTab : 'home';
 
   const [isTowerModalOpen, setIsTowerModalOpen] = useState(false);
   const [towerToEdit, setTowerToEdit] = useState<TowerPoint | null>(null);
@@ -300,7 +305,7 @@ export default function App() {
   const handleUnlock = (user: StaffUser) => {
     setCurrentUser(user);
     saveActiveStaffUser(user);
-    setActiveTabRaw('subscribers');
+    setActiveTabRaw('home');
     sessionStorage.setItem('sas_plus_authenticated_session', 'active');
     setIsLocked(false);
     setLockReason(null);
@@ -1075,6 +1080,14 @@ export default function App() {
     notify('تم مسح وتفريغ كافة البيانات بنجاح! المنظومة نظيفة وجاهزة للعمل الفعلي.');
   };
 
+  // الجرس وتثبيت التطبيق (الرأس وصفحة «المزيد»)
+  const device = useDeviceActions(currentUser, () => checkAndTriggerExpiryNotifications(subscribers, settings, true));
+  const openWhatsApp = (sub: Subscriber, tab?: 'debt' | 'expired' | 'expiry') => {
+    setSubscriberForWhatsApp(sub);
+    setWhatsAppDefaultTab(tab || (getRemainingDebt(sub) > 0 ? 'debt' : getDaysRemaining(sub.expiryDate) < 0 ? 'expired' : 'expiry'));
+    setIsWhatsAppModalOpen(true);
+  };
+
   if (isLocked) {
     return (
       <LockScreen
@@ -1107,19 +1120,15 @@ export default function App() {
       <Header
         activeTab={safeActiveTab}
         setActiveTab={setActiveTab}
-        stats={stats}
+        openTickets={stats.openTicketsCount}
         ispName={settings.ispName}
-        contactPhone={settings.contactPhone}
         currentUser={currentUser}
         onOpenAddModal={() => {
           setSubscriberToEdit(null);
           setIsSubscriberModalOpen(true);
         }}
-        onExportExcel={() => exportSubscribersToExcel(subscribers, `${settings.ispName}_مشتركون.xlsx`)}
-        onOpenImportModal={() => setIsImportModalOpen(true)}
-        onTriggerNotificationCheck={() => {
-          checkAndTriggerExpiryNotifications(subscribers, settings, true);
-        }}
+        notificationsOn={device.permission === 'granted'}
+        onBell={() => { void device.enableNotifications(); }}
         onOpenLoginModal={() => setIsLoginModalOpen(true)}
         onOpenSearch={() => setIsQuickSearchOpen(true)}
         onLogout={handleLogout}
@@ -1127,6 +1136,8 @@ export default function App() {
         onToggleSimpleMode={() => setSimpleMode(!simpleMode)}
         planAlerts={currentUser.role === 'technician' ? 0 : planAlertCount(settings.marketingPlan, todayStr())}
       />
+
+      {device.iosHelp}
 
       <QuickSearch
         open={isQuickSearchOpen}
@@ -1219,11 +1230,43 @@ export default function App() {
           </div>
         ) : (
         <React.Suspense fallback={<ViewLoader />}>
+        <SubNav activeTab={safeActiveTab} role={currentUser.role} onSelect={setActiveTab} />
         <div
           key={safeActiveTab}
           className="view-enter"
           style={{ '--view-from': `${viewDir * -24}px` } as React.CSSProperties}
         >
+        {safeActiveTab === 'home' && (
+          <HomeView
+            subscribers={activeSubscribers}
+            payments={payments}
+            tickets={tickets}
+            settings={settings}
+            currentUser={currentUser}
+            onSearch={() => setIsQuickSearchOpen(true)}
+            onRenew={(sub) => { setSubscriberToRenew(sub); setIsRenewModalOpen(true); }}
+            onRemind={(sub) => openWhatsApp(sub, getDaysRemaining(sub.expiryDate) < 0 ? 'expired' : 'expiry')}
+            onDebt={(sub) => openWhatsApp(sub, 'debt')}
+            onProfile={(sub) => setProfileSubscriberId(sub.id)}
+            onOpenTab={setActiveTab}
+          />
+        )}
+        {safeActiveTab === 'more' && (
+          <MoreView
+            currentUser={currentUser}
+            openTickets={stats.openTicketsCount}
+            onOpenTab={setActiveTab}
+            onToggleSimpleMode={() => setSimpleMode(true)}
+            onExport={() => exportSubscribersToExcel(subscribers, `${settings.ispName}_مشتركون.xlsx`)}
+            onImport={() => setIsImportModalOpen(true)}
+            onSwitchUser={() => setIsLoginModalOpen(true)}
+            onLogout={handleLogout}
+            notificationsOn={device.permission === 'granted'}
+            onBell={() => { void device.enableNotifications(); }}
+            canInstall={device.canInstall}
+            onInstall={() => { void device.install(); }}
+          />
+        )}
         {safeActiveTab === 'subscribers' && (
           <SubscribersView
             subscribers={subscribers}

@@ -17,6 +17,8 @@ export const isRole = (r: unknown): r is Role => typeof r === 'string' && (ROLES
 // ---------- أقسام الواجهة ----------
 
 export const TAB_ACCESS: Record<string, Role[]> = {
+  home: ALL_ROLES,
+  more: ALL_ROLES,
   subscribers: ALL_ROLES,
   reminders: ALL_ROLES,
   tickets: ALL_ROLES,

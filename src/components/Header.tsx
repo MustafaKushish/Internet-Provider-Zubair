@@ -1,216 +1,74 @@
-import React, { useState, useEffect } from 'react';
-import {
-  Users,
-  LayoutDashboard,
-  MessageSquare,
-  Wrench,
-  Server,
-  Settings,
-  Plus,
-  Download,
-  Upload,
-  Wifi,
-  BellRing,
-  DollarSign,
-  AlertTriangle,
-  BarChart3,
-  Bell,
-  BellOff,
-  UserCheck,
-  ShieldCheck,
-  Lock,
-  LogOut,
-  TowerControl,
-  MonitorDown,
-  Sparkles,
-  Share,
-  MoreHorizontal,
-  Wallet,
-  HandCoins,
-  Megaphone,
-  Search,
-  X as CloseIcon,
-  LayoutGrid,
-  Smile,
-} from 'lucide-react';
+import React from 'react';
+import { Bell, BellOff, LayoutGrid, LogOut, Plus, Search, Wifi, ChevronRight } from 'lucide-react';
 import { LazyMotion, MotionConfig } from 'motion/react';
 import * as m from 'motion/react-m';
-import { getNotificationPermission, requestNotificationPermission } from '../utils/notifications';
-import { enablePush, sendTestPush } from '../utils/push';
-import { PREVIEW_MODE } from '../sync/api';
 import { StaffUser } from '../types/isp';
-import { canAccessTab } from '../../shared/access';
-import { canPromptInstall, isStandalone, onInstallAvailabilityChange, requestInstall } from '../pwa';
-import { notify } from './ui/Dialogs';
-import { useEscapeKey } from './ui/useEscapeKey';
+import { NAV_GROUPS, TAB_LABEL, firstTab, groupOf, tabsFor, visibleGroups, type NavGroup } from './nav';
 
-
-interface TabDef {
-  id: string;
-  label: string;   // الاسم الكامل (الحاسوب)
-  short: string;   // اسم قصير لشريط الهاتف السفلي
-  icon: React.ComponentType<{ className?: string }>;
-  accent?: 'indigo';
-}
-
-// ترتيب الأقسام؛ الصلاحيات في shared/access.ts (تُفرض أيضاً على الخادم)
-const TABS: TabDef[] = [
-  { id: 'subscribers', label: 'المشتركين والاشتراكات', short: 'المشتركون', icon: Users },
-  { id: 'dashboard', label: 'لوحة المؤشرات', short: 'المؤشرات', icon: LayoutDashboard },
-  { id: 'reports', label: 'التقارير المالية والجرد الدوري', short: 'التقارير', icon: BarChart3 },
-  { id: 'cash', label: 'الصندوق والمصاريف', short: 'الصندوق', icon: Wallet },
-  { id: 'debts', label: 'الديون والمطالبات', short: 'الديون', icon: HandCoins },
-  { id: 'marketing', label: 'العروض والتسويق', short: 'التسويق', icon: Megaphone },
-  { id: 'reminders', label: 'تذكيرات الواتساب والديون', short: 'التذكيرات', icon: MessageSquare },
-  { id: 'tickets', label: 'البلاغات والدعم الفني', short: 'البلاغات', icon: Wrench },
-  { id: 'advisor', label: 'المستشار الذكي', short: 'المستشار', icon: Sparkles, accent: 'indigo' },
-  { id: 'towers', label: 'الأبراج', short: 'الأبراج', icon: TowerControl },
-  { id: 'providers', label: 'المزودون وباقات الزبير', short: 'المزودون', icon: Server },
-  { id: 'users', label: 'المستخدمون والمشرفون', short: 'المستخدمون', icon: ShieldCheck, accent: 'indigo' },
-  { id: 'settings', label: 'إعدادات المنظومة', short: 'الإعدادات', icon: Settings },
-];
-
-/** ترتيب الأقسام في شريط التنقل (يحدد اتجاه حركة دخول القسم) */
-export const TAB_ORDER = TABS.map(t => t.id);
+export { TAB_ORDER } from './nav';
 
 const loadMotionFeatures = () => import('./ui/motionFeatures').then(r => r.default);
 
-// مؤشر التبويب النشط ينزلق بين التبويبات بحركة نابضية
+// مؤشر القسم النشط ينزلق بين الأقسام بحركة نابضية
 const PILL_SPRING = { type: 'spring', stiffness: 420, damping: 34, mass: 0.8 } as const;
 
-// الأقسام الظاهرة مباشرة في الشريط السفلي (الباقي في «المزيد»): 4 في الهاتف و 6 في التابلت
-const MOBILE_PRIMARY = ['subscribers', 'debts', 'reminders', 'dashboard', 'tickets', 'cash', 'reports', 'towers'];
-
-function useIsTablet(): boolean {
-  const query = '(min-width: 768px)';
-  const [match, setMatch] = useState(() => typeof window !== 'undefined' && window.matchMedia?.(query).matches);
-  useEffect(() => {
-    const mq = window.matchMedia?.(query);
-    if (!mq) return;
-    const on = () => setMatch(mq.matches);
-    mq.addEventListener?.('change', on);
-    return () => mq.removeEventListener?.('change', on);
-  }, []);
-  return !!match;
-}
+const ROLE_LABEL = { admin: 'المدير', accountant: 'محاسب', technician: 'فني' } as const;
 
 interface HeaderProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
-  stats: {
-    totalSubscribers: number;
-    activeCount: number;
-    expiringSoonCount: number;
-    expiredCount: number;
-    totalProfit: number;
-    totalDebts: number;
-    openTicketsCount: number;
-  };
+  /** عدد البلاغات المفتوحة (شارة على «المزيد») */
+  openTickets: number;
   ispName: string;
-  contactPhone: string;
   currentUser: StaffUser;
   onOpenAddModal: () => void;
-  onExportExcel: () => void;
-  onOpenImportModal: () => void;
-  onTriggerNotificationCheck: () => void;
   onOpenLoginModal: () => void;
   onOpenSearch: () => void;
   onLogout: () => void;
-  onOpenAddUser?: () => void;
-  /** الوضع البسيط: رأس صغير بدون أقسام ولا أرقام */
+  notificationsOn: boolean;
+  onBell: () => void;
+  /** الوضع البسيط: رأس صغير بدون أقسام */
   simpleMode?: boolean;
   onToggleSimpleMode?: () => void;
-  /** بنود خطة التسويق التي تبدأ خلال أيام (تنبيه على «التسويق») */
+  /** بنود خطة التسويق التي تبدأ خلال أيام (شارة على «التسويق») */
   planAlerts?: number;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   activeTab,
   setActiveTab,
-  stats,
+  openTickets,
   ispName,
-  contactPhone,
   currentUser,
   onOpenAddModal,
-  onExportExcel,
-  onOpenImportModal,
-  onTriggerNotificationCheck,
   onOpenLoginModal,
   onOpenSearch,
   onLogout,
-  onOpenAddUser,
+  notificationsOn,
+  onBell,
   simpleMode,
   onToggleSimpleMode,
   planAlerts = 0,
 }) => {
-  const [notifPermission, setNotifPermission] = useState<NotificationPermission>('default');
-  // زر التثبيت يظهر ما دامت المنظومة مفتوحة في المتصفح وليس كتطبيق مثبت
-  const [showInstall, setShowInstall] = useState(() => !isStandalone());
-  const [iosHelpOpen, setIosHelpOpen] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
-
-  const visibleTabs = TABS.filter(t => canAccessTab(currentUser.role, t.id));
-  const isTablet = useIsTablet();
-  const primaryTabs = visibleTabs
-    .filter(t => MOBILE_PRIMARY.includes(t.id))
-    .sort((a, b) => MOBILE_PRIMARY.indexOf(a.id) - MOBILE_PRIMARY.indexOf(b.id))
-    .slice(0, isTablet ? 6 : 4);
-  const moreTabs = visibleTabs.filter(t => !primaryTabs.includes(t));
-  const alertsCount = stats.expiringSoonCount + stats.expiredCount;
-  const badgeFor = (id: string): React.ReactNode => {
-    if (id === 'subscribers') return <span className="relative text-xs px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-300 font-normal">{stats.totalSubscribers}</span>;
-    if (id === 'tickets' && stats.openTicketsCount > 0) return <span className="relative text-xs px-1.5 py-0.2 rounded-full bg-rose-500/30 text-rose-300 border border-rose-500/40">{stats.openTicketsCount}</span>;
-    if (id === 'marketing' && planAlerts > 0) return <span className="relative text-xs px-1.5 rounded-full bg-amber-500/30 text-amber-200 border border-amber-500/40" title="بنود تبدأ قريباً في خطة التسويق">{planAlerts}</span>;
-    if (id === 'reminders' && alertsCount > 0) return <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping absolute top-2 right-2"></span>;
-    return null;
-  };
-  const go = (id: string) => {
-    setActiveTab(id);
-    setMoreOpen(false);
+  const groups = visibleGroups(currentUser.role);
+  const activeGroup = groupOf(activeTab).id;
+  const badge = (g: NavGroup) => (g.id === 'marketing' ? planAlerts : g.id === 'more' ? openTickets : 0);
+  const go = (g: NavGroup) => {
+    setActiveTab(firstTab(g, currentUser.role));
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
-  useEffect(() => onInstallAvailabilityChange(() => setShowInstall(!isStandalone())), []);
-
-  const handleInstall = async () => {
-    const result = await requestInstall();
-    if (result === 'installed') {
-      setShowInstall(false);
-      notify('تم تثبيت التطبيق. ستجده في قائمة التطبيقات وعلى الشاشة الرئيسية.', 'success');
-    } else if (result === 'ios') {
-      setIosHelpOpen(true);
-    } else if (result === 'manual') {
-      notify(canPromptInstall()
-        ? 'اضغط زر التثبيت مرة أخرى.'
-        : 'للتثبيت: افتح قائمة المتصفح (⋮ أو …) واختر "تثبيت التطبيق" أو "إضافة إلى الشاشة الرئيسية". في ويندوز استخدم Edge أو Chrome.', 'info');
-    }
-  };
-
-  useEffect(() => {
-    setNotifPermission(getNotificationPermission());
-  }, []);
-
-  // الجرس: يطلب الصلاحية، يفحص التنبيهات الآن، ثم يفعّل إشعارات الخلفية (تصل والتطبيق مغلق) ويرسل تجربة
-  const handleNotificationClick = async () => {
-    let granted = notifPermission === 'granted';
-    if (!granted) {
-      granted = await requestNotificationPermission();
-      setNotifPermission(granted ? 'granted' : 'denied');
-    }
-    if (!granted) {
-      notify('الإشعارات محظورة لهذا الموقع. فعّلها من إعدادات المتصفح (رمز القفل بجانب العنوان) ثم اضغط الجرس.', 'warning');
-      return;
-    }
-    onTriggerNotificationCheck();
-    if (PREVIEW_MODE || currentUser.role === 'technician') return;
-    const r = await enablePush();
-    if (!r.ok) { notify(r.reason, 'warning'); return; }
-    try {
-      const n = await sendTestPush();
-      notify(n > 0 ? 'تم تفعيل إشعارات الخلفية ✅ أرسلنا لك إشعاراً تجريبياً الآن.' : 'تم تسجيل هذا الجهاز. ستصلك التنبيهات كل صباح الساعة 7.', 'success');
-    } catch {
-      notify('تم تسجيل هذا الجهاز. ستصلك التنبيهات كل صباح الساعة 7.', 'success');
-    }
-  };
+  const bellBtn = (big = false) => (
+    <button
+      type="button"
+      onClick={onBell}
+      aria-label={notificationsOn ? 'الإشعارات مفعلة: فحص التنبيهات الآن' : 'تفعيل الإشعارات'}
+      title={notificationsOn ? 'الإشعارات مفعلة' : 'تفعيل الإشعارات'}
+      className={`${big ? 'h-12 px-3 sm:px-4 gap-2 text-base font-semibold' : 'w-11 h-11 justify-center'} rounded-xl bg-slate-800 border border-slate-700 text-slate-100 flex items-center cursor-pointer hover:bg-slate-700`}
+    >
+      {notificationsOn ? <Bell className="w-5 h-5 text-emerald-300" /> : <BellOff className="w-5 h-5 text-amber-300" />}
+      {big && (notificationsOn ? 'الإشعارات' : 'فعّل الإشعارات')}
+    </button>
+  );
 
   if (simpleMode) {
     return (
@@ -225,27 +83,12 @@ export const Header: React.FC<HeaderProps> = ({
             <p className="text-sm text-slate-400 truncate">{currentUser.name}</p>
           </div>
           <div className="flex gap-2 ms-auto">
-            <button
-              type="button"
-              onClick={handleNotificationClick}
-              className="h-12 px-3 sm:px-4 rounded-xl bg-slate-800 border border-slate-700 text-slate-100 text-base font-semibold flex items-center gap-2 cursor-pointer hover:bg-slate-700"
-            >
-              {notifPermission === 'granted' ? <Bell className="w-5 h-5 text-emerald-300" /> : <BellOff className="w-5 h-5 text-amber-300" />}
-              {notifPermission === 'granted' ? 'الإشعارات' : 'فعّل الإشعارات'}
-            </button>
-            <button
-              type="button"
-              onClick={onToggleSimpleMode}
-              className="h-12 px-3 sm:px-4 rounded-xl bg-slate-800 border border-slate-700 text-slate-100 text-base font-semibold flex items-center gap-2 cursor-pointer hover:bg-slate-700"
-            >
+            {bellBtn(true)}
+            <button type="button" onClick={onToggleSimpleMode} className="h-12 px-3 sm:px-4 rounded-xl bg-slate-800 border border-slate-700 text-slate-100 text-base font-semibold flex items-center gap-2 cursor-pointer hover:bg-slate-700">
               <LayoutGrid className="w-5 h-5 text-cyan-300" />
               كل الأقسام
             </button>
-            <button
-              type="button"
-              onClick={onLogout}
-              className="h-12 px-3 sm:px-4 rounded-xl bg-slate-800 border border-slate-700 text-slate-100 text-base font-semibold flex items-center gap-2 cursor-pointer hover:bg-slate-700"
-            >
+            <button type="button" onClick={onLogout} className="h-12 px-3 sm:px-4 rounded-xl bg-slate-800 border border-slate-700 text-slate-100 text-base font-semibold flex items-center gap-2 cursor-pointer hover:bg-slate-700">
               <LogOut className="w-5 h-5 text-rose-300" />
               خروج
             </button>
@@ -260,450 +103,139 @@ export const Header: React.FC<HeaderProps> = ({
     <MotionConfig reducedMotion="user">
     <header className="relative bg-slate-900/80 lg:sticky lg:top-0 z-30 shadow-2xl shadow-black/30 backdrop-blur-xl no-print">
       <div className="gradient-line absolute bottom-0 inset-x-0" aria-hidden="true" />
-      {/* الهاتف: شريط علوي مضغوط */}
-      <div className="lg:hidden px-3 pt-3 pb-2 space-y-2">
-        <div className="flex items-center gap-2">
-          <div className="logo-glow w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-600 via-blue-600 to-indigo-600 flex items-center justify-center text-white flex-shrink-0">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2.5 flex items-center gap-2 sm:gap-3">
+        <button type="button" onClick={() => go(NAV_GROUPS[0])} className="flex items-center gap-2.5 min-w-0 cursor-pointer text-right" aria-label="الرئيسية">
+          <span className="logo-glow w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 via-blue-600 to-indigo-600 flex items-center justify-center text-white flex-shrink-0">
             <Wifi className="w-5 h-5" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h1 className="text-sm font-bold gradient-text truncate">{ispName}</h1>
-            <p className="text-xs text-slate-400 truncate">{currentUser.name} • {currentUser.role === 'admin' ? 'المدير' : currentUser.role === 'accountant' ? 'محاسب' : 'فني'}</p>
-          </div>
-          <button
-            type="button"
-            onClick={onOpenSearch}
-            aria-label="بحث سريع عن مشترك"
-            className="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 flex items-center justify-center cursor-pointer"
-          >
-            <Search className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={onOpenAddModal}
-            aria-label="إضافة مشترك"
-            className="h-9 px-3 rounded-xl bg-cyan-700 hover:bg-cyan-600 text-white text-sm font-bold flex items-center gap-1 cursor-pointer"
-          >
-            <Plus className="w-4 h-4" /> <span>مشترك</span>
-          </button>
-          <button
-            type="button"
-            onClick={onLogout}
-            aria-label="تسجيل الخروج"
-            className="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 text-rose-300 flex items-center justify-center cursor-pointer"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
-        </div>
-        <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-3 px-3 pb-0.5">
-          <span className="flex-shrink-0 bg-slate-800/80 border border-slate-700/60 rounded-lg px-2.5 py-1 text-xs text-slate-300">
-            نشط <b className="text-white">{stats.activeCount}</b> من {stats.totalSubscribers}
           </span>
-          {currentUser.role !== 'technician' && (
-            <span className="flex-shrink-0 bg-emerald-950/40 border border-emerald-800/40 rounded-lg px-2.5 py-1 text-xs text-emerald-300">
-              ربح شهري <b className="text-emerald-400">{stats.totalProfit.toLocaleString()}</b>
-            </span>
-          )}
-          {currentUser.role !== 'technician' && stats.totalDebts > 0 && (
-            <button type="button" onClick={() => go('reminders')} className="flex-shrink-0 bg-rose-950/40 border border-rose-800/40 rounded-lg px-2.5 py-1 text-xs text-rose-300 cursor-pointer">
-              ديون <b className="text-rose-400">{stats.totalDebts.toLocaleString()}</b>
-            </button>
-          )}
-          {alertsCount > 0 && (
-            <button type="button" onClick={() => go('reminders')} className="flex-shrink-0 bg-amber-950/50 border border-amber-700/50 rounded-lg px-2.5 py-1 text-xs text-amber-300 cursor-pointer">
-              {stats.expiringSoonCount} قريباً • {stats.expiredCount} متأخر
-            </button>
-          )}
-          {stats.openTicketsCount > 0 && (
-            <button type="button" onClick={() => go('tickets')} className="flex-shrink-0 bg-amber-950/50 border border-amber-700/50 rounded-lg px-2.5 py-1 text-xs text-amber-300 cursor-pointer">
-              {stats.openTicketsCount} عطل مفتوح
-            </button>
-          )}
-        </div>
-      </div>
+          <span className="min-w-0 hidden sm:block lg:max-w-[9rem] 2xl:max-w-[16rem]">
+            <span className="block text-base font-bold gradient-text truncate">{ispName}</span>
+          </span>
+        </button>
 
-      {/* Top Banner */}
-      <div className="hidden lg:block max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          {/* Logo & Brand */}
-          <div className="flex items-center gap-3">
-            <div className="logo-glow w-11 h-11 rounded-xl bg-gradient-to-tr from-cyan-600 via-blue-600 to-indigo-600 flex items-center justify-center text-white ring-2 ring-cyan-400/30">
-              <Wifi className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold gradient-text tracking-tight">{ispName}</h1>
-                <span className="bg-gradient-to-r from-cyan-500/20 to-blue-500/20 text-cyan-300 text-xs px-2.5 py-0.5 rounded-full border border-cyan-500/30 font-semibold">
-                  البصرة - الزبير
-                </span>
-              </div>
-              <p className="text-xs text-slate-400">
-                إدارة المشتركين والأبراج{contactPhone ? <> • هاتف وواتساب: <span className="text-cyan-400 font-mono font-semibold" dir="ltr">{contactPhone}</span></> : null}
-              </p>
-            </div>
-          </div>
-
-          {/* Quick Metrics Bar & User Account Profile */}
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-            {/* Logged-in Staff User Pill */}
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={onOpenLoginModal}
-                title="اضغط لتبديل المستخدم أو فحص الجلسة"
-                className="bg-slate-800/90 hover:bg-slate-800 border border-slate-700/80 rounded-xl px-2.5 py-1.5 flex items-center gap-2 transition cursor-pointer text-right"
-              >
-                <div className="w-7 h-7 rounded-lg bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 flex items-center justify-center text-xs font-bold">
-                  {currentUser.name.charAt(0)}
-                </div>
-                <div className="text-xs">
-                  <div className="flex items-center gap-1">
-                    <span className="font-bold text-white max-w-[120px] truncate">{currentUser.name}</span>
-                    <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
-                      currentUser.role === 'admin'
-                        ? 'bg-rose-950 text-rose-300 border border-rose-800'
-                        : currentUser.role === 'accountant'
-                        ? 'bg-cyan-950 text-cyan-300 border border-cyan-800'
-                        : 'bg-amber-950 text-amber-300 border border-amber-800'
-                    }`}>
-                      {currentUser.role === 'admin' ? 'المدير' : currentUser.role === 'accountant' ? 'محاسب' : 'فني'}
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-slate-400 block font-mono" dir="ltr">@{currentUser.username}</span>
-                </div>
-              </button>
-
-              {/* Logout Button */}
-              <button
-                onClick={onLogout}
-                title="تسجيل الخروج وقفل المنظومة (أمان) • يتم القفل تلقائياً بعد 60 دقيقة من الخمول"
-                className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 hover:text-white px-2.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
-              >
-                <LogOut className="w-4 h-4 text-rose-400" />
-                <span className="hidden sm:inline">خروج</span>
-              </button>
-            </div>
-
-            {/* Active Subscribers Pill */}
-            <div className="bg-slate-800/80 border border-slate-700/60 rounded-lg px-3 py-1.5 flex items-center gap-2">
-              <Users className="w-4 h-4 text-cyan-400" />
-              <div className="text-xs">
-                <span className="text-slate-400 block text-[10px]">المشتركون النشطون</span>
-                <span className="font-bold text-white">{stats.activeCount} من {stats.totalSubscribers}</span>
-              </div>
-            </div>
-
-            {/* Financial Metrics - Visible ONLY for Admin and Accountant */}
-            {currentUser.role !== 'technician' && (
-              <>
-                <div className="bg-emerald-950/40 border border-emerald-800/40 rounded-lg px-3 py-1.5 flex items-center gap-2">
-                  <DollarSign className="w-4 h-4 text-emerald-400" />
-                  <div className="text-xs">
-                    <span className="text-emerald-300 block text-[10px]">صافي الربح الشهري</span>
-                    <span className="font-bold text-emerald-400">{stats.totalProfit.toLocaleString()} د.ع</span>
-                  </div>
-                </div>
-
-                {stats.totalDebts > 0 && (
-                  <div className="bg-rose-950/40 border border-rose-800/40 rounded-lg px-3 py-1.5 flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 text-rose-400" />
-                    <div className="text-xs">
-                      <span className="text-rose-300 block text-[10px]">المتأخرات والديون</span>
-                      <span className="font-bold text-rose-400">{stats.totalDebts.toLocaleString()} د.ع</span>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-
-            {/* Open Tickets Pill for Technician */}
-            {currentUser.role === 'technician' && stats.openTicketsCount > 0 && (
-              <button
-                onClick={() => setActiveTab('tickets')}
-                className="bg-amber-950/50 hover:bg-amber-900/60 border border-amber-700/50 rounded-lg px-3 py-1.5 flex items-center gap-2 transition cursor-pointer"
-              >
-                <Wrench className="w-4 h-4 text-amber-400" />
-                <div className="text-xs text-right">
-                  <span className="text-amber-300 block text-[10px]">بلاغات الصيانة</span>
-                  <span className="font-bold text-amber-400">{stats.openTicketsCount} عطل مفتوح</span>
-                </div>
-              </button>
-            )}
-
-            {currentUser.role !== 'technician' && stats.expiringSoonCount + stats.expiredCount > 0 && (
-              <button
-                onClick={() => setActiveTab('reminders')}
-                className="bg-amber-950/50 hover:bg-amber-900/60 border border-amber-700/50 rounded-lg px-3 py-1.5 flex items-center gap-2 transition cursor-pointer"
-                title="اضغط للانتقال إلى تذكيرات الدفع والاشتراكات"
-              >
-                <BellRing className="w-4 h-4 text-amber-400 animate-bounce" />
-                <div className="text-xs text-right">
-                  <span className="text-amber-300 block text-[10px]">تنبيهات التجديد</span>
-                  <span className="font-bold text-amber-400">
-                    {stats.expiringSoonCount} قريباً • {stats.expiredCount} متأخر
-                  </span>
-                </div>
-              </button>
-            )}
-
-            {/* Quick Actions */}
-            <div className="flex items-center gap-1.5 ms-auto md:ms-2">
-              <button
-                onClick={onOpenSearch}
-                title="بحث سريع عن مشترك (Ctrl+K)"
-                className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white text-xs px-2.5 py-2 rounded-lg flex items-center gap-1.5 transition cursor-pointer"
-              >
-                <Search className="w-4 h-4" />
-                <span className="hidden lg:inline">بحث</span>
-                <kbd className="hidden lg:inline text-[9px] font-mono bg-slate-900 border border-slate-700 rounded px-1 text-slate-400">Ctrl K</kbd>
-              </button>
-              {/* Browser Notification Bell Toggle */}
-              <button
-                onClick={handleNotificationClick}
-                title={
-                  notifPermission === 'granted'
-                    ? 'إشعارات المتصفح مفعلة (اضغط لفحص وتنبيه الاشتراكات القريبة)'
-                    : 'اضغط لتفعيل إشعارات المتصفح للتنبيه قبل انتهاء الاشتراك'
-                }
-                className={`p-2 rounded-lg border transition cursor-pointer flex items-center gap-1 ${
-                  notifPermission === 'granted'
-                    ? 'bg-emerald-950/50 border-emerald-700/60 text-emerald-400 hover:bg-emerald-900/60'
-                    : 'bg-slate-800 border-slate-700 text-amber-400 hover:bg-slate-700'
-                }`}
-              >
-                {notifPermission === 'granted' ? (
-                  <Bell className="w-4 h-4 text-emerald-400" />
-                ) : (
-                  <BellOff className="w-4 h-4 text-amber-400" />
-                )}
-              </button>
-
-              {showInstall && (
-                <button
-                  onClick={handleInstall}
-                  title="تثبيت المنظومة كتطبيق على هذا الجهاز"
-                  className="bg-slate-800 hover:bg-slate-700 border border-cyan-700 text-cyan-300 text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 transition cursor-pointer"
-                >
-                  <MonitorDown className="w-4 h-4" />
-                  <span>تثبيت التطبيق</span>
-                </button>
-              )}
-
-              {onToggleSimpleMode && (
-                <button
-                  onClick={onToggleSimpleMode}
-                  className="bg-slate-800 hover:bg-slate-700 border border-emerald-700 text-emerald-300 text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 transition cursor-pointer"
-                >
-                  <Smile className="w-4 h-4" />
-                  <span>الوضع البسيط</span>
-                </button>
-              )}
-
-              <button
-                onClick={onOpenAddModal}
-                className="bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 shadow-md shadow-cyan-600/30 transition cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                <span>إضافة مشترك</span>
-              </button>
-
-              <button
-                onClick={onExportExcel}
-                title="تصدير إلى إكسل XLSX"
-                className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white p-2 rounded-lg border border-slate-700 transition cursor-pointer"
-              >
-                <Download className="w-4 h-4" />
-              </button>
-
-              <button
-                onClick={onOpenImportModal}
-                title="استيراد من إكسل / CSV"
-                className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white p-2 rounded-lg border border-slate-700 transition cursor-pointer"
-              >
-                <Upload className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Navigation Tabs */}
-        <nav aria-label="أقسام المنظومة" className="flex flex-wrap items-center gap-0.5 mt-3 pt-2 border-t border-slate-800/80">
-          {visibleTabs.map(t => {
-            const Icon = t.icon;
-            const active = activeTab === t.id;
-            const activeCls = t.accent === 'indigo' ? 'text-indigo-200' : 'text-cyan-300';
-            const pillCls = t.accent === 'indigo'
-              ? 'bg-indigo-500/20 border-indigo-500/40 shadow-[0_0_24px_-6px_rgb(99_102_241/0.6)]'
-              : 'bg-cyan-500/15 border-cyan-500/35 shadow-[0_0_24px_-6px_rgb(34_211_238/0.55)]';
-            const idleCls = t.id === 'advisor' ? 'text-indigo-300/80 hover:text-indigo-200 hover:bg-slate-800/60' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60';
+        {/* الحاسوب: الأقسام الخمسة في الرأس */}
+        <nav aria-label="أقسام المنظومة" className="hidden lg:flex items-center gap-1 ms-4">
+          {groups.map(g => {
+            const Icon = g.icon;
+            const active = activeGroup === g.id;
+            const n = badge(g);
             return (
               <button
-                key={t.id}
-                onClick={() => setActiveTab(t.id)}
+                key={g.id}
+                type="button"
+                onClick={() => go(g)}
                 aria-current={active ? 'page' : undefined}
-                title={t.label}
-                className={`px-2 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-1 whitespace-nowrap transition cursor-pointer relative ${active ? activeCls : idleCls}`}
+                className={`relative h-11 px-3.5 rounded-xl text-sm font-semibold flex items-center gap-2 cursor-pointer transition-colors ${active ? 'text-cyan-200' : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'}`}
               >
-                {active && (
-                  <m.span
-                    layoutId="desktop-nav-pill"
-                    transition={PILL_SPRING}
-                    className={`absolute inset-0 rounded-lg border ${pillCls}`}
-                    aria-hidden="true"
-                  />
-                )}
-                <Icon className={`relative w-4 h-4 transition-transform duration-300 ${active ? 'scale-110' : ''} ${t.id === 'users' ? 'text-indigo-400' : ''}`} />
-                <span className="relative">{t.short}</span>
-                {badgeFor(t.id)}
+                {active && <m.span layoutId="desktop-nav-pill" transition={PILL_SPRING} className="absolute inset-0 rounded-xl bg-cyan-500/15 border border-cyan-500/35" aria-hidden="true" />}
+                <Icon className="relative w-4 h-4" />
+                <span className="relative">{g.label}</span>
+                {n > 0 && <span className="relative text-xs min-w-5 px-1.5 rounded-full bg-amber-500/25 text-amber-200 border border-amber-500/40">{n}</span>}
               </button>
             );
           })}
         </nav>
+
+        <div className="flex-1" />
+
+        <button
+          type="button"
+          onClick={onOpenSearch}
+          aria-label="بحث سريع عن مشترك"
+          title="بحث سريع (Ctrl+K)"
+          className="h-11 min-w-11 px-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 hover:text-white flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap"
+        >
+          <Search className="w-5 h-5" />
+          <span className="hidden 2xl:inline text-sm">ابحث عن مشترك</span>
+          <kbd className="hidden 2xl:inline text-[10px] font-mono bg-slate-950 border border-slate-700 rounded px-1 text-slate-400">Ctrl K</kbd>
+        </button>
+        {bellBtn()}
+        <button
+          type="button"
+          onClick={onOpenAddModal}
+          className="h-11 px-3 sm:px-4 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-bold flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+        >
+          <Plus className="w-5 h-5" />
+          <span><span className="hidden sm:inline">أضف </span>مشتركاً</span>
+        </button>
+        <button
+          type="button"
+          onClick={onOpenLoginModal}
+          title={`${currentUser.name} • ${ROLE_LABEL[currentUser.role]} (اضغط لتبديل المستخدم)`}
+          aria-label={`الحساب: ${currentUser.name}`}
+          className="hidden sm:flex w-11 h-11 rounded-xl bg-slate-800 border border-slate-700 text-slate-100 font-bold items-center justify-center cursor-pointer"
+        >
+          {currentUser.name.charAt(0)}
+        </button>
       </div>
     </header>
-    {iosHelpOpen && (
-      <div className="app-overlay fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm" onClick={() => setIosHelpOpen(false)}>
-        <div role="dialog" aria-modal="true" className="bg-slate-900 border border-slate-700 rounded-2xl max-w-sm w-full p-5 space-y-3 shadow-2xl text-sm" onClick={e => e.stopPropagation()}>
-          <div className="flex items-center justify-between">
-            <h2 className="font-bold text-white">تثبيت التطبيق على آيفون / آيباد</h2>
-            <button type="button" onClick={() => setIosHelpOpen(false)} className="text-slate-400 hover:text-white cursor-pointer" aria-label="إغلاق">
-              <CloseIcon className="w-4 h-4" />
-            </button>
-          </div>
-          <ol className="space-y-2.5 text-slate-300 text-xs leading-relaxed list-decimal pr-4">
-            <li>افتح المنظومة في متصفح <strong className="text-white">Safari</strong>.</li>
-            <li>اضغط زر المشاركة <Share className="w-3.5 h-3.5 inline text-cyan-400" /> أسفل الشاشة.</li>
-            <li>اختر <strong className="text-white">«إضافة إلى الشاشة الرئيسية»</strong> ثم <strong className="text-white">«إضافة»</strong>.</li>
-            <li>افتح التطبيق من أيقونة <strong className="text-white">أولاد كشيش</strong> على الشاشة الرئيسية.</li>
-          </ol>
-        </div>
-      </div>
-    )}
 
-    {/* الهاتف: شريط تنقل سفلي ثابت */}
+    {/* الهاتف: شريط تنقل سفلي بالأقسام الخمسة */}
     <nav
       aria-label="التنقل السريع"
       className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-slate-900/85 backdrop-blur-xl border-t border-slate-800/80 shadow-[0_-10px_30px_-12px_rgb(0_0_0/0.6)] no-print"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      <div className="grid" style={{ gridTemplateColumns: `repeat(${primaryTabs.length + (moreTabs.length ? 1 : 0)}, minmax(0, 1fr))` }}>
-        {primaryTabs.map(t => {
-          const Icon = t.icon;
-          const active = activeTab === t.id;
-          const count = t.id === 'tickets' ? stats.openTicketsCount : t.id === 'reminders' ? alertsCount : 0;
+      <div className="grid" style={{ gridTemplateColumns: `repeat(${groups.length}, minmax(0, 1fr))` }}>
+        {groups.map(g => {
+          const Icon = g.icon;
+          const active = activeGroup === g.id;
+          const n = badge(g);
           return (
             <button
-              key={t.id}
+              key={g.id}
               type="button"
-              onClick={() => go(t.id)}
+              onClick={() => go(g)}
               aria-current={active ? 'page' : undefined}
-              className={`relative flex flex-col items-center justify-center gap-0.5 py-2 text-xs font-semibold cursor-pointer transition-colors ${active ? 'text-cyan-300' : 'text-slate-400'}`}
+              className={`relative flex flex-col items-center justify-center gap-0.5 min-h-14 py-2 text-xs font-semibold cursor-pointer transition-colors ${active ? 'text-cyan-300' : 'text-slate-400'}`}
             >
-              {active && (
-                <m.span
-                  layoutId="mobile-nav-indicator"
-                  transition={PILL_SPRING}
-                  className="absolute inset-x-2 inset-y-1 rounded-2xl bg-gradient-to-b from-cyan-500/20 to-cyan-500/0 border-t-2 border-cyan-400 shadow-[0_-6px_18px_-6px_rgb(34_211_238/0.7)]"
-                  aria-hidden="true"
-                />
-              )}
-              <span className={`relative transition-transform duration-300 ease-[cubic-bezier(0.34,1.4,0.64,1)] ${active ? '-translate-y-0.5 scale-110' : ''}`}>
+              {active && <m.span layoutId="mobile-nav-indicator" transition={PILL_SPRING} className="absolute inset-x-2 inset-y-1 rounded-2xl bg-cyan-500/10" aria-hidden="true" />}
+              <span className="relative">
                 <Icon className="w-5 h-5" />
-                {count > 0 && (
-                  <span className="absolute -top-1.5 -left-2.5 min-w-[16px] h-4 px-1 rounded-full bg-rose-600 text-white text-[9px] leading-4 text-center">
-                    {count > 99 ? '99+' : count}
-                  </span>
-                )}
+                {n > 0 && <span className="absolute -top-1.5 -left-2.5 min-w-[16px] h-4 px-1 rounded-full bg-amber-500 text-slate-950 text-[10px] font-bold leading-4 text-center">{n > 99 ? '99+' : n}</span>}
               </span>
-              <span className="relative">{t.short}</span>
+              <span className="relative">{g.label}</span>
             </button>
           );
         })}
-        {moreTabs.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setMoreOpen(true)}
-            aria-expanded={moreOpen}
-            className={`flex flex-col items-center justify-center gap-0.5 py-2 text-xs font-semibold cursor-pointer ${moreTabs.some(t => t.id === activeTab) ? 'text-cyan-400' : 'text-slate-400'}`}
-          >
-            <MoreHorizontal className="w-5 h-5" />
-            <span>المزيد</span>
-          </button>
-        )}
       </div>
     </nav>
-
-    {moreOpen && (
-      <MoreSheet onClose={() => setMoreOpen(false)}>
-        {onToggleSimpleMode && (
-          <button
-            type="button"
-            onClick={() => { setMoreOpen(false); onToggleSimpleMode(); }}
-            className="w-full mb-3 h-12 rounded-2xl bg-emerald-600/15 border border-emerald-600/60 text-emerald-200 text-base font-semibold flex items-center justify-center gap-2 cursor-pointer"
-          >
-            <Smile className="w-5 h-5" /> الوضع البسيط (أزرار كبيرة)
-          </button>
-        )}
-        <div className="grid grid-cols-3 gap-2">
-          {moreTabs.map((t, i) => {
-            const Icon = t.icon;
-            const active = activeTab === t.id;
-            return (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => go(t.id)}
-                style={{ animationDelay: `${0.08 + i * 0.035}s` }}
-                className={`animate-rise flex flex-col items-center gap-1.5 rounded-2xl border p-3 text-[11px] font-semibold cursor-pointer ${active ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300' : 'bg-slate-800/60 border-slate-700 text-slate-200'}`}
-              >
-                <Icon className="w-5 h-5" />
-                <span className="text-center leading-tight">{t.short}</span>
-              </button>
-            );
-          })}
-        </div>
-        <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
-          <button type="button" onClick={() => { setMoreOpen(false); onOpenLoginModal(); }} className="flex items-center gap-2 rounded-xl bg-slate-800 border border-slate-700 px-3 py-2.5 text-slate-200 cursor-pointer">
-            <UserCheck className="w-4 h-4 text-indigo-300" /> تبديل المستخدم
-          </button>
-          <button type="button" onClick={() => { setMoreOpen(false); void handleNotificationClick(); }} className="flex items-center gap-2 rounded-xl bg-slate-800 border border-slate-700 px-3 py-2.5 text-slate-200 cursor-pointer">
-            {notifPermission === 'granted' ? <Bell className="w-4 h-4 text-emerald-400" /> : <BellOff className="w-4 h-4 text-amber-400" />}
-            {notifPermission === 'granted' ? 'فحص التنبيهات' : 'تفعيل الإشعارات'}
-          </button>
-          <button type="button" onClick={() => { setMoreOpen(false); onExportExcel(); }} className="flex items-center gap-2 rounded-xl bg-slate-800 border border-slate-700 px-3 py-2.5 text-slate-200 cursor-pointer">
-            <Download className="w-4 h-4 text-cyan-300" /> تصدير إكسل
-          </button>
-          <button type="button" onClick={() => { setMoreOpen(false); onOpenImportModal(); }} className="flex items-center gap-2 rounded-xl bg-slate-800 border border-slate-700 px-3 py-2.5 text-slate-200 cursor-pointer">
-            <Upload className="w-4 h-4 text-cyan-300" /> استيراد إكسل
-          </button>
-          {showInstall && (
-            <button type="button" onClick={() => { setMoreOpen(false); void handleInstall(); }} className="col-span-2 flex items-center justify-center gap-2 rounded-xl bg-slate-800 border border-cyan-700 px-3 py-2.5 text-cyan-300 font-bold cursor-pointer">
-              <MonitorDown className="w-4 h-4" /> تثبيت التطبيق على هذا الجهاز
-            </button>
-          )}
-        </div>
-      </MoreSheet>
-    )}
     </MotionConfig>
     </LazyMotion>
   );
 };
 
-/** لوحة «المزيد» تنزلق من أسفل الشاشة في الهاتف */
-const MoreSheet: React.FC<{ onClose: () => void; children: React.ReactNode }> = ({ onClose, children }) => {
-  useEscapeKey(onClose);
-  return (
-    <div className="lg:hidden app-overlay fixed inset-0 z-50 flex items-end bg-slate-950/70 backdrop-blur-sm no-print" onClick={onClose}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="المزيد من الأقسام"
-        className="w-full md:max-w-xl md:mx-auto bg-slate-900 border-t border-x md:border border-slate-700 rounded-t-3xl p-4 shadow-2xl"
-        style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-700" />
-        {children}
+/** شريط الصفحات داخل القسم (مثل: الديون • الصندوق • التقارير). في «المزيد»: زر رجوع إلى القائمة. */
+export const SubNav: React.FC<{ activeTab: string; role: StaffUser['role']; onSelect: (tab: string) => void }> = ({ activeTab, role, onSelect }) => {
+  const group = groupOf(activeTab);
+  const tabs = tabsFor(group, role);
+  if (group.id === 'more') {
+    if (activeTab === 'more') return null;
+    return (
+      <div className="mb-4 flex items-center gap-2 text-sm no-print">
+        <button type="button" onClick={() => onSelect('more')} className="h-10 px-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 flex items-center gap-1 cursor-pointer">
+          <ChevronRight className="w-4 h-4" /> المزيد
+        </button>
+        <span className="text-slate-400">/</span>
+        <span className="text-white font-semibold">{TAB_LABEL[activeTab]}</span>
       </div>
+    );
+  }
+  if (tabs.length < 2) return null;
+  return (
+    <div role="tablist" aria-label={group.label} className="mb-4 flex gap-1 p-1 rounded-2xl bg-slate-900 border border-slate-700 overflow-x-auto no-scrollbar no-print">
+      {tabs.map(t => (
+        <button
+          key={t}
+          type="button"
+          role="tab"
+          aria-selected={t === activeTab}
+          onClick={() => onSelect(t)}
+          className={`flex-1 min-w-max h-10 px-4 rounded-xl text-sm font-semibold cursor-pointer whitespace-nowrap ${t === activeTab ? 'bg-cyan-500/15 text-cyan-100' : 'text-slate-400 hover:text-slate-100'}`}
+        >
+          {TAB_LABEL[t]}
+        </button>
+      ))}
     </div>
   );
 };
