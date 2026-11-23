@@ -170,11 +170,26 @@ export interface SystemSettings {
   monthlyTarget?: number;  // هدف التحصيل الشهري (لوحة المؤشرات)
   advisorNotes?: string;   // «معلومات عملي» للمستشار: كلف، منافسون، سعة الأبراج، أهداف (بدون بيانات شخصية)
   promotions?: Promotion[];      // العروض (يديرها المدير)
+  marketingPlan?: PlanItem[];    // خطة التسويق (يديرها المدير، يقرؤها المكتب)
   referralRewardDays?: number;   // أيام مجانية للداعي عن كل مشترك جديد يدفع
   marketingDailyLimit?: number;  // حد رسائل العروض يومياً (حماية رقم الواتساب)
 }
 
 import type { Promotion } from '../../shared/promotions';
+
+/** بند في خطة التسويق: فكرة من المكتبة (أو مخصصة) بتاريخ بدء وانتهاء */
+export interface PlanItem {
+  id: string;
+  ideaId: string;            // معرّف الفكرة في المكتبة، أو 'custom'
+  title: string;
+  startDate: string;         // YYYY-MM-DD
+  endDate?: string;
+  note?: string;
+  promotionId?: string;      // العرض الذي أنشأته الخطة تلقائياً لهذا البند
+  segment?: 'lost' | 'loyal' | 'upgrade' | 'tower'; // للحملات: الفئة المستهدفة
+  skipped?: boolean;         // قرّر المدير عدم تنفيذه
+  createdAt: string;
+}
 export type { Promotion } from '../../shared/promotions';
 
 export type ReportPeriod = 'this_month' | 'last_month' | 'this_quarter' | 'last_quarter' | 'this_year' | 'custom';

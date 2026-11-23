@@ -100,6 +100,7 @@ import { withRemainingDebt } from './utils/debt';
 import { splitImportDuplicates } from './utils/importDedupe';
 import { applyDebtAdjustment, buildPayment, buildRenewal, reversePayment, type RenewalInput } from './utils/ledger';
 import { pendingReferrals } from './utils/marketing';
+import { planAlertCount } from './utils/marketingPlan';
 import { DebtModal } from './components/DebtModal';
 import { appConfirm, notify } from './components/ui/Dialogs';
 
@@ -1118,6 +1119,7 @@ export default function App() {
         onLogout={handleLogout}
         simpleMode={simpleMode}
         onToggleSimpleMode={() => setSimpleMode(!simpleMode)}
+        planAlerts={currentUser.role === 'technician' ? 0 : planAlertCount(settings.marketingPlan, todayStr())}
       />
 
       <QuickSearch

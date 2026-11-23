@@ -120,6 +120,8 @@ interface HeaderProps {
   /** الوضع البسيط: رأس صغير بدون أقسام ولا أرقام */
   simpleMode?: boolean;
   onToggleSimpleMode?: () => void;
+  /** بنود خطة التسويق التي تبدأ خلال أيام (تنبيه على «التسويق») */
+  planAlerts?: number;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -139,6 +141,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenAddUser,
   simpleMode,
   onToggleSimpleMode,
+  planAlerts = 0,
 }) => {
   const [notifPermission, setNotifPermission] = useState<NotificationPermission>('default');
   // زر التثبيت يظهر ما دامت المنظومة مفتوحة في المتصفح وليس كتطبيق مثبت
@@ -157,6 +160,7 @@ export const Header: React.FC<HeaderProps> = ({
   const badgeFor = (id: string): React.ReactNode => {
     if (id === 'subscribers') return <span className="relative text-xs px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-300 font-normal">{stats.totalSubscribers}</span>;
     if (id === 'tickets' && stats.openTicketsCount > 0) return <span className="relative text-xs px-1.5 py-0.2 rounded-full bg-rose-500/30 text-rose-300 border border-rose-500/40">{stats.openTicketsCount}</span>;
+    if (id === 'marketing' && planAlerts > 0) return <span className="relative text-xs px-1.5 rounded-full bg-amber-500/30 text-amber-200 border border-amber-500/40" title="بنود تبدأ قريباً في خطة التسويق">{planAlerts}</span>;
     if (id === 'reminders' && alertsCount > 0) return <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping absolute top-2 right-2"></span>;
     return null;
   };

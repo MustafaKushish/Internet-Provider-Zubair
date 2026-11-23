@@ -137,6 +137,13 @@ Der Windows-Installer ist eine Electron-Hülle (`desktop/`) um dieselbe Adresse.
 
 ## Angebote und Marketing („العروض والتسويق“, Admin und Buchhalter)
 
+- **Planung („التخطيط“, erster Reiter):** Eine Bibliothek fertiger Marketing-Ideen zum Lesen (Ziel, wann sinnvoll, was die
+  App tut, Wirkung), die nächsten Anlässe (Ramadan, Eid al-Fitr, Eid al-Adha, Schulbeginn; islamische Daten nach
+  Umm-al-Qura, können um einen Tag abweichen) mit passenden Vorschlägen, und „meine Planung“ mit laufenden, kommenden,
+  beendeten und gestrichenen Punkten. Bei Angebots-Ideen legt die App auf Wunsch das Angebot für genau diesen Zeitraum an
+  und zeigt danach Nutzungen, Einnahmen und Kosten. Bei Kampagnen öffnet „افتح الحملة“ direkt die richtige Zielgruppe.
+  Punkte, die in den nächsten 3 Tagen beginnen, erscheinen als Erinnerung und als Zahl am Menüpunkt „التسويق“.
+  Den Plan bearbeitet der Admin, der Buchhalter kann ihn lesen.
 - **Angebote:** Der Admin legt Angebote an (oder tippt eine Vorlage an): Gratis-Monate („3 Monate + 1 gratis“), Rabatt in
   Dinar oder in Prozent, mit Mindestlaufzeit, Zeitraum und optional „nur bei Verlängerung vor Ablauf“. Gratis-Monate
   verlängern das Ablaufdatum, der Kunde zahlt nur die bezahlten Monate. Pro Angebot zeigt die App Nutzungen, Einnahmen und
