@@ -68,7 +68,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   if (simpleMode) {
     return (
-      <header className="relative bg-slate-900/80 lg:sticky lg:top-0 z-30 shadow-2xl shadow-black/30 backdrop-blur-xl no-print">
+      <header className="relative bg-slate-900/80 lg:sticky lg:top-0 z-30 shadow-2xl shadow-black/30 backdrop-blur-xl no-print" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="gradient-line absolute bottom-0 inset-x-0" aria-hidden="true" />
         <div className="max-w-3xl mx-auto px-3 sm:px-6 py-3 flex flex-wrap items-center gap-3">
           <div className="logo-glow w-11 h-11 rounded-xl bg-gradient-to-tr from-cyan-600 via-blue-600 to-indigo-600 flex items-center justify-center text-white flex-shrink-0">
@@ -97,7 +97,7 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <LazyMotion features={loadMotionFeatures} strict>
     <MotionConfig reducedMotion="user">
-    <header className="relative bg-slate-900/80 lg:sticky lg:top-0 z-30 shadow-2xl shadow-black/30 backdrop-blur-xl no-print">
+    <header className="relative bg-slate-900/80 lg:sticky lg:top-0 z-30 shadow-2xl shadow-black/30 backdrop-blur-xl no-print" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <div className="gradient-line absolute bottom-0 inset-x-0" aria-hidden="true" />
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2.5 flex items-center gap-2 sm:gap-3">
         <button type="button" onClick={() => go(NAV_GROUPS[0])} className="flex items-center gap-2.5 min-w-0 cursor-pointer text-right" aria-label="الرئيسية">

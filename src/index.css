@@ -54,6 +54,24 @@ html, body {
     font-size: 16px;
   }
 }
+/*
+ * حافة الشاشة العليا (آيفون: الساعة والبطارية فوق المحتوى عند التمرير):
+ * شريط زجاجي بارتفاع المنطقة الآمنة فقط، لا يظهر على الشاشات بلا نوتش. النوافذ تنزل تحتها.
+ */
+#root::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  inset-inline: 0;
+  height: env(safe-area-inset-top);
+  z-index: 100;
+  pointer-events: none;
+  background: rgb(2 6 23 / 0.78);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+}
+.app-overlay { padding-top: max(0.75rem, env(safe-area-inset-top)); }
+@media print { #root::before { display: none; } }
 button, a {
   -webkit-tap-highlight-color: transparent;
 }
