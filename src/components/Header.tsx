@@ -68,7 +68,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   if (simpleMode) {
     return (
-      <header className="relative bg-slate-900/80 lg:sticky lg:top-0 z-30 shadow-2xl shadow-black/30 backdrop-blur-xl no-print">
+      <header className="relative bg-slate-900/80 lg:sticky lg:top-0 z-30 shadow-2xl shadow-black/30 backdrop-blur-xl no-print" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="gradient-line absolute bottom-0 inset-x-0" aria-hidden="true" />
         <div className="max-w-3xl mx-auto px-3 sm:px-6 py-3 flex flex-wrap items-center gap-3">
           <div className="logo-glow w-11 h-11 rounded-xl bg-gradient-to-tr from-cyan-600 via-blue-600 to-indigo-600 flex items-center justify-center text-white flex-shrink-0">
@@ -97,7 +97,7 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <LazyMotion features={loadMotionFeatures} strict>
     <MotionConfig reducedMotion="user">
-    <header className="relative bg-slate-900/80 lg:sticky lg:top-0 z-30 shadow-2xl shadow-black/30 backdrop-blur-xl no-print">
+    <header className="relative bg-slate-900/80 lg:sticky lg:top-0 z-30 shadow-2xl shadow-black/30 backdrop-blur-xl no-print" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <div className="gradient-line absolute bottom-0 inset-x-0" aria-hidden="true" />
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2.5 flex items-center gap-2 sm:gap-3">
         <button type="button" onClick={() => go(NAV_GROUPS[0])} className="flex items-center gap-2.5 min-w-0 cursor-pointer text-right" aria-label="الرئيسية">
@@ -166,13 +166,13 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
     </header>
 
-    {/* الهاتف: شريط تنقل سفلي بالأقسام الخمسة */}
+    {/* الهاتف: شريط تنقل سفلي عائم (زجاج) بالأقسام الخمسة */}
     <nav
       aria-label="التنقل السريع"
-      className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-slate-900/85 backdrop-blur-xl border-t border-slate-800/80 shadow-[0_-10px_30px_-12px_rgb(0_0_0/0.6)] no-print"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      className="mobile-dock lg:hidden fixed inset-x-3 z-40 no-print"
+      style={{ bottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}
     >
-      <div className="grid" style={{ gridTemplateColumns: `repeat(${groups.length}, minmax(0, 1fr))` }}>
+      <div className="mobile-dock-bar grid gap-1 p-1.5 rounded-[1.75rem]" style={{ gridTemplateColumns: `repeat(${groups.length}, minmax(0, 1fr))` }}>
         {groups.map(g => {
           const Icon = g.icon;
           const active = activeGroup === g.id;
@@ -183,14 +183,14 @@ export const Header: React.FC<HeaderProps> = ({
               type="button"
               onClick={() => go(g)}
               aria-current={active ? 'page' : undefined}
-              className={`relative flex flex-col items-center justify-center gap-0.5 min-h-14 py-2 text-xs font-semibold cursor-pointer transition-colors ${active ? 'text-cyan-300' : 'text-slate-400'}`}
+              className={`relative flex flex-col items-center justify-center gap-1 min-h-[3.5rem] rounded-[1.25rem] text-xs font-semibold cursor-pointer transition-colors ${active ? 'text-white' : 'text-slate-400 active:text-slate-200'}`}
             >
-              {active && <m.span layoutId="mobile-nav-indicator" transition={PILL_SPRING} className="absolute inset-x-2 inset-y-1 rounded-2xl bg-cyan-500/10" aria-hidden="true" />}
+              {active && <m.span layoutId="mobile-nav-indicator" transition={PILL_SPRING} className="mobile-dock-active absolute inset-0 rounded-[1.25rem]" aria-hidden="true" />}
               <span className="relative">
-                <Icon className="w-5 h-5" />
-                {n > 0 && <span className="absolute -top-1.5 -left-2.5 min-w-[16px] h-4 px-1 rounded-full bg-amber-500 text-slate-950 text-[10px] font-bold leading-4 text-center">{n > 99 ? '99+' : n}</span>}
+                <Icon className={`w-[1.4rem] h-[1.4rem] transition-transform ${active ? 'text-cyan-200 scale-110' : ''}`} />
+                {n > 0 && <span className="absolute -top-1.5 -left-2.5 min-w-[1.1rem] h-[1.1rem] px-1 rounded-full bg-amber-400 text-slate-950 text-[10px] font-bold leading-[1.1rem] text-center ring-2 ring-slate-900">{n > 99 ? '99+' : n}</span>}
               </span>
-              <span className="relative">{g.label}</span>
+              <span className="relative leading-none">{g.label}</span>
             </button>
           );
         })}

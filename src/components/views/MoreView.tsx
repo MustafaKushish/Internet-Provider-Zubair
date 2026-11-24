@@ -1,8 +1,9 @@
-import React from 'react';
-import { Bell, BellOff, ChevronLeft, Download, LogOut, MonitorDown, Server, Settings, ShieldCheck, Smile, Sparkles, TowerControl, Upload, UserCheck, Wrench } from 'lucide-react';
+import React, { useState } from 'react';
+import { Bell, BellOff, ChevronLeft, Download, LogOut, MonitorDown, Server, Settings, ShieldCheck, Smile, TowerControl, Upload, UserCheck, Wrench } from 'lucide-react';
 import { StaffUser } from '../../types/isp';
 import { canAccessTab } from '../../../shared/access';
 import { TAB_LABEL } from '../nav';
+import { UI_SCALES, loadUiScale, saveUiScale, type UiScaleId } from '../../utils/uiScale';
 
 /** «المزيد»: الأقسام الأقل استعمالاً، وأدوات الجهاز والحساب (بدل أزرار الرأس القديمة) */
 interface MoreViewProps {
@@ -40,6 +41,31 @@ const Group: React.FC<{ title: string; children: React.ReactNode }> = ({ title, 
   </section>
 );
 
+/** حجم الخط والعناصر: أربع درجات، تُحفظ على هذا الجهاز */
+const ScalePicker: React.FC = () => {
+  const [scale, setScale] = useState<UiScaleId>(loadUiScale);
+  return (
+    <li className="px-4 py-3 space-y-2.5">
+      <span className="block text-base text-slate-100">حجم الخط والأزرار</span>
+      <div role="radiogroup" aria-label="حجم الخط والأزرار" className="grid grid-cols-4 gap-1.5 p-1 rounded-2xl bg-slate-950/60 border border-slate-700">
+        {UI_SCALES.map((s, i) => (
+          <button
+            key={s.id}
+            type="button"
+            role="radio"
+            aria-checked={scale === s.id}
+            onClick={() => { setScale(s.id); saveUiScale(s.id); }}
+            className={`h-12 rounded-xl flex flex-col items-center justify-center gap-0.5 cursor-pointer ${scale === s.id ? 'bg-cyan-500/20 text-cyan-100 ring-1 ring-cyan-400/50' : 'text-slate-300 hover:bg-white/5'}`}
+          >
+            <span className="font-bold leading-none" style={{ fontSize: `${0.9 + i * 0.18}rem` }}>أ</span>
+            <span className="text-[11px] leading-none">{s.label}</span>
+          </button>
+        ))}
+      </div>
+    </li>
+  );
+};
+
 export const MoreView: React.FC<MoreViewProps> = p => {
   const can = (t: string) => canAccessTab(p.currentUser.role, t);
   const isOffice = p.currentUser.role !== 'technician';
@@ -50,7 +76,6 @@ export const MoreView: React.FC<MoreViewProps> = p => {
       <Group title="العمل اليومي">
         {can('tickets') && <Row icon={Wrench} label={TAB_LABEL.tickets} badge={p.openTickets} onClick={() => p.onOpenTab('tickets')} />}
         {can('towers') && <Row icon={TowerControl} label={TAB_LABEL.towers} onClick={() => p.onOpenTab('towers')} />}
-        {can('advisor') && <Row icon={Sparkles} label={TAB_LABEL.advisor} onClick={() => p.onOpenTab('advisor')} />}
       </Group>
 
       {(can('providers') || can('users') || can('settings') || isOffice) && (
@@ -71,6 +96,7 @@ export const MoreView: React.FC<MoreViewProps> = p => {
             <span className="block text-sm text-slate-400">{ROLE_LABEL[p.currentUser.role]} • <span dir="ltr">@{p.currentUser.username}</span></span>
           </span>
         </li>
+        <ScalePicker />
         <Row icon={Smile} label="الوضع البسيط (خط وأزرار كبيرة)" onClick={p.onToggleSimpleMode} />
         <Row icon={p.notificationsOn ? Bell : BellOff} label={p.notificationsOn ? 'الإشعارات مفعلة: افحص التنبيهات الآن' : 'فعّل الإشعارات على هذا الجهاز'} onClick={p.onBell} />
         {p.canInstall && <Row icon={MonitorDown} label="ثبّت التطبيق على هذا الجهاز" onClick={p.onInstall} />}

@@ -63,7 +63,8 @@ import {
 // Components & Modals
 import { Header, SubNav, TAB_ORDER } from './components/Header';
 import { useDeviceActions } from './hooks/useDeviceActions';
-import { canAccessTab } from '../shared/access';
+import { canAccessTab, canUseAdvisor } from '../shared/access';
+import { AdvisorFab } from './components/AdvisorFab';
 import { ViewLoader } from './components/ui/ViewLoader';
 import { pushTabHistory, setTabBackHandler } from './components/ui/backStack';
 import { useUndo } from './hooks/useUndo';
@@ -95,7 +96,6 @@ import { useCloudSync } from './sync/useCloudSync';
 const ReportsView = React.lazy(() => import('./components/views/ReportsView').then(m => ({ default: m.ReportsView })));
 // المستشار الذكي يُحمَّل عند فتح التبويب فقط
 const CashView = React.lazy(() => import('./components/views/CashView').then(m => ({ default: m.CashView })));
-const AdvisorView = React.lazy(() => import('./components/views/AdvisorView').then(m => ({ default: m.AdvisorView })));
 import { NO_TOWER_LABEL, normTower } from './utils/towers';
 import { withRemainingDebt } from './utils/debt';
 import { splitImportDuplicates } from './utils/importDedupe';
@@ -1532,31 +1532,6 @@ export default function App() {
           />
         )}
 
-        {safeActiveTab === 'advisor' && (
-          <React.Suspense fallback={<ViewLoader label="جارٍ تحميل المستشار…" />}>
-            <AdvisorView
-              subscribers={activeSubscribers}
-              payments={payments}
-              tickets={tickets}
-              providers={providers}
-              towers={towerPoints}
-              settings={settings}
-              expenses={expenses}
-              currentUser={currentUser}
-              onChangeProvider={(p) => {
-                if (currentUser.role !== 'admin') return;
-                setSettings(prev => ({ ...prev, advisorProvider: p }));
-                notify('تم تغيير محرك المستشار الذكي.', 'success');
-              }}
-              onSaveNotes={(notes) => {
-                if (currentUser.role !== 'admin') return;
-                setSettings(prev => ({ ...prev, advisorNotes: notes }));
-                notify('تم حفظ معلومات العمل للمستشار.', 'success');
-              }}
-            />
-          </React.Suspense>
-        )}
-
         {safeActiveTab === 'users' && (
           <UsersManagementView
             currentUser={currentUser}
@@ -1596,12 +1571,36 @@ export default function App() {
       {lastUndo && <div className="h-16 no-print" aria-hidden="true" />}
 
       {/* Footer */}
-      <footer className={`relative border-t border-slate-800/60 bg-slate-950/70 backdrop-blur-sm py-4 ${simpleMode ? 'pb-6' : 'pb-24'} lg:pb-4 text-center text-xs text-slate-400 no-print`}>
+      <footer className={`relative border-t border-slate-800/60 bg-slate-950/70 backdrop-blur-sm py-4 ${simpleMode ? 'pb-6' : 'pb-[calc(7.5rem+env(safe-area-inset-bottom))]'} lg:pb-4 text-center text-xs text-slate-400 no-print`}>
         <p>
           {settings.ispName} (العراق - البصرة - قضاء الزبير) © {new Date().getFullYear()}
           {settings.contactPhone && <> • هاتف وواتساب:{' '}<span className="font-mono text-cyan-400 font-semibold" dir="ltr">{settings.contactPhone}</span></>}
         </p>
       </footer>
+
+      {canUseAdvisor(currentUser.role) && (
+        <AdvisorFab
+          raised={!simpleMode}
+          subscribers={activeSubscribers}
+          payments={payments}
+          tickets={tickets}
+          providers={providers}
+          towers={towerPoints}
+          settings={settings}
+          expenses={expenses}
+          currentUser={currentUser}
+          onChangeProvider={(p) => {
+            if (currentUser.role !== 'admin') return;
+            setSettings(prev => ({ ...prev, advisorProvider: p }));
+            notify('تم تغيير محرك المستشار الذكي.', 'success');
+          }}
+          onSaveNotes={(notes) => {
+            if (currentUser.role !== 'admin') return;
+            setSettings(prev => ({ ...prev, advisorNotes: notes }));
+            notify('تم حفظ معلومات العمل للمستشار.', 'success');
+          }}
+        />
+      )}
 
       <UndoBar entry={lastUndo} count={undoCount} raised={!simpleMode} onUndo={handleUndo} />
 

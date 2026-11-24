@@ -3,6 +3,9 @@
 ISP manager for شبكة أولاد كشيش (Basra, Zubair): subscribers, renewals, debts, towers, cash.
 UI is **Arabic, RTL**. README, chat replies to the owner: **German**. Commit messages: English.
 
+## Workflow
+- After every finished piece of work: commit, push and open (or update) the pull request right away, without asking. Don't offer to watch it.
+
 ## Save tokens
 - Never read `package-lock.json`, `dist/`, `dist-preview/`, `.wrangler/`, `node_modules/`.
 - `src/App.tsx` (~1600 lines) and the views are big: `grep -n` first, then read only the needed line range.
@@ -14,7 +17,7 @@ UI is **Arabic, RTL**. README, chat replies to the owner: **German**. Commit mes
 
 ## Layout
 - Navigation: 5 sections in `src/components/nav.ts` (`NAV_GROUPS`: الرئيسية, المشتركون, المال = debts/cash/reports/dashboard,
-  التسويق = marketing/reminders, المزيد = more page + tickets/towers/advisor/providers/users/settings). Pages (tabs) are unchanged and
+  التسويق = marketing/reminders, المزيد = more page + tickets/towers/providers/users/settings). Pages (tabs) are unchanged and
   keep their access rules; a new page needs an entry in a group, `TAB_LABEL` and `TAB_ACCESS`. `SubNav` (in Header) shows the pages
   of the active section. Start page = `HomeView` (3 numbers + one "today" list from pure `utils/today.ts`); `MoreView` holds device
   and account actions (simple mode, bell, install, Excel, switch user, logout) via `hooks/useDeviceActions`.
@@ -62,7 +65,7 @@ UI is **Arabic, RTL**. README, chat replies to the owner: **German**. Commit mes
 - `src/utils/storage.ts` — localStorage load/save, money math (`getAmountDue`, `getRemainingDebt`), formatting, WhatsApp, Excel.
 - `src/utils/debt.ts` (months-based debt), `installments.ts` (plans), `search.ts` (Arabic-tolerant search), `dates.ts` (local dates, `todayStr`).
 - `src/sync/` — offline-first sync: local data + shadow copy, push diffs / pull by cursor to `/api/sync`.
-- `worker/index.ts` — Cloudflare Worker + D1: auth (PBKDF2), roles, sync, audit log. `worker/advisor.ts` — AI advisor.
+- `worker/index.ts` — Cloudflare Worker + D1: auth (PBKDF2), roles, sync, audit log. `worker/advisor.ts` — AI advisor. UI = floating button bottom-right `components/AdvisorFab.tsx` (lazy `AdvisorPanel` in `views/AdvisorView.tsx`, chat stays alive when closed; bottom-left is the sync badge; `canUseAdvisor` in `shared/access.ts`). It is no page/tab anymore.
 - `desktop/` — Electron shell that only loads the hosted URL.
 - Deploy: push to `main` → GitHub Action → `wrangler deploy`.
 
@@ -93,4 +96,5 @@ UI is **Arabic, RTL**. README, chat replies to the owner: **German**. Commit mes
   every `.app-overlay > *`, `.glass-popover`, `.glass-toast`); don't give dialogs their own border colors/radius. Primary `bg-cyan/emerald/indigo-600|700` buttons get gradients.
 - Color meaning: cyan = brand/primary, rose = expired/danger only, amber = expiring soon or debt, emerald = active/paid.
   Show a status color once per row (pill), keep avatars/secondary buttons neutral. Logout is neutral with a rose icon.
+- Sizes: everything is rem. Type tokens (`--text-xs..2xl`) and tiny `text-[10/11px]` are raised in `index.css` ("مقياس الخط"); touch devices get 44px min tap targets. The user picks the root scale (4 steps, device-local) in «المزيد» (`utils/uiScale.ts`, applied in `main.tsx`). Don't use fixed px sizes for text or controls.
 - Motion: transform/opacity only, honor `prefers-reduced-motion` (already global in `index.css`).

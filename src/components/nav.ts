@@ -18,7 +18,7 @@ export const NAV_GROUPS: NavGroup[] = [
   { id: 'subscribers', label: 'المشتركون', icon: Users, tabs: ['subscribers'] },
   { id: 'money', label: 'المال', icon: Wallet, tabs: ['debts', 'cash', 'reports', 'dashboard'] },
   { id: 'marketing', label: 'التسويق', icon: Megaphone, tabs: ['marketing', 'reminders'] },
-  { id: 'more', label: 'المزيد', icon: LayoutGrid, tabs: ['more', 'tickets', 'towers', 'advisor', 'providers', 'users', 'settings'] },
+  { id: 'more', label: 'المزيد', icon: LayoutGrid, tabs: ['more', 'tickets', 'towers', 'providers', 'users', 'settings'] },
 ];
 
 /** أسماء الصفحات داخل القسم (الشريط الصغير تحت العنوان) */
@@ -34,7 +34,6 @@ export const TAB_LABEL: Record<string, string> = {
   more: 'المزيد',
   tickets: 'البلاغات والدعم الفني',
   towers: 'الأبراج',
-  advisor: 'المستشار الذكي',
   providers: 'المزودون والباقات',
   users: 'المستخدمون والصلاحيات',
   settings: 'الإعدادات',

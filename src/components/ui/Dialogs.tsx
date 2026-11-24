@@ -171,7 +171,7 @@ export const DialogHost: React.FC = () => {
       )}
 
       {toasts.length > 0 && (
-        <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[80] flex flex-col gap-2 w-[min(28rem,calc(100vw-2rem))] no-print" aria-live="polite">
+        <div className="fixed top-[calc(0.75rem+env(safe-area-inset-top))] left-1/2 -translate-x-1/2 z-[80] flex flex-col gap-2 w-[min(28rem,calc(100vw-2rem))] no-print" aria-live="polite">
           {toasts.map(t => (
             <div
               key={t.id}

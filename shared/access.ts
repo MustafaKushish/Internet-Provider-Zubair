@@ -26,13 +26,15 @@ export const TAB_ACCESS: Record<string, Role[]> = {
   dashboard: OFFICE_ROLES,
   reports: OFFICE_ROLES,
   providers: OFFICE_ROLES,
-  advisor: OFFICE_ROLES,
   cash: OFFICE_ROLES,
   debts: OFFICE_ROLES,
   marketing: OFFICE_ROLES,
   users: ADMIN_ONLY,
   settings: ADMIN_ONLY,
 };
+
+/** المستشار الذكي (زر عائم لا صفحة): للمدير والمحاسب فقط */
+export const canUseAdvisor = (role: Role): boolean => OFFICE_ROLES.includes(role);
 
 export const canAccessTab = (role: Role, tab: string): boolean => (TAB_ACCESS[tab] || []).includes(role);
 
