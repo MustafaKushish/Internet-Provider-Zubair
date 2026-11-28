@@ -471,7 +471,8 @@ export default function App() {
       .filter(p => p.subscriberId === subscriberForReceipt.id)
       .sort((a, b) => b.date.localeCompare(a.date) || (b.receiptNumber || '').localeCompare(a.receiptNumber || ''));
     if (receiptCustomAmount !== undefined) {
-      return subPays.find(p => p.amount === receiptCustomAmount) || subPays[0];
+      // مبلغ بلا وصل مطابق: البون يعرض المبلغ نفسه، لا وصلاً آخر
+      return subPays.find(p => p.amount === receiptCustomAmount);
     }
     return subPays[0];
   }, [subscriberForReceipt, receiptCustomAmount, payments]);
@@ -1680,8 +1681,7 @@ export default function App() {
         subscriber={subscriberForReceipt}
         settings={settings}
         customAmount={receiptCustomAmount}
-        receiptNumber={receiptPayment?.receiptNumber}
-        receiptDate={receiptPayment?.date}
+        payment={receiptPayment}
       />
 
       <TicketModal

@@ -504,3 +504,83 @@ button.bg-indigo-600, button.bg-indigo-700 {
     display: block !important;
   }
 }
+
+/* ============================================================
+ * بون الطابعة الحرارية (80 / 58 مم): أسود على أبيض، بلا خلفيات رمادية (تطبع باهتة)
+ * المعاينة على الشاشة بحجم الورق الحقيقي؛ عند الطباعة يُطبع .receipt-print وحده.
+ * ============================================================ */
+.thermal {
+  background: #fff;
+  color: #000;
+  font-family: 'Cairo', 'Tajawal', system-ui, sans-serif;
+  font-size: 9.5pt;
+  line-height: 1.45;
+  padding: 4mm 3mm 3mm;
+  direction: rtl;
+  text-align: right;
+}
+.thermal-80 { width: 72mm; }
+.thermal-58 { width: 48mm; font-size: 8.5pt; padding: 3mm 1.5mm 2mm; }
+.thermal * { color: #000; }
+.thermal-center { text-align: center; }
+.thermal-logo {
+  width: 11mm; height: 11mm; margin: 0 auto 1.5mm;
+  border-radius: 50%; background: #000;
+  display: flex; align-items: center; justify-content: center;
+}
+.thermal-logo svg { width: 6.5mm; height: 6.5mm; }
+.thermal .thermal-logo, .thermal .thermal-logo * { color: #fff; }
+.thermal-brand { font-size: 1.45em; font-weight: 900; line-height: 1.25; }
+.thermal-sub { font-size: 0.85em; font-weight: 600; }
+.thermal-num { font-variant-numeric: tabular-nums; font-weight: 700; letter-spacing: 0.02em; }
+.thermal-title {
+  margin: 2.5mm 0 1.5mm; padding: 1mm 0;
+  border-top: 2px solid #000; border-bottom: 2px solid #000;
+  text-align: center; font-size: 1.25em; font-weight: 900; letter-spacing: 0.05em;
+}
+.thermal-row { display: flex; justify-content: space-between; align-items: baseline; gap: 2mm; padding: 0.4mm 0; }
+.thermal-row > span:first-child { font-weight: 600; white-space: nowrap; }
+.thermal-val { text-align: left; font-weight: 700; overflow-wrap: anywhere; }
+.thermal-strong, .thermal-strong .thermal-val { font-weight: 900; }
+.thermal-hr { border: 0; border-top: 1.5px dashed #000; margin: 1.8mm 0; }
+.thermal-total {
+  display: flex; justify-content: space-between; align-items: center;
+  margin: 2mm 0 1.5mm; padding: 1.5mm 2mm;
+  border: 2px solid #000; border-radius: 2mm;
+  font-size: 1.2em; font-weight: 900;
+}
+.thermal-total .thermal-num { white-space: nowrap; }
+.thermal-58 .thermal-total { flex-direction: column; gap: 0.5mm; text-align: center; }
+.thermal-58 .thermal-total .thermal-num { font-size: 1.15em; }
+.thermal-note { margin-top: 1mm; font-size: 0.9em; }
+.thermal-box {
+  margin-top: 2.5mm; padding: 1.5mm 2mm;
+  border: 1.5px dashed #000; border-radius: 2mm;
+  text-align: center; font-size: 0.9em; font-weight: 700;
+}
+.thermal-ad-head {
+  margin-top: 2.5mm; padding: 0.8mm 0;
+  background: #000; color: #fff; text-align: center; font-weight: 900; letter-spacing: 0.05em;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.thermal .thermal-ad-head { color: #fff; }
+.thermal-ads { margin: 1.5mm 0 0; padding: 0 3.5mm 0 0; list-style: disc; font-size: 0.9em; font-weight: 700; }
+.thermal-ads li { margin-bottom: 0.8mm; }
+.thermal-foot { font-size: 0.85em; }
+.thermal-cut { margin-top: 3mm; text-align: center; font-size: 0.8em; letter-spacing: 0.1em; overflow: hidden; white-space: nowrap; }
+
+/* معاينة: ورقة بيضاء بظل وحافة ممزقة */
+.receipt-paper-preview {
+  box-shadow: 0 18px 40px -12px rgb(0 0 0 / 0.8);
+  -webkit-mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% / 3mm 100%;
+  mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% / 3mm 100%;
+  padding-bottom: 1.5mm;
+  background: #fff;
+}
+.receipt-print { display: none; }
+@media print {
+  body.receipt-printing > :not(.receipt-print) { display: none !important; }
+  body.receipt-printing .receipt-print { display: block !important; }
+  body.receipt-printing { background: #fff !important; margin: 0; }
+  .receipt-print .thermal { padding-top: 2mm; margin: 0 auto; }
+}
