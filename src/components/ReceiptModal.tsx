@@ -1,170 +1,179 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Printer, Wifi } from 'lucide-react';
 import { useEscapeKey } from './ui/useEscapeKey';
-import { Subscriber, SystemSettings } from '../types/isp';
-import { formatCurrency, getRemainingDebt } from '../utils/storage';
-import { todayStr } from '../utils/dates';
-import { X, Printer, Wifi, ShieldCheck, CheckCircle } from 'lucide-react';
 import { BackButton } from './ui/BackButton';
+import type { PaymentRecord, Subscriber, SystemSettings } from '../types/isp';
+import { todayStr } from '../utils/dates';
+import { buildReceipt, type ReceiptData } from '../utils/receipt';
 
 interface ReceiptModalProps {
   isOpen: boolean;
   onClose: () => void;
   subscriber: Subscriber | null;
   settings: SystemSettings;
+  /** سجل الدفعة (المصدر الأساسي: المبلغ والطريقة والعرض والمتبقي) */
+  payment?: PaymentRecord;
   customAmount?: number;
-  receiptNumber?: string;
-  receiptDate?: string;
 }
 
-// الغلاف يضمن استدعاء الـ hooks دائماً بنفس الترتيب (قواعد React)، ويعيد ضبط الحقول عند كل فتح
+type Paper = 80 | 58;
+interface Prefs { paper: Paper; ads: boolean }
+const PREFS_KEY = 'sas_plus_receipt_prefs_v1';
+const loadPrefs = (): Prefs => {
+  try {
+    const p = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
+    return { paper: p.paper === 58 ? 58 : 80, ads: p.ads !== false };
+  } catch { return { paper: 80, ads: true }; }
+};
+
+// الغلاف يضمن استدعاء الـ hooks دائماً بنفس الترتيب (قواعد React)
 export const ReceiptModal: React.FC<ReceiptModalProps> = (props) =>
   props.isOpen && props.subscriber ? <ReceiptModalInner {...props} subscriber={props.subscriber} /> : null;
 
-const ReceiptModalInner: React.FC<ReceiptModalProps & { subscriber: Subscriber }> = ({
-  isOpen,
-  onClose,
-  subscriber,
-  settings,
-  customAmount,
-  receiptNumber: receiptNumberProp,
-  receiptDate,
-}) => {
+const ReceiptModalInner: React.FC<ReceiptModalProps & { subscriber: Subscriber }> = ({ onClose, subscriber, settings, payment, customAmount }) => {
   useEscapeKey(onClose);
+  const [prefs, setPrefs] = useState<Prefs>(loadPrefs);
+  const setPref = (p: Partial<Prefs>) => setPrefs(prev => {
+    const next = { ...prev, ...p };
+    try { localStorage.setItem(PREFS_KEY, JSON.stringify(next)); } catch { /* التخزين غير متاح */ }
+    return next;
+  });
+  const data = useMemo(
+    () => buildReceipt(subscriber, payment, settings, { today: todayStr(), customAmount, showAds: prefs.ads }),
+    [subscriber, payment, settings, customAmount, prefs.ads],
+  );
 
-  // رقم الوصل الحقيقي من سجل الدفعات (وليس رقماً مشتقاً من معرّف المشترك)
-  const receiptNumber = receiptNumberProp || '—';
-  const today = receiptDate || todayStr();
-  const paid = customAmount !== undefined ? customAmount : subscriber.paidAmount;
-  // المتبقي الفعلي بذمة المشترك
-  const remainingDebt = getRemainingDebt(subscriber);
-
+  // الطباعة: يُطبع البون وحده بعرض ورق الطابعة الحرارية
   const handlePrint = () => {
+    const style = document.createElement('style');
+    style.textContent = `@page { size: ${prefs.paper}mm auto; margin: 0; }`;
+    document.head.appendChild(style);
+    document.body.classList.add('receipt-printing');
+    const done = () => {
+      document.body.classList.remove('receipt-printing');
+      style.remove();
+      window.removeEventListener('afterprint', done);
+    };
+    window.addEventListener('afterprint', done);
     window.print();
   };
+  useEffect(() => () => document.body.classList.remove('receipt-printing'), []);
+
+  const chip = (on: boolean) => `h-10 px-3 rounded-xl text-sm font-semibold cursor-pointer ${on ? 'bg-cyan-500/20 text-cyan-100 ring-1 ring-cyan-400/50' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`;
 
   return (
-    <div className="app-overlay fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-xl w-full shadow-2xl overflow-hidden my-6">
-        {/* Top Controls (Hidden on print) */}
-        <div className="px-6 py-3 bg-slate-800/80 border-b border-slate-700/80 flex items-center justify-between no-print">
-          <span className="text-sm font-bold text-slate-200">معاينة وطباعة وصل القبض</span>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handlePrint}
-              className="px-4 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
-            >
-              <Printer className="w-4 h-4" />
-              <span>طباعة الوصل</span>
-            </button>
-            <BackButton onClick={onClose} />
+    <div className="app-overlay fixed inset-0 z-50 flex items-start sm:items-center justify-center p-3 sm:p-4 overflow-y-auto" onClick={onClose}>
+      <div role="dialog" aria-modal="true" aria-label="طباعة بون القبض" className="bg-slate-900 rounded-2xl w-full max-w-md overflow-hidden my-4" onClick={e => e.stopPropagation()}>
+        <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between gap-2">
+          <h2 className="text-base font-bold text-white">بون القبض</h2>
+          <BackButton onClick={onClose} />
+        </div>
+
+        <div className="px-4 py-3 border-b border-slate-700 flex flex-wrap items-center gap-2">
+          <span className="text-sm text-slate-400">عرض الورق:</span>
+          <button type="button" onClick={() => setPref({ paper: 80 })} className={chip(prefs.paper === 80)} aria-pressed={prefs.paper === 80}>80 مم</button>
+          <button type="button" onClick={() => setPref({ paper: 58 })} className={chip(prefs.paper === 58)} aria-pressed={prefs.paper === 58}>58 مم</button>
+          <label className="ms-auto flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+            <input type="checkbox" checked={prefs.ads} onChange={e => setPref({ ads: e.target.checked })} className="w-4 h-4 accent-cyan-500" />
+            العروض والإعلان
+          </label>
+        </div>
+
+        {/* معاينة بحجم الورق الحقيقي */}
+        <div className="bg-slate-950 px-3 py-6 flex justify-center overflow-x-auto">
+          <div className="receipt-paper-preview">
+            <ThermalReceipt data={data} settings={settings} paper={prefs.paper} />
           </div>
         </div>
 
-        {/* The Printable Receipt Document */}
-        <div className="p-8 bg-white text-slate-900 font-sans print:p-0 print:m-0" id="printable-receipt">
-          {/* Header */}
-          <div className="border-b-2 border-slate-800 pb-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-slate-900 text-white flex items-center justify-center">
-                <Wifi className="w-7 h-7 text-cyan-400" />
-              </div>
-              <div>
-                <h1 className="text-xl font-black text-slate-900">{settings.ispName}</h1>
-                <p className="text-xs text-slate-600 font-semibold">{settings.agentName} • {settings.contactPhone}</p>
-                <p className="text-[11px] text-slate-500">{settings.address}</p>
-              </div>
-            </div>
-            <div className="text-left" dir="ltr">
-              <span className="inline-block bg-slate-100 text-slate-800 border border-slate-300 text-xs px-2.5 py-1 rounded font-mono font-bold">
-                {receiptNumber}
-              </span>
-              <p className="text-xs text-slate-500 mt-1">التاريخ: {today}</p>
-            </div>
-          </div>
-
-          {/* Receipt Title */}
-          <div className="text-center py-4">
-            <h2 className="text-lg font-black tracking-wide text-slate-900 border-b inline-block px-4 pb-1">
-              وصل استلام وتسديد اشتراك إنترنت
-            </h2>
-          </div>
-
-          {/* Subscriber Data Grid */}
-          <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 grid grid-cols-2 gap-3 text-xs mb-4">
-            <div>
-              <span className="text-slate-500 block">اسم المشترك:</span>
-              <span className="text-sm font-bold text-slate-900">{subscriber.name}</span>
-            </div>
-            <div>
-              <span className="text-slate-500 block">رقم الهاتف:</span>
-              <span className="text-sm font-bold text-slate-900 font-mono" dir="ltr">{subscriber.phone}</span>
-            </div>
-            <div>
-              <span className="text-slate-500 block">اسم المستخدم (User):</span>
-              <span className="text-sm font-bold text-indigo-700 font-mono" dir="ltr">{subscriber.username}</span>
-            </div>
-            <div>
-              <span className="text-slate-500 block">البرج / التغذية:</span>
-              <span className="text-sm font-semibold text-slate-800">{subscriber.towerName}</span>
-            </div>
-          </div>
-
-          {/* Plan & Payment Table */}
-          <table className="w-full text-xs text-right border border-slate-300 rounded-lg overflow-hidden mb-4">
-            <thead className="bg-slate-800 text-white font-bold">
-              <tr>
-                <th className="p-2.5">البيان / نوع الباقة</th>
-                <th className="p-2.5">المزود</th>
-                <th className="p-2.5">صالح لغاية</th>
-                <th className="p-2.5 text-left" dir="ltr">المبلغ المسدد</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
-              <tr>
-                <td className="p-2.5 font-bold text-slate-900">{subscriber.planName}</td>
-                <td className="p-2.5 text-slate-600">{subscriber.upstreamProvider}</td>
-                <td className="p-2.5 font-bold text-emerald-700 font-mono" dir="ltr">{subscriber.expiryDate}</td>
-                <td className="p-2.5 font-black text-slate-900 text-sm text-left" dir="ltr">
-                  {formatCurrency(paid, settings.currency)}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-
-          {/* Financial summary breakdown */}
-          <div className="flex justify-end mb-6">
-            <div className="w-64 bg-slate-50 rounded-xl p-3 border border-slate-200 space-y-1.5 text-xs">
-              <div className="flex justify-between text-slate-600">
-                <span>سعر الاشتراك:</span>
-                <span className="font-bold">{formatCurrency(subscriber.salePrice, settings.currency)}</span>
-              </div>
-              <div className="flex justify-between text-emerald-700 font-bold border-t pt-1">
-                <span>المبلغ المدفوع:</span>
-                <span>{formatCurrency(paid, settings.currency)}</span>
-              </div>
-              <div className="flex justify-between text-rose-600 font-bold border-t pt-1">
-                <span>المتبقي بذمة المشترك:</span>
-                <span>{remainingDebt > 0 ? formatCurrency(remainingDebt, settings.currency) : '0 د.ع (خالص)'}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Footer & Signature */}
-          <div className="border-t border-slate-200 pt-4 flex items-center justify-between text-[11px] text-slate-500">
-            <div>
-              <p className="font-semibold text-slate-700">توقيع المستلم / الوكيل:</p>
-              <p className="mt-4 italic">.......................................</p>
-            </div>
-            <div className="text-left text-slate-400">
-              <p className="flex items-center gap-1 font-semibold text-emerald-600">
-                <CheckCircle className="w-3.5 h-3.5" />
-                <span>إيصال معتمد من المنظومة</span>
-              </p>
-              <p className="text-[10px] mt-1">{settings.whatsappFooter}</p>
-            </div>
-          </div>
+        <div className="p-3 border-t border-slate-700">
+          <button type="button" onClick={handlePrint} className="w-full h-12 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-base font-bold flex items-center justify-center gap-2 cursor-pointer">
+            <Printer className="w-5 h-5" /> اطبع البون
+          </button>
+          <p className="text-xs text-slate-400 text-center mt-2">في نافذة الطباعة اختر الطابعة الحرارية، وأوقف «الرأس والتذييل» إن ظهرا.</p>
         </div>
       </div>
+
+      {/* نسخة الطباعة: خارج النافذة حتى لا يُطبع غيرها */}
+      {createPortal(
+        <div className="receipt-print" dir="rtl">
+          <ThermalReceipt data={data} settings={settings} paper={prefs.paper} />
+        </div>,
+        document.body,
+      )}
     </div>
   );
 };
+
+const Row: React.FC<{ label: string; children: React.ReactNode; strong?: boolean; ltr?: boolean }> = ({ label, children, strong, ltr }) => (
+  <div className={`thermal-row ${strong ? 'thermal-strong' : ''}`}>
+    <span>{label}</span>
+    <span dir={ltr ? 'ltr' : undefined} className="thermal-val">{children}</span>
+  </div>
+);
+
+/** البون نفسه: أسود على أبيض، خطوط عريضة، فواصل متقطعة (مناسب للطابعات الحرارية) */
+export const ThermalReceipt: React.FC<{ data: ReceiptData; settings: SystemSettings; paper: Paper }> = ({ data: d, settings, paper }) => (
+  <div className={`thermal ${paper === 58 ? 'thermal-58' : 'thermal-80'}`}>
+    <div className="thermal-center">
+      <div className="thermal-logo"><Wifi /></div>
+      <div className="thermal-brand">{settings.ispName}</div>
+      <div className="thermal-sub">خدمات الإنترنت اللاسلكي</div>
+      {settings.address && <div className="thermal-sub">{settings.address}</div>}
+      {settings.contactPhone && <div className="thermal-sub">هاتف وواتساب: <span dir="ltr" className="thermal-num">{settings.contactPhone}</span></div>}
+    </div>
+
+    <div className="thermal-title">وصل قبض</div>
+    <Row label="رقم الوصل" ltr><span className="thermal-num">{d.number}</span></Row>
+    <Row label="التاريخ" ltr><span className="thermal-num">{d.date} {d.time}</span></Row>
+
+    <hr className="thermal-hr" />
+    <Row label="المشترك">{d.customer.name}</Row>
+    {d.customer.phone && <Row label="الهاتف" ltr><span className="thermal-num">{d.customer.phone}</span></Row>}
+    <Row label="اسم المستخدم" ltr><span className="thermal-num">{d.customer.username}</span></Row>
+    {d.customer.tower && <Row label="البرج">{d.customer.tower}</Row>}
+
+    <hr className="thermal-hr" />
+    <Row label="البيان" strong>{d.purpose}</Row>
+    <Row label="الباقة">{d.plan}{d.provider ? ` • ${d.provider}` : ''}</Row>
+    <Row label="سعر الشهر">{d.unitPrice}</Row>
+    {d.months && <Row label="المدة">{d.months}</Row>}
+    {d.freeMonths && <Row label="أشهر مجانية (هدية)">{d.freeMonths}</Row>}
+    {d.bonusDays && <Row label="أيام مكافأة الدعوة">{d.bonusDays}</Row>}
+    {d.promoName && <Row label="العرض">{d.promoName}</Row>}
+    {d.discount && <Row label="قيمة الخصم">{d.discount}</Row>}
+
+    <div className="thermal-total">
+      <span>المبلغ المستلم</span>
+      <span className="thermal-num">{d.paid}</span>
+    </div>
+    {d.method && <Row label="طريقة الدفع">{d.method}</Row>}
+    <Row label="المتبقي بذمتك" strong>{d.remainingText}</Row>
+    <Row label="صالح لغاية" strong ltr><span className="thermal-num">{d.validUntil}</span></Row>
+    {d.collectedBy && <Row label="المستلم">{d.collectedBy}</Row>}
+    {d.notes && <div className="thermal-note">ملاحظة: {d.notes}</div>}
+
+    <div className="thermal-box">
+      جدّد قبل <span dir="ltr" className="thermal-num">{d.validUntil}</span> لتبقى متصلاً بلا انقطاع.
+      {settings.contactPhone && <> للتجديد والدعم الفني راسلنا على واتساب.</>}
+    </div>
+
+    {d.ads.length > 0 && (
+      <>
+        <div className="thermal-ad-head">★ عروضنا لك ★</div>
+        <ul className="thermal-ads">
+          {d.ads.map(a => <li key={a}>{a}</li>)}
+        </ul>
+      </>
+    )}
+
+    <hr className="thermal-hr" />
+    <div className="thermal-center thermal-foot">
+      {settings.whatsappFooter && <div>{settings.whatsappFooter}</div>}
+      <div className="thermal-strong">شكراً لثقتكم بنا</div>
+      <div>احتفظ بهذا الوصل لحين انتهاء الاشتراك</div>
+    </div>
+    <div className="thermal-cut" aria-hidden="true">✂ - - - - - - - - - - - - - -</div>
+  </div>
+);

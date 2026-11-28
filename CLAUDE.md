@@ -58,6 +58,9 @@ UI is **Arabic, RTL**. README, chat replies to the owner: **German**. Commit mes
 - Subscriber rows: only «تجديد», WhatsApp and «⋯» (`RowMenu` in `SubscribersView`: profile, debt, history, edit, receipt, ticket, delete). Keep new
   per-subscriber actions in that menu. Dashboard: no lists that exist elsewhere (urgent → Home, debtors → Debts, towers → Towers); empty cards are hidden.
 - Labels are Arabic only (no «(Overdue)»/«(Paid)» in the UI).
+- Receipt = thermal bon (80/58 mm, never an A4 invoice): pure `utils/receipt.ts` (`buildReceipt` from the `PaymentRecord` first: amount,
+  method, months, offer, `remainingBalanceAfter`; ads = running offers max 3 + referral line) + `ReceiptModal.tsx` (`ThermalReceipt`,
+  `.thermal*` CSS in `index.css`, black on white only). Printing portals `.receipt-print` to body and sets `body.receipt-printing`.
 - `src/components/*Modal.tsx`, `SubscriberProfile.tsx`, `QuickSearch.tsx`, `Header.tsx` (tabs, mobile bottom nav).
 - `src/components/ui/` — `Dialogs.tsx` (`appConfirm`, `notify` instead of confirm/alert), `overlayExit.ts`, `CountUp`, `ViewLoader`,
   `BackButton` ("رجوع" in every dialog header), `backStack.ts` + `useEscapeKey` (Escape / phone back closes the top dialog;
